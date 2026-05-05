@@ -1,11 +1,25 @@
-<script setup></script>
+<script setup>
+/**
+ * 根元件
+ * 只放 <RouterView />，讓 Layout 元件決定版面
+ */
+</script>
 
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <RouterView />
 </template>
 
-<style scoped></style>
+<style>
+/* 全域基礎樣式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+  color: #333;
+  background-color: #f5f5f5;
+}
+</style>
