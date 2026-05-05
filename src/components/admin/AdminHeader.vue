@@ -1,5 +1,13 @@
 <script setup>
 // TODO: 顯示目前登入的管理員名稱、登出按鈕
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+function handleLogout() {
+  // TODO: 呼叫登出 API，清除登入狀態
+  router.push('/admin/login')
+}
 </script>
 
 <template>
@@ -11,17 +19,6 @@
     </div>
   </header>
 </template>
-
-<script setup>
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
-
-function handleLogout() {
-  // TODO: 呼叫登出 API，清除登入狀態
-  router.push('/admin/login')
-}
-</script>
 
 <style scoped>
 .admin-header {
