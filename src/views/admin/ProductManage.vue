@@ -274,7 +274,7 @@ onMounted(loadProducts)
           <div class="product-img-wrap">
             <img
               v-if="product.imageUrl"
-              :src="product.imageUrl"
+              :src="product.imageUrl.startsWith('/') || product.imageUrl.startsWith('http') ? product.imageUrl : '/' + product.imageUrl"
               :alt="product.productName"
               class="product-img"
             />

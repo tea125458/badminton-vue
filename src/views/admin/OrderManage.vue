@@ -3,7 +3,7 @@
  * 訂單管理 — 表格 + 展開明細 + 狀態篩選 + 快速狀態變更 + 分頁
  *
  * 後端資料結構：
- * Order  { orderId, member{name,email,phone}, orderDate, totalAmount, status, paymentType, note, createdAt }
+ * Order  { orderId, member{fullName,email,phone}, orderDate, totalAmount, status, paymentType, note, createdAt }
  * OrderItem { itemId, orderId, product{productName,imageUrl}, quantity, unitPrice, subtotal }
  * OrderStatus: UNPAID | PAID | SHIPPED | COMPLETED | CANCELLED
  * PaymentType: CASH | CREDIT_CARD | TRANSFER | LINE_PAY
@@ -75,7 +75,7 @@ const filteredOrders = computed(() => {
     const matchKeyword =
       !keyword.value ||
       String(o.orderId).includes(keyword.value) ||
-      o.member?.name?.toLowerCase().includes(keyword.value.toLowerCase()) ||
+      o.member?.fullName?.toLowerCase().includes(keyword.value.toLowerCase()) ||
       o.member?.phone?.includes(keyword.value)
     const matchStatus = !filterStatus.value || o.status === filterStatus.value
     return matchKeyword && matchStatus
@@ -319,7 +319,7 @@ onMounted(loadOrders)
                   <span class="fw-bold" style="color: var(--brand-dark)">#{{ order.orderId }}</span>
                 </td>
                 <td>
-                  <div class="fw-semibold" style="font-size: 0.9rem">{{ order.member?.name || '未知' }}</div>
+                  <div class="fw-semibold" style="font-size: 0.9rem">{{ order.member?.fullName || '未知' }}</div>
                   <div class="text-secondary" style="font-size: 0.75rem">{{ order.member?.phone || '' }}</div>
                 </td>
                 <td style="font-size: 0.85rem">{{ formatDate(order.orderDate) }}</td>
@@ -406,7 +406,7 @@ onMounted(loadOrders)
                             <div class="d-flex align-items-center gap-2">
                               <img
                                 v-if="item.product?.imageUrl"
-                                :src="item.product.imageUrl"
+                                :src="item.product.imageUrl.startsWith('/') || item.product.imageUrl.startsWith('http') ? item.product.imageUrl : '/' + item.product.imageUrl"
                                 class="rounded"
                                 style="width: 36px; height: 36px; object-fit: cover"
                               />
