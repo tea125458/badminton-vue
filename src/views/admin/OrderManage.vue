@@ -229,8 +229,8 @@ async function handleCreateOrder() {
 const statusMap = {
   UNPAID:    { label: '未付款', color: '#F59E0B', bg: '#FFFBEB', icon: 'bi-clock' },
   PAID:      { label: '已付款', color: '#10B981', bg: '#ECFDF5', icon: 'bi-check-circle' },
-  SHIPPED:   { label: '已出貨', color: '#3B82F6', bg: '#EFF6FF', icon: 'bi-truck' },
-  COMPLETED: { label: '已完成', color: '#6366F1', bg: '#EEF2FF', icon: 'bi-trophy' },
+  SHIPPED:   { label: '已出貨', color: '#0EA5E9', bg: '#F0F9FF', icon: 'bi-truck' },
+  COMPLETED: { label: '已完成', color: '#8B5CF6', bg: '#F5F3FF', icon: 'bi-trophy' },
   CANCELLED: { label: '已取消', color: '#EF4444', bg: '#FEF2F2', icon: 'bi-x-circle' },
 }
 const statusOptions = Object.entries(statusMap)
@@ -286,6 +286,60 @@ const statusCounts = computed(() => {
   }
   return counts
 })
+
+// 頂部數據儀表板
+const dashboardStats = computed(() => {
+  const todayStr = new Date().toISOString().split('T')[0] // 格式: YYYY-MM-DD
+  const monthStr = todayStr.substring(0, 7) // 格式: YYYY-MM
+  let todayCount = 0
+  let todaySales = 0
+  let pendingCount = 0
+  let monthSales = 0
+
+  orders.value.forEach(o => {
+    // 待處理訂單
+    if (['UNPAID', 'PAID'].includes(o.status)) {
+      pendingCount++
+    }
+    
+    // 今日訂單數 (不論狀態都算)
+    if (o.orderDate && o.orderDate.startsWith(todayStr)) {
+      todayCount++
+    }
+
+    // 計算營收 (排除已取消)
+    if (o.status !== 'CANCELLED') {
+      if (o.orderDate && o.orderDate.startsWith(todayStr)) {
+        todaySales += o.totalAmount
+      }
+      if (o.orderDate && o.orderDate.startsWith(monthStr)) {
+        monthSales += o.totalAmount
+      }
+    }
+  })
+
+  return {
+    monthRevenue: monthSales,
+    todayOrders: todayCount,
+    pendingOrders: pendingCount,
+    todayRevenue: todaySales
+  }
+})
+
+// 進度條輔助方法
+const progressSteps = ['UNPAID', 'PAID', 'SHIPPED', 'COMPLETED']
+function isStepActive(currentStatus, step) {
+  if (currentStatus === 'CANCELLED') return false
+  const currentIndex = progressSteps.indexOf(currentStatus)
+  const stepIndex = progressSteps.indexOf(step)
+  return stepIndex <= currentIndex
+}
+function getProgressWidth(currentStatus) {
+  if (currentStatus === 'CANCELLED') return '0%'
+  const index = progressSteps.indexOf(currentStatus)
+  if (index === -1) return '0%'
+  return (index / (progressSteps.length - 1)) * 75 + '%'
+}
 
 // ===================== 方法 =====================
 async function loadOrders() {
@@ -398,38 +452,76 @@ onUnmounted(() => {
 
 <template>
   <div class="order-manage">
-    <!-- ====== 頁面標題 ====== -->
-    <div class="mb-4">
-      <h2 class="fw-bold mb-1" style="font-size: 1.5rem">
-        <i class="bi bi-receipt me-2" style="color: var(--brand-sky)"></i>訂單管理
-      </h2>
-      <p class="text-secondary mb-0" style="font-size: 0.85rem">
-        管理所有訂單，共 {{ orders.length }} 筆訂單
-      </p>
+    <!-- ====== 頂部數據儀表板 Banner ====== -->
+    <div class="dashboard-banner mb-4 shadow-sm">
+      <div class="row text-center g-0">
+        <div class="col-6 col-md-3 stat-block">
+          <div class="stat-label">本月累積營收</div>
+          <div class="stat-value" style="color: var(--brand-sky);">{{ formatPrice(dashboardStats.monthRevenue) }}</div>
+        </div>
+        <div class="col-6 col-md-3 stat-block">
+          <div class="stat-label">今日訂單</div>
+          <div class="stat-value">{{ dashboardStats.todayOrders }}</div>
+        </div>
+        <div class="col-6 col-md-3 stat-block">
+          <div class="stat-label">待處理訂單</div>
+          <div class="stat-value">{{ dashboardStats.pendingOrders }}</div>
+        </div>
+        <div class="col-6 col-md-3 stat-block border-end-0">
+          <div class="stat-label">今日銷售額</div>
+          <div class="stat-value text-brand">{{ formatPrice(dashboardStats.todayRevenue) }}</div>
+        </div>
+      </div>
     </div>
 
-    <!-- ====== 精簡統計列 + 新增按鈕 ====== -->
+    <!-- ====== 頁面標題 & 新增按鈕 ====== -->
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <div class="d-flex align-items-center gap-3" style="font-size: 0.8rem">
-        <span v-for="s in ['UNPAID','PAID','SHIPPED','COMPLETED']" :key="s" class="d-flex align-items-center gap-1">
-          <span class="stat-dot" :style="{ background: statusMap[s]?.color }"></span>
-          {{ statusMap[s]?.label }} {{ statusCounts[s] || 0 }}
-        </span>
+      <div>
+        <h2 class="fw-bold mb-0" style="font-size: 1.5rem">
+          <i class="bi bi-receipt me-2" style="color: var(--brand-sky)"></i>訂單管理
+        </h2>
       </div>
       <button class="btn btn-brand" @click="openCreateOrder"><i class="bi bi-plus-lg me-1"></i>新增訂單</button>
     </div>
-    <!-- ====== 工具列 ====== -->
+    <!-- ====== 工具列 (狀態比例圖 + 搜尋框) ====== -->
     <div class="card card-rounded shadow-sm border-0 mb-3">
-      <div class="card-body p-3">
-        <div class="d-flex flex-wrap gap-2 mb-3">
-          <button v-for="tab in statusTabs" :key="tab.key" class="btn btn-sm status-tab"
-            :class="{ active: filterStatus === tab.key }" @click="onFilterChange(tab.key)">
-            {{ tab.label }}<span class="tab-count">{{ statusCounts[tab.key] || 0 }}</span>
-          </button>
+      <div class="card-body p-3 d-flex flex-column flex-md-row align-items-center gap-4">
+        <!-- 狀態長條比例圖 (篩選器) -->
+        <div class="flex-grow-1 w-100">
+          <div class="d-flex justify-content-between align-items-end mb-2" style="color: #64748B;">
+            <span class="fw-bold" style="font-size: 0.85rem;"><i class="bi bi-funnel me-1"></i>訂單狀態分佈 (點擊篩選)</span>
+            <div class="d-flex align-items-center" style="font-size: 0.95rem;">
+              <span v-if="filterStatus" class="badge bg-secondary me-3 px-3 py-2 shadow-sm" style="cursor:pointer; font-size: 0.85rem;" @click="onFilterChange('')"><i class="bi bi-x-circle me-1"></i>清除篩選</span>
+              <span class="fw-bold text-dark" style="letter-spacing: 0.5px;">總計 {{ Number(statusCounts[''] || 0).toLocaleString() }} 筆</span>
+            </div>
+          </div>
+          <div class="status-stacked-bar">
+            <!-- 我們只顯示有數量的狀態 -->
+            <template v-for="tab in statusTabs.slice(1)" :key="tab.key">
+              <div v-if="statusCounts[tab.key] > 0" 
+                   class="stacked-segment"
+                   :class="{ 'is-dimmed': filterStatus && filterStatus !== tab.key, 'is-active': filterStatus === tab.key }"
+                   :style="{ 
+                     width: (statusCounts[tab.key] / statusCounts[''] * 100) + '%', 
+                     backgroundColor: statusMap[tab.key]?.color,
+                     color: 'white'
+                   }"
+                   @click="onFilterChange(tab.key)"
+                   :title="tab.label + ': ' + statusCounts[tab.key] + '筆'">
+                <span class="segment-label" v-if="(statusCounts[tab.key] / statusCounts[''] * 100) > 8">
+                  {{ tab.label }} {{ statusCounts[tab.key] }}
+                </span>
+              </div>
+            </template>
+            <!-- 若完全沒訂單的佔位 -->
+            <div v-if="statusCounts[''] === 0" class="stacked-segment" style="width: 100%; background-color: #E2E8F0; color: #94A3B8;">無資料</div>
+          </div>
         </div>
-        <div class="input-group" style="max-width: 400px">
+
+        <!-- 搜尋框 -->
+        <div class="input-group" style="width: 100%; max-width: 320px; flex-shrink: 0;">
           <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-secondary"></i></span>
-          <input v-model="keyword" type="text" class="form-control border-start-0" placeholder="搜尋訂單編號、會員名稱、電話..." />
+          <input v-model="keyword" type="text" class="form-control border-start-0" placeholder="搜尋訂單編號、會員名稱..." />
         </div>
       </div>
     </div>
@@ -449,7 +541,7 @@ onUnmounted(() => {
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
               <thead><tr style="background: #F8FAFC">
-                <th style="width: 8%">編號</th><th style="width: 18%">會員</th><th style="width: 20%">日期</th>
+                <th style="width: 8%">編號</th><th style="width: 18%">會員</th><th style="width: 20%">訂購日期</th>
                 <th style="width: 14%" class="text-end">金額</th><th style="width: 14%" class="text-center">狀態</th><th style="width: 26%" class="text-center">操作</th>
               </tr></thead>
               <tbody>
@@ -490,27 +582,82 @@ onUnmounted(() => {
       <transition name="slide-panel">
         <div v-if="selectedOrder" class="c-detail">
           <div class="c-detail-inner">
-            <div class="c-detail-header">
-              <div>
+            <div class="c-detail-header d-flex align-items-center">
+              <div class="flex-grow-1">
                 <h5 class="fw-bold mb-1" style="color: var(--brand-dark); font-size: 1.1rem"><i class="bi bi-receipt me-2" style="color: var(--brand-sky)"></i>#{{ selectedOrder.orderId }}</h5>
                 <span class="order-status-badge" :style="{ backgroundColor: statusMap[selectedOrder.status]?.bg, color: statusMap[selectedOrder.status]?.color }"><i :class="['bi', statusMap[selectedOrder.status]?.icon]" class="me-1"></i>{{ statusMap[selectedOrder.status]?.label }}</span>
+              </div>
+              <div class="text-end me-3">
+                <div class="text-secondary mb-1" style="font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px;">訂單總額</div>
+                <div class="fw-bold" style="color: var(--brand-teal); font-size: 1.25rem; line-height: 1;">{{ formatPrice(selectedOrder.totalAmount) }}</div>
               </div>
               <button class="btn btn-sm btn-outline-secondary" @click="closeDetail" style="border-radius: 50%; width: 30px; height: 30px; padding: 0"><i class="bi bi-x-lg" style="font-size: 0.7rem"></i></button>
             </div>
             <div class="c-detail-tabs">
-              <button v-for="t in [{key:'info',icon:'bi-info-circle',label:'資訊'},{key:'items',icon:'bi-box-seam',label:'明細'},{key:'payment',icon:'bi-credit-card',label:'付款'},{key:'notes',icon:'bi-sticky',label:'備註'}]" :key="t.key" class="c-tab-btn" :class="{ active: activeTab === t.key }" @click="activeTab = t.key"><i :class="['bi', t.icon]" class="me-1"></i>{{ t.label }}</button>
+              <button v-for="t in [{key:'info',icon:'bi-info-circle',label:'資訊'},{key:'items',icon:'bi-box-seam',label:'明細'},{key:'notes',icon:'bi-sticky',label:'備註'}]" :key="t.key" class="c-tab-btn" :class="{ active: activeTab === t.key }" @click="activeTab = t.key"><i :class="['bi', t.icon]" class="me-1"></i>{{ t.label }}</button>
             </div>
             <div class="c-detail-body">
               <div v-if="activeTab === 'info'" class="c-tab-content">
-                <div class="info-card mb-2"><div class="info-label"><i class="bi bi-person me-1"></i>會員</div><div class="info-value">{{ selectedOrder.member?.fullName || '未知' }}</div><div class="info-sub">{{ selectedOrder.member?.phone || '-' }} · {{ selectedOrder.member?.email || '-' }}</div></div>
-                <div class="info-card mb-2"><div class="info-label"><i class="bi bi-calendar3 me-1"></i>日期</div><div class="info-value">{{ formatDate(selectedOrder.orderDate) }}</div></div>
-                <div class="info-card mb-2"><div class="info-label"><i class="bi bi-cash-stack me-1"></i>金額</div><div class="info-value" style="color: var(--brand-teal); font-size: 1.3rem">{{ formatPrice(selectedOrder.totalAmount) }}</div></div>
-                <div class="info-card"><div class="info-label"><i class="bi bi-flag me-1"></i>狀態流轉</div>
-                  <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
-                    <span class="order-status-badge" :style="{ backgroundColor: statusMap[selectedOrder.status]?.bg, color: statusMap[selectedOrder.status]?.color }"><i :class="['bi', statusMap[selectedOrder.status]?.icon]" class="me-1"></i>{{ statusMap[selectedOrder.status]?.label }}</span>
-                    <template v-if="statusFlow[selectedOrder.status]?.length > 0"><i class="bi bi-arrow-right text-secondary"></i>
-                      <button v-for="next in statusFlow[selectedOrder.status]" :key="next" class="btn btn-sm" style="font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 9999px" :style="{ background: statusMap[next]?.bg, color: statusMap[next]?.color, border: '1px solid ' + statusMap[next]?.color }" @click="changeStatus(selectedOrder, next)">{{ statusMap[next]?.label }}</button>
-                    </template>
+                <div class="info-card mb-3 p-3">
+                  <div class="row g-3">
+                    <div class="col-12 border-bottom pb-2">
+                      <div class="info-label"><i class="bi bi-person me-1"></i>訂購會員</div>
+                      <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="fw-bold" style="font-size: 0.95rem; color: var(--brand-dark);">{{ selectedOrder.member?.fullName || '未知' }}</span>
+                        <span class="badge bg-light text-secondary border">{{ selectedOrder.member?.phone || '-' }}</span>
+                      </div>
+                      <div class="info-sub text-muted" style="font-size: 0.75rem;"><i class="bi bi-envelope me-1"></i>{{ selectedOrder.member?.email || '-' }}</div>
+                    </div>
+                    <div class="col-6">
+                      <div class="info-label"><i class="bi bi-calendar3 me-1"></i>訂購日期</div>
+                      <div class="info-value" style="font-size: 0.85rem;">{{ formatDate(selectedOrder.orderDate) }}</div>
+                    </div>
+                    <div class="col-6">
+                      <div class="info-label"><i class="bi bi-credit-card me-1"></i>付款方式</div>
+                      <div class="info-value" style="font-size: 0.85rem;">
+                        <span class="badge" style="background: #F1F5F9; color: #475569;">{{ paymentMap[selectedOrder.paymentType] || '未設定' }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- 進度條區塊 -->
+                <div class="info-card mt-3 pt-4 pb-3 px-3">
+                  <div class="info-label mb-4"><i class="bi bi-flag me-1"></i>訂單處理進度</div>
+                  <div class="progress-tracker">
+                    <div class="progress-line"></div>
+                    <div class="progress-line-fill" 
+                         :style="{ width: getProgressWidth(selectedOrder.status), backgroundColor: statusMap[selectedOrder.status]?.color || 'var(--brand-sky)' }"></div>
+                    
+                    <div v-for="(step, index) in ['UNPAID', 'PAID', 'SHIPPED', 'COMPLETED']" :key="step" 
+                         class="progress-step" :class="{ 'active': isStepActive(selectedOrder.status, step), 'current': selectedOrder.status === step }">
+                      <div class="step-circle" 
+                           :style="isStepActive(selectedOrder.status, step) ? { borderColor: statusMap[step]?.color, backgroundColor: selectedOrder.status === step ? 'white' : statusMap[step]?.color } : {}">
+                        <i v-if="selectedOrder.status === step" :class="['bi', statusMap[step]?.icon]" :style="{ color: statusMap[step]?.color, fontSize: '0.95rem' }"></i>
+                        <i v-else-if="isStepActive(selectedOrder.status, step)" class="bi bi-check" style="color: white; font-size: 1.2rem;"></i>
+                      </div>
+                      <div class="step-label" :style="selectedOrder.status === step ? { color: statusMap[step]?.color, fontWeight: '700' } : {}">
+                        {{ statusMap[step]?.label }}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- 若有可變更的下一步，顯示按鈕 -->
+                  <div v-if="statusFlow[selectedOrder.status]?.length > 0" class="d-flex justify-content-center gap-2 mt-4 pt-3" style="border-top: 1px dashed #E2E8F0;">
+                    <span class="text-secondary" style="font-size: 0.8rem; line-height: 30px;">手動更新進度：</span>
+                    <button v-for="next in statusFlow[selectedOrder.status]" :key="next" class="btn btn-sm fw-bold" 
+                      style="font-size: 0.85rem; padding: 0.35rem 1rem; border-radius: 8px; transition: all 0.2s;" 
+                      :style="next === 'CANCELLED' ? { color: statusMap[next]?.color, border: '1px solid ' + statusMap[next]?.color, background: 'white' } : { color: 'white', background: statusMap[next]?.color, border: '1px solid ' + statusMap[next]?.color, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }" 
+                      @click="changeStatus(selectedOrder, next)"
+                      onmouseover="this.style.opacity='0.85'"
+                      onmouseout="this.style.opacity='1'">
+                      <i v-if="next !== 'CANCELLED'" :class="['bi', statusMap[next]?.icon]" class="me-1"></i>
+                      <i v-else class="bi bi-x-lg me-1"></i>
+                      {{ statusMap[next]?.label }}
+                    </button>
+                  </div>
+                  <!-- 訂單取消提示 -->
+                  <div v-if="selectedOrder.status === 'CANCELLED'" class="text-center mt-3 text-danger fw-bold" style="font-size: 0.9rem;">
+                    <i class="bi bi-x-circle me-1"></i>此訂單已取消
                   </div>
                 </div>
               </div>
@@ -526,12 +673,7 @@ onUnmounted(() => {
                       <div class="fw-bold" style="color: var(--brand-teal); font-size: 0.9rem">{{ formatPrice(item.subtotal) }}</div>
                     </div>
                   </div>
-                  <div class="d-flex justify-content-between align-items-center mt-2 pt-2" style="border-top: 2px solid #E2E8F0"><span class="fw-bold" style="font-size: 0.9rem">總計</span><span class="fw-bold" style="color: var(--brand-teal); font-size: 1.1rem">{{ formatPrice(selectedOrder.totalAmount) }}</span></div>
                 </div>
-              </div>
-              <div v-if="activeTab === 'payment'" class="c-tab-content">
-                <div class="info-card mb-2"><div class="info-label"><i class="bi bi-credit-card me-1"></i>付款方式</div><div class="info-value">{{ paymentMap[selectedOrder.paymentType] || '未設定' }}</div></div>
-                <div class="info-card"><div class="info-label"><i class="bi bi-cash-coin me-1"></i>金額</div><div class="info-value" style="color: var(--brand-teal)">{{ formatPrice(selectedOrder.totalAmount) }}</div></div>
               </div>
               <div v-if="activeTab === 'notes'" class="c-tab-content">
                 <div v-if="selectedOrder.note" class="p-3 rounded-3" style="background: #FFFBEB; font-size: 0.85rem; line-height: 1.8"><i class="bi bi-sticky me-1" style="color: #F59E0B"></i>{{ selectedOrder.note }}</div>
@@ -1114,4 +1256,150 @@ table td {
 .slide-panel-enter-from { opacity: 0; transform: translateX(30px); }
 .slide-panel-leave-to { opacity: 0; transform: translateX(30px); }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+/* 儀表板 Banner */
+.dashboard-banner {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #E2E8F0;
+}
+.stat-block {
+  padding: 1.2rem 1rem;
+  border-right: 1px solid #F1F5F9;
+  transition: background 0.2s ease;
+}
+.stat-block:hover {
+  background: #F8FAFC;
+}
+.stat-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748B;
+  margin-bottom: 0.5rem;
+}
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1E293B;
+}
+.text-brand {
+  color: var(--brand-teal);
+}
+
+/* 進度條樣式 */
+.progress-tracker {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.progress-line {
+  position: absolute;
+  top: 10px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 4px;
+  background: #E2E8F0;
+  z-index: 1;
+  border-radius: 2px;
+}
+.progress-line-fill {
+  position: absolute;
+  top: 10px;
+  left: 12.5%;
+  height: 4px;
+  background: var(--brand-sky);
+  z-index: 2;
+  transition: width 0.4s ease;
+  border-radius: 2px;
+}
+.progress-step {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 25%;
+}
+.step-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  border: 4px solid #E2E8F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  transition: all 0.3s ease;
+  color: white;
+  font-size: 0.8rem;
+}
+.progress-step.active .step-circle {
+  border-color: var(--brand-sky);
+  background: var(--brand-sky);
+}
+.progress-step.current .step-circle {
+  border-color: var(--brand-sky);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+.progress-step.current .step-circle::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-sky);
+}
+.step-label {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+.progress-step.active .step-label {
+  color: var(--brand-dark);
+}
+
+/* 堆疊長條比例圖 */
+.status-stacked-bar {
+  display: flex;
+  height: 24px;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+  cursor: pointer;
+  background-color: #F8FAFC;
+}
+.stacked-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 0.7rem;
+  font-weight: 600;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  border-right: 1px solid rgba(255,255,255,0.3);
+}
+.stacked-segment:last-child {
+  border-right: none;
+}
+.stacked-segment:hover {
+  filter: brightness(0.9);
+}
+.stacked-segment.is-dimmed {
+  opacity: 0.3;
+  filter: grayscale(0.6);
+}
+.stacked-segment.is-active {
+  opacity: 1;
+  filter: brightness(1);
+}
+.segment-label {
+  padding: 0 4px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
 </style>
