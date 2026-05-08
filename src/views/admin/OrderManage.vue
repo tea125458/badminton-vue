@@ -8,7 +8,7 @@
  * OrderStatus: UNPAID | PAID | SHIPPED | COMPLETED | CANCELLED
  * PaymentType: CASH | CREDIT_CARD | TRANSFER | LINE_PAY
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { orderApi } from '@/api/order'
 import { memberApi } from '@/api/member'
 import { productApi } from '@/api/product'
@@ -24,10 +24,31 @@ const filterStatus = ref('')
 const currentPage = ref(1)
 const pageSize = 10
 
-// ===================== 展開明細 =====================
-const expandedOrderId = ref(null)
+// ===================== C 版面：選中訂單 + 側邊面板 =====================
+const selectedOrder = ref(null)
+const activeTab = ref('info')
 const orderItems = ref([])
 const loadingItems = ref(false)
+
+function selectOrder(order) {
+  selectedOrder.value = order
+  activeTab.value = 'info'
+}
+function closeDetail() {
+  selectedOrder.value = null
+}
+watch(selectedOrder, async (order) => {
+  if (!order) { orderItems.value = []; return }
+  loadingItems.value = true
+  try {
+    orderItems.value = await orderApi.findItems(order.orderId)
+  } catch (e) {
+    console.error('載入明細失敗', e)
+    orderItems.value = []
+  } finally {
+    loadingItems.value = false
+  }
+})
 
 // ===================== 狀態下拉選單 =====================
 const statusDropdownId = ref(null)
@@ -271,6 +292,10 @@ async function loadOrders() {
   loading.value = true
   try {
     orders.value = await orderApi.findAll()
+    if (selectedOrder.value) {
+      const updated = orders.value.find(o => o.orderId === selectedOrder.value.orderId)
+      selectedOrder.value = updated || null
+    }
   } catch (e) {
     console.error('載入訂單失敗', e)
     alert('載入訂單失敗，請確認後端是否已啟動')
@@ -279,24 +304,7 @@ async function loadOrders() {
   }
 }
 
-// 展開 / 收合明細
-async function toggleExpand(order) {
-  if (expandedOrderId.value === order.orderId) {
-    expandedOrderId.value = null
-    orderItems.value = []
-    return
-  }
-  expandedOrderId.value = order.orderId
-  loadingItems.value = true
-  try {
-    orderItems.value = await orderApi.findItems(order.orderId)
-  } catch (e) {
-    console.error('載入明細失敗', e)
-    orderItems.value = []
-  } finally {
-    loadingItems.value = false
-  }
-}
+// (C 版面已用 watch 自動載入明細)
 
 // 快速變更訂單狀態
 async function changeStatus(order, newStatus) {
@@ -400,265 +408,140 @@ onUnmounted(() => {
       </p>
     </div>
 
-    <!-- ====== 統計卡片 ====== -->
-    <div class="row g-3 mb-4">
-      <div class="col-6 col-lg-3" v-for="stat in ['UNPAID','PAID','SHIPPED','COMPLETED']" :key="stat">
-        <div class="card card-rounded shadow-sm border-0">
-          <div class="card-body p-3 d-flex align-items-center gap-3">
-            <div
-              class="d-flex align-items-center justify-content-center rounded-3"
-              :style="{ width: '42px', height: '42px', backgroundColor: statusMap[stat].bg, color: statusMap[stat].color }"
-            >
-              <i :class="['bi', statusMap[stat].icon]" style="font-size: 1.1rem"></i>
-            </div>
-            <div>
-              <div class="fw-bold" style="font-size: 1.25rem">{{ statusCounts[stat] || 0 }}</div>
-              <div class="text-secondary" style="font-size: 0.75rem">{{ statusMap[stat].label }}</div>
-            </div>
-          </div>
-        </div>
+    <!-- ====== 精簡統計列 + 新增按鈕 ====== -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex align-items-center gap-3" style="font-size: 0.8rem">
+        <span v-for="s in ['UNPAID','PAID','SHIPPED','COMPLETED']" :key="s" class="d-flex align-items-center gap-1">
+          <span class="stat-dot" :style="{ background: statusMap[s]?.color }"></span>
+          {{ statusMap[s]?.label }} {{ statusCounts[s] || 0 }}
+        </span>
       </div>
+      <button class="btn btn-brand" @click="openCreateOrder"><i class="bi bi-plus-lg me-1"></i>新增訂單</button>
     </div>
-
     <!-- ====== 工具列 ====== -->
-    <div class="card card-rounded shadow-sm border-0 mb-4">
+    <div class="card card-rounded shadow-sm border-0 mb-3">
       <div class="card-body p-3">
-        <!-- 狀態 Tabs -->
         <div class="d-flex flex-wrap gap-2 mb-3">
-          <button
-            v-for="tab in statusTabs"
-            :key="tab.key"
-            class="btn btn-sm status-tab"
-            :class="{ active: filterStatus === tab.key }"
-            @click="onFilterChange(tab.key)"
-          >
-            {{ tab.label }}
-            <span class="tab-count">{{ statusCounts[tab.key] || 0 }}</span>
+          <button v-for="tab in statusTabs" :key="tab.key" class="btn btn-sm status-tab"
+            :class="{ active: filterStatus === tab.key }" @click="onFilterChange(tab.key)">
+            {{ tab.label }}<span class="tab-count">{{ statusCounts[tab.key] || 0 }}</span>
           </button>
         </div>
-        <!-- 搜尋列 + 新增按鈕 -->
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="input-group" style="max-width: 400px">
-            <span class="input-group-text bg-white border-end-0">
-              <i class="bi bi-search text-secondary"></i>
-            </span>
-            <input
-              v-model="keyword"
-              type="text"
-              class="form-control border-start-0"
-              placeholder="搜尋訂單編號、會員名稱、電話..."
-            />
-          </div>
-          <button class="btn btn-brand" @click="openCreateOrder">
-            <i class="bi bi-plus-lg me-1"></i>新增訂單
-          </button>
+        <div class="input-group" style="max-width: 400px">
+          <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-secondary"></i></span>
+          <input v-model="keyword" type="text" class="form-control border-start-0" placeholder="搜尋訂單編號、會員名稱、電話..." />
         </div>
       </div>
     </div>
-
-    <!-- ====== Loading ====== -->
-    <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border" style="color: var(--brand-sky)" role="status"></div>
-      <p class="text-secondary mt-2">載入訂單中...</p>
-    </div>
-
-    <!-- ====== 空狀態 ====== -->
-    <div v-else-if="filteredOrders.length === 0" class="text-center py-5">
-      <i class="bi bi-inbox" style="font-size: 3rem; color: #CBD5E1"></i>
-      <p class="text-secondary mt-2">
-        {{ orders.length === 0 ? '尚無任何訂單' : '沒有符合條件的訂單' }}
-      </p>
-    </div>
-
-    <!-- ====== 訂單表格 ====== -->
-    <div v-else class="card card-rounded shadow-sm border-0">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead>
-            <tr style="background: #F8FAFC">
-              <th style="width: 40px"></th>
-              <th style="width: 10%">訂單編號</th>
-              <th style="width: 15%">會員</th>
-              <th style="width: 18%">訂單日期</th>
-              <th style="width: 10%">付款方式</th>
-              <th style="width: 12%" class="text-end">金額</th>
-              <th style="width: 12%" class="text-center">狀態</th>
-              <th style="width: 18%" class="text-center">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-for="order in pagedOrders" :key="order.orderId">
-              <!-- 訂單主列 -->
-              <tr
-                class="order-row"
-                :class="{ expanded: expandedOrderId === order.orderId }"
-                @click="toggleExpand(order)"
-                style="cursor: pointer"
-              >
-                <td class="text-center">
-                  <i
-                    class="bi expand-icon"
-                    :class="expandedOrderId === order.orderId ? 'bi-chevron-down' : 'bi-chevron-right'"
-                  ></i>
-                </td>
-                <td>
-                  <span class="fw-bold" style="color: var(--brand-dark)">#{{ order.orderId }}</span>
-                </td>
-                <td>
-                  <div class="fw-semibold" style="font-size: 0.9rem">{{ order.member?.fullName || '未知' }}</div>
-                  <div class="text-secondary" style="font-size: 0.75rem">{{ order.member?.phone || '' }}</div>
-                </td>
-                <td style="font-size: 0.85rem">{{ formatDate(order.orderDate) }}</td>
-                <td>
-                  <span v-if="order.paymentType" class="badge-payment">
-                    {{ paymentMap[order.paymentType] || order.paymentType }}
-                  </span>
-                  <span v-else class="text-secondary" style="font-size: 0.8rem">未設定</span>
-                </td>
-                <td class="text-end">
-                  <span class="fw-bold" style="color: var(--brand-teal)">{{ formatPrice(order.totalAmount) }}</span>
-                </td>
-                <td class="text-center">
-                  <span
-                    class="order-status-badge"
-                    :style="{ backgroundColor: statusMap[order.status]?.bg, color: statusMap[order.status]?.color }"
-                  >
-                    <i :class="['bi', statusMap[order.status]?.icon]" class="me-1"></i>
-                    {{ statusMap[order.status]?.label || order.status }}
-                  </span>
-                </td>
-                <td class="text-center" @click.stop>
-                  <div class="d-flex gap-2 justify-content-center">
-                    <!-- 更新狀態（下拉選單） -->
-                    <div class="status-dropdown-wrap">
-                      <button
-                        class="btn btn-sm action-btn action-btn-status"
-                        :disabled="statusFlow[order.status]?.length === 0"
-                        @click="toggleStatusDropdown(order.orderId)"
-                      >
-                        <i class="bi bi-arrow-repeat me-1"></i>狀態
-                      </button>
-                      <!-- 下拉選單 -->
-                      <div
-                        v-if="statusDropdownId === order.orderId && statusFlow[order.status]?.length > 0"
-                        class="status-dropdown-menu"
-                      >
-                        <button
-                          v-for="next in statusFlow[order.status]"
-                          :key="next"
-                          class="status-dropdown-item"
-                          :style="{ color: statusMap[next]?.color }"
-                          @click="changeStatus(order, next); closeStatusDropdown()"
-                        >
-                          <i :class="['bi', statusMap[next]?.icon]" class="me-1"></i>
-                          {{ statusMap[next]?.label }}
-                        </button>
+    <!-- ====== C 版面：左右分割 Master-Detail ====== -->
+    <div class="c-layout" :class="{ 'has-detail': selectedOrder }">
+      <!-- 左：訂單列表 -->
+      <div class="c-master">
+        <div v-if="loading" class="text-center py-5">
+          <div class="spinner-border" style="color: var(--brand-sky)" role="status"></div>
+          <p class="text-secondary mt-2">載入訂單中...</p>
+        </div>
+        <div v-else-if="filteredOrders.length === 0" class="text-center py-5">
+          <i class="bi bi-inbox" style="font-size: 3rem; color: #CBD5E1"></i>
+          <p class="text-secondary mt-2">{{ orders.length === 0 ? '尚無任何訂單' : '沒有符合條件的訂單' }}</p>
+        </div>
+        <div v-else class="card card-rounded shadow-sm border-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead><tr style="background: #F8FAFC">
+                <th style="width: 8%">編號</th><th style="width: 18%">會員</th><th style="width: 20%">日期</th>
+                <th style="width: 14%" class="text-end">金額</th><th style="width: 14%" class="text-center">狀態</th><th style="width: 26%" class="text-center">操作</th>
+              </tr></thead>
+              <tbody>
+                <tr v-for="order in pagedOrders" :key="order.orderId" class="c-order-row"
+                  :class="{ 'c-selected': selectedOrder?.orderId === order.orderId }"
+                  @click="selectOrder(order)" style="cursor: pointer">
+                  <td><span class="fw-bold" style="color: var(--brand-dark)">#{{ order.orderId }}</span></td>
+                  <td><div class="fw-semibold" style="font-size: 0.85rem">{{ order.member?.fullName || '未知' }}</div><div class="text-secondary" style="font-size: 0.72rem">{{ order.member?.phone || '' }}</div></td>
+                  <td style="font-size: 0.82rem">{{ formatDate(order.orderDate) }}</td>
+                  <td class="text-end"><span class="fw-bold" style="color: var(--brand-teal)">{{ formatPrice(order.totalAmount) }}</span></td>
+                  <td class="text-center"><span class="order-status-badge" :style="{ backgroundColor: statusMap[order.status]?.bg, color: statusMap[order.status]?.color }"><i :class="['bi', statusMap[order.status]?.icon]" class="me-1"></i>{{ statusMap[order.status]?.label }}</span></td>
+                  <td class="text-center" @click.stop>
+                    <div class="d-flex gap-1 justify-content-center">
+                      <div class="status-dropdown-wrap">
+                        <button class="btn btn-sm action-btn action-btn-status" :disabled="statusFlow[order.status]?.length === 0" @click="toggleStatusDropdown(order.orderId)"><i class="bi bi-arrow-repeat"></i></button>
+                        <div v-if="statusDropdownId === order.orderId && statusFlow[order.status]?.length > 0" class="status-dropdown-menu">
+                          <button v-for="next in statusFlow[order.status]" :key="next" class="status-dropdown-item" :style="{ color: statusMap[next]?.color }" @click="changeStatus(order, next); closeStatusDropdown()"><i :class="['bi', statusMap[next]?.icon]" class="me-1"></i>{{ statusMap[next]?.label }}</button>
+                        </div>
                       </div>
+                      <button class="btn btn-sm action-btn action-btn-edit" @click="openEdit(order)"><i class="bi bi-pencil"></i></button>
+                      <button class="btn btn-sm action-btn action-btn-delete" @click="confirmDelete(order)"><i class="bi bi-trash3"></i></button>
                     </div>
-                    <!-- 修改 -->
-                    <button class="btn btn-sm action-btn action-btn-edit" @click="openEdit(order)">
-                      <i class="bi bi-pencil me-1"></i>修改
-                    </button>
-                    <!-- 刪除 -->
-                    <button class="btn btn-sm action-btn action-btn-delete" @click="confirmDelete(order)">
-                      <i class="bi bi-trash3 me-1"></i>刪除
-                    </button>
-                  </div>
-                </td>
-              </tr>
-
-              <!-- 展開：訂單明細 -->
-              <tr v-if="expandedOrderId === order.orderId" class="detail-row">
-                <td colspan="8" class="p-0">
-                  <div class="detail-panel">
-                    <!-- 備註 -->
-                    <div v-if="order.note" class="mb-3 p-2 rounded-3" style="background: #FFFBEB; font-size: 0.85rem">
-                      <i class="bi bi-sticky me-1" style="color: #F59E0B"></i>
-                      <strong>備註：</strong>{{ order.note }}
-                    </div>
-
-                    <!-- 明細載入中 -->
-                    <div v-if="loadingItems" class="text-center py-3">
-                      <div class="spinner-border spinner-border-sm" style="color: var(--brand-sky)"></div>
-                      <span class="text-secondary ms-2" style="font-size: 0.85rem">載入明細中...</span>
-                    </div>
-
-                    <!-- 無明細 -->
-                    <div v-else-if="orderItems.length === 0" class="text-center py-3 text-secondary" style="font-size: 0.85rem">
-                      此訂單尚無明細項目
-                    </div>
-
-                    <!-- 明細表格 -->
-                    <table v-else class="table table-sm mb-0">
-                      <thead>
-                        <tr style="background: #F8FAFC; font-size: 0.8rem">
-                          <th>商品</th>
-                          <th class="text-center">單價</th>
-                          <th class="text-center">數量</th>
-                          <th class="text-end">小計</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="item in orderItems" :key="item.itemId">
-                          <td>
-                            <div class="d-flex align-items-center gap-2">
-                              <img
-                                v-if="item.product?.imageUrl"
-                                :src="item.product.imageUrl.startsWith('/') || item.product.imageUrl.startsWith('http') ? item.product.imageUrl : '/' + item.product.imageUrl"
-                                class="rounded"
-                                style="width: 36px; height: 36px; object-fit: cover"
-                              />
-                              <div
-                                v-else
-                                class="rounded d-flex align-items-center justify-content-center"
-                                style="width: 36px; height: 36px; background: #F1F5F9"
-                              >
-                                <i class="bi bi-box-seam" style="color: #CBD5E1; font-size: 0.8rem"></i>
-                              </div>
-                              <span class="fw-semibold" style="font-size: 0.85rem">
-                                {{ item.product?.productName || '未知商品' }}
-                              </span>
-                            </div>
-                          </td>
-                          <td class="text-center" style="font-size: 0.85rem">{{ formatPrice(item.unitPrice) }}</td>
-                          <td class="text-center" style="font-size: 0.85rem">× {{ item.quantity }}</td>
-                          <td class="text-end fw-bold" style="font-size: 0.85rem; color: var(--brand-teal)">
-                            {{ formatPrice(item.subtotal) }}
-                          </td>
-                        </tr>
-                      </tbody>
-                      <tfoot>
-                        <tr style="border-top: 2px solid #E2E8F0">
-                          <td colspan="3" class="text-end fw-bold" style="font-size: 0.9rem">訂單總計</td>
-                          <td class="text-end fw-bold" style="font-size: 1rem; color: var(--brand-teal)">
-                            {{ formatPrice(order.totalAmount) }}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <nav v-if="totalPages > 1" class="d-flex justify-content-center py-3">
+            <ul class="pagination pagination-custom mb-0">
+              <li class="page-item" :class="{ disabled: currentPage === 1 }"><button class="page-link" @click="goToPage(currentPage - 1)"><i class="bi bi-chevron-left"></i></button></li>
+              <li v-for="page in totalPages" :key="page" class="page-item" :class="{ active: currentPage === page }"><button class="page-link" @click="goToPage(page)">{{ page }}</button></li>
+              <li class="page-item" :class="{ disabled: currentPage === totalPages }"><button class="page-link" @click="goToPage(currentPage + 1)"><i class="bi bi-chevron-right"></i></button></li>
+            </ul>
+          </nav>
+        </div>
       </div>
+      <!-- 右：詳情側邊面板 -->
+      <transition name="slide-panel">
+        <div v-if="selectedOrder" class="c-detail">
+          <div class="c-detail-inner">
+            <div class="c-detail-header">
+              <div>
+                <h5 class="fw-bold mb-1" style="color: var(--brand-dark); font-size: 1.1rem"><i class="bi bi-receipt me-2" style="color: var(--brand-sky)"></i>#{{ selectedOrder.orderId }}</h5>
+                <span class="order-status-badge" :style="{ backgroundColor: statusMap[selectedOrder.status]?.bg, color: statusMap[selectedOrder.status]?.color }"><i :class="['bi', statusMap[selectedOrder.status]?.icon]" class="me-1"></i>{{ statusMap[selectedOrder.status]?.label }}</span>
+              </div>
+              <button class="btn btn-sm btn-outline-secondary" @click="closeDetail" style="border-radius: 50%; width: 30px; height: 30px; padding: 0"><i class="bi bi-x-lg" style="font-size: 0.7rem"></i></button>
+            </div>
+            <div class="c-detail-tabs">
+              <button v-for="t in [{key:'info',icon:'bi-info-circle',label:'資訊'},{key:'items',icon:'bi-box-seam',label:'明細'},{key:'payment',icon:'bi-credit-card',label:'付款'},{key:'notes',icon:'bi-sticky',label:'備註'}]" :key="t.key" class="c-tab-btn" :class="{ active: activeTab === t.key }" @click="activeTab = t.key"><i :class="['bi', t.icon]" class="me-1"></i>{{ t.label }}</button>
+            </div>
+            <div class="c-detail-body">
+              <div v-if="activeTab === 'info'" class="c-tab-content">
+                <div class="info-card mb-2"><div class="info-label"><i class="bi bi-person me-1"></i>會員</div><div class="info-value">{{ selectedOrder.member?.fullName || '未知' }}</div><div class="info-sub">{{ selectedOrder.member?.phone || '-' }} · {{ selectedOrder.member?.email || '-' }}</div></div>
+                <div class="info-card mb-2"><div class="info-label"><i class="bi bi-calendar3 me-1"></i>日期</div><div class="info-value">{{ formatDate(selectedOrder.orderDate) }}</div></div>
+                <div class="info-card mb-2"><div class="info-label"><i class="bi bi-cash-stack me-1"></i>金額</div><div class="info-value" style="color: var(--brand-teal); font-size: 1.3rem">{{ formatPrice(selectedOrder.totalAmount) }}</div></div>
+                <div class="info-card"><div class="info-label"><i class="bi bi-flag me-1"></i>狀態流轉</div>
+                  <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
+                    <span class="order-status-badge" :style="{ backgroundColor: statusMap[selectedOrder.status]?.bg, color: statusMap[selectedOrder.status]?.color }"><i :class="['bi', statusMap[selectedOrder.status]?.icon]" class="me-1"></i>{{ statusMap[selectedOrder.status]?.label }}</span>
+                    <template v-if="statusFlow[selectedOrder.status]?.length > 0"><i class="bi bi-arrow-right text-secondary"></i>
+                      <button v-for="next in statusFlow[selectedOrder.status]" :key="next" class="btn btn-sm" style="font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 9999px" :style="{ background: statusMap[next]?.bg, color: statusMap[next]?.color, border: '1px solid ' + statusMap[next]?.color }" @click="changeStatus(selectedOrder, next)">{{ statusMap[next]?.label }}</button>
+                    </template>
+                  </div>
+                </div>
+              </div>
+              <div v-if="activeTab === 'items'" class="c-tab-content">
+                <div v-if="loadingItems" class="text-center py-4"><div class="spinner-border spinner-border-sm" style="color: var(--brand-sky)"></div></div>
+                <div v-else-if="orderItems.length === 0" class="text-center py-4 text-secondary" style="font-size: 0.85rem">尚無明細</div>
+                <div v-else>
+                  <div v-for="item in orderItems" :key="item.itemId" class="c-item-row">
+                    <div class="d-flex align-items-center gap-2">
+                      <img v-if="item.product?.imageUrl" :src="item.product.imageUrl.startsWith('/') || item.product.imageUrl.startsWith('http') ? item.product.imageUrl : '/' + item.product.imageUrl" class="rounded" style="width: 40px; height: 40px; object-fit: cover" />
+                      <div v-else class="rounded d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: #F1F5F9"><i class="bi bi-box-seam" style="color: #CBD5E1"></i></div>
+                      <div class="flex-grow-1"><div class="fw-semibold" style="font-size: 0.85rem">{{ item.product?.productName || '未知' }}</div><div class="text-secondary" style="font-size: 0.72rem">{{ formatPrice(item.unitPrice) }} × {{ item.quantity }}</div></div>
+                      <div class="fw-bold" style="color: var(--brand-teal); font-size: 0.9rem">{{ formatPrice(item.subtotal) }}</div>
+                    </div>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center mt-2 pt-2" style="border-top: 2px solid #E2E8F0"><span class="fw-bold" style="font-size: 0.9rem">總計</span><span class="fw-bold" style="color: var(--brand-teal); font-size: 1.1rem">{{ formatPrice(selectedOrder.totalAmount) }}</span></div>
+                </div>
+              </div>
+              <div v-if="activeTab === 'payment'" class="c-tab-content">
+                <div class="info-card mb-2"><div class="info-label"><i class="bi bi-credit-card me-1"></i>付款方式</div><div class="info-value">{{ paymentMap[selectedOrder.paymentType] || '未設定' }}</div></div>
+                <div class="info-card"><div class="info-label"><i class="bi bi-cash-coin me-1"></i>金額</div><div class="info-value" style="color: var(--brand-teal)">{{ formatPrice(selectedOrder.totalAmount) }}</div></div>
+              </div>
+              <div v-if="activeTab === 'notes'" class="c-tab-content">
+                <div v-if="selectedOrder.note" class="p-3 rounded-3" style="background: #FFFBEB; font-size: 0.85rem; line-height: 1.8"><i class="bi bi-sticky me-1" style="color: #F59E0B"></i>{{ selectedOrder.note }}</div>
+                <div v-else class="text-center text-secondary py-4" style="font-size: 0.85rem">此訂單無備註</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
     </div>
-
-    <!-- ====== 分頁 ====== -->
-    <nav v-if="totalPages > 1" class="d-flex justify-content-center mt-4">
-      <ul class="pagination pagination-custom">
-        <li class="page-item" :class="{ disabled: currentPage === 1 }">
-          <button class="page-link" @click="goToPage(currentPage - 1)"><i class="bi bi-chevron-left"></i></button>
-        </li>
-        <li v-for="page in totalPages" :key="page" class="page-item" :class="{ active: currentPage === page }">
-          <button class="page-link" @click="goToPage(page)">{{ page }}</button>
-        </li>
-        <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-          <button class="page-link" @click="goToPage(currentPage + 1)"><i class="bi bi-chevron-right"></i></button>
-        </li>
-      </ul>
-    </nav>
 
     <!-- ====== 編輯 Modal ====== -->
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
@@ -1190,4 +1073,45 @@ table td {
   border-radius: 0.75rem;
   overflow: hidden;
 }
+/* ===== C 版面：左右分割 ===== */
+.c-layout { display: flex; gap: 1rem; transition: all 0.35s cubic-bezier(0.4,0,0.2,1); }
+.c-master { flex: 1; min-width: 0; transition: all 0.35s cubic-bezier(0.4,0,0.2,1); }
+.c-layout.has-detail .c-master { flex: 0 0 58%; }
+.c-detail { flex: 0 0 40%; min-width: 0; }
+.c-detail-inner {
+  background: white; border-radius: 1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border: 1px solid #F1F5F9; overflow: hidden; position: sticky; top: 1rem;
+  max-height: calc(100vh - 120px); display: flex; flex-direction: column;
+}
+.c-order-row { transition: background 0.15s ease; }
+.c-order-row:hover { background: #F0F9FF !important; }
+.c-order-row.c-selected { background: #E0F2FE !important; border-left: 3px solid var(--brand-sky); }
+.c-detail-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 1rem 1.25rem; border-bottom: 1px solid #F1F5F9;
+  background: linear-gradient(135deg, #FAFBFC 0%, #F0F9FF 100%);
+}
+.c-detail-tabs { display: flex; gap: 0; border-bottom: 1px solid #F1F5F9; background: #FAFBFC; }
+.c-tab-btn {
+  flex: 1; padding: 0.55rem 0.25rem; border: none; background: none;
+  color: #64748B; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+  border-bottom: 2px solid transparent; transition: all 0.2s ease;
+}
+.c-tab-btn:hover { color: var(--brand-sky); }
+.c-tab-btn.active { color: var(--brand-sky); border-bottom-color: var(--brand-sky); background: white; }
+.c-detail-body { flex: 1; overflow-y: auto; padding: 1rem 1.25rem; }
+.c-tab-content { animation: fadeIn 0.2s ease; }
+.c-item-row { padding: 0.5rem 0; border-bottom: 1px solid #F1F5F9; }
+.c-item-row:last-child { border-bottom: none; }
+.info-card { padding: 0.65rem 0.85rem; background: #FAFBFC; border-radius: 0.65rem; border: 1px solid #F1F5F9; }
+.info-label { font-size: 0.68rem; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.2rem; }
+.info-value { font-size: 0.95rem; font-weight: 700; color: var(--brand-dark); }
+.info-sub { font-size: 0.72rem; color: #94A3B8; margin-top: 0.1rem; }
+.stat-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+/* 側邊面板滑入動畫 */
+.slide-panel-enter-active { transition: all 0.35s cubic-bezier(0.4,0,0.2,1); }
+.slide-panel-leave-active { transition: all 0.25s cubic-bezier(0.4,0,0.2,1); }
+.slide-panel-enter-from { opacity: 0; transform: translateX(30px); }
+.slide-panel-leave-to { opacity: 0; transform: translateX(30px); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 </style>
