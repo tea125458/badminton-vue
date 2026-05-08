@@ -10,6 +10,8 @@
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { orderApi } from '@/api/order'
+import { memberApi } from '@/api/member'
+import { productApi } from '@/api/product'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 
 // ===================== 資料狀態 =====================
@@ -46,6 +48,161 @@ const deleteTarget = ref(null)
 const showModal = ref(false)
 const saving = ref(false)
 const editForm = ref({})
+
+// ===================== 新增訂單 Modal =====================
+const showCreateModal = ref(false)
+const creating = ref(false)
+const createForm = ref({ paymentType: '', note: '' })
+
+// 會員搜尋
+const memberKeyword = ref('')
+const memberResults = ref([])
+const selectedMember = ref(null)
+const searchingMember = ref(false)
+const showMemberDropdown = ref(false)
+let memberDebounceTimer = null
+
+// 商品選擇
+const products = ref([])
+const selectedProductId = ref('')
+const selectQty = ref(1)
+
+// 購物車
+const cart = ref([])
+
+const cartTotal = computed(() =>
+  cart.value.reduce((sum, item) => sum + item.price * item.quantity, 0)
+)
+
+// 會員搜尋（防抖 300ms）
+function onMemberInput() {
+  clearTimeout(memberDebounceTimer)
+  if (memberKeyword.value.trim().length < 1) {
+    memberResults.value = []
+    showMemberDropdown.value = false
+    return
+  }
+  memberDebounceTimer = setTimeout(async () => {
+    searchingMember.value = true
+    try {
+      memberResults.value = await memberApi.search(memberKeyword.value.trim())
+      showMemberDropdown.value = true
+    } catch (e) {
+      console.error('會員搜尋失敗', e)
+      memberResults.value = []
+    } finally {
+      searchingMember.value = false
+    }
+  }, 300)
+}
+
+function pickMember(member) {
+  selectedMember.value = member
+  memberKeyword.value = member.fullName || member.username
+  showMemberDropdown.value = false
+}
+
+function clearMember() {
+  selectedMember.value = null
+  memberKeyword.value = ''
+  memberResults.value = []
+}
+
+// 載入可選商品（ACTIVE + 有庫存）
+async function loadProducts() {
+  try {
+    const all = await productApi.findAll()
+    products.value = all.filter(p => p.status === 'ACTIVE' && p.stockQty > 0)
+  } catch (e) {
+    console.error('載入商品失敗', e)
+  }
+}
+
+// 加入購物車
+function addToCart() {
+  const pid = parseInt(selectedProductId.value)
+  if (!pid) { alert('請選擇商品！'); return }
+  const qty = parseInt(selectQty.value) || 1
+  const product = products.value.find(p => p.productId === pid)
+  if (!product) return
+
+  const existing = cart.value.find(c => c.productId === pid)
+  if (existing) {
+    existing.quantity += qty
+  } else {
+    cart.value.push({
+      productId: pid,
+      name: product.productName,
+      brand: product.brand || '',
+      imageUrl: product.imageUrl,
+      price: Math.round(product.price),
+      stock: product.stockQty,
+      quantity: qty,
+    })
+  }
+  selectedProductId.value = ''
+  selectQty.value = 1
+}
+
+function removeFromCart(index) {
+  cart.value.splice(index, 1)
+}
+
+function updateCartQty(index, delta) {
+  const item = cart.value[index]
+  const newQty = item.quantity + delta
+  if (newQty < 1) return
+  if (newQty > item.stock) { alert(`庫存不足！剩餘 ${item.stock} 件`); return }
+  item.quantity = newQty
+}
+
+// 打開新增訂單 Modal
+function openCreateOrder() {
+  createForm.value = { paymentType: '', note: '' }
+  selectedMember.value = null
+  memberKeyword.value = ''
+  memberResults.value = []
+  cart.value = []
+  selectedProductId.value = ''
+  selectQty.value = 1
+  loadProducts()
+  showCreateModal.value = true
+}
+
+// 送出新增訂單
+async function handleCreateOrder() {
+  if (!selectedMember.value) { alert('請選擇會員！'); return }
+  if (cart.value.length === 0) { alert('請至少加入一項商品！'); return }
+
+  creating.value = true
+  try {
+    // Step 1: 建立訂單
+    const newOrder = await orderApi.create({
+      member: { memberId: selectedMember.value.memberId },
+      totalAmount: cartTotal.value,
+      paymentType: createForm.value.paymentType || null,
+      note: createForm.value.note || null,
+    })
+
+    // Step 2: 逐筆新增明細（後端自動扣庫存）
+    for (const item of cart.value) {
+      await orderApi.createItem(newOrder.orderId, {
+        product: { productId: item.productId },
+        quantity: item.quantity,
+        unitPrice: item.price,
+      })
+    }
+
+    showCreateModal.value = false
+    await loadOrders()
+    alert('訂單建立成功！')
+  } catch (e) {
+    console.error('建立訂單失敗', e)
+    alert('建立訂單失敗：' + (e.response?.data?.message || e.message))
+  } finally {
+    creating.value = false
+  }
+}
 
 // ===================== 常數 =====================
 const statusMap = {
@@ -279,17 +436,22 @@ onUnmounted(() => {
             <span class="tab-count">{{ statusCounts[tab.key] || 0 }}</span>
           </button>
         </div>
-        <!-- 搜尋列 -->
-        <div class="input-group" style="max-width: 400px">
-          <span class="input-group-text bg-white border-end-0">
-            <i class="bi bi-search text-secondary"></i>
-          </span>
-          <input
-            v-model="keyword"
-            type="text"
-            class="form-control border-start-0"
-            placeholder="搜尋訂單編號、會員名稱、電話..."
-          />
+        <!-- 搜尋列 + 新增按鈕 -->
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="input-group" style="max-width: 400px">
+            <span class="input-group-text bg-white border-end-0">
+              <i class="bi bi-search text-secondary"></i>
+            </span>
+            <input
+              v-model="keyword"
+              type="text"
+              class="form-control border-start-0"
+              placeholder="搜尋訂單編號、會員名稱、電話..."
+            />
+          </div>
+          <button class="btn btn-brand" @click="openCreateOrder">
+            <i class="bi bi-plus-lg me-1"></i>新增訂單
+          </button>
         </div>
       </div>
     </div>
@@ -550,6 +712,177 @@ onUnmounted(() => {
       @confirm="handleDelete"
       @cancel="showConfirm = false"
     />
+
+    <!-- ====== 新增訂單 Modal ====== -->
+    <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
+      <div class="modal-container" style="max-width: 720px">
+        <div class="modal-header-custom">
+          <h5 class="fw-bold mb-0">
+            <i class="bi bi-cart-plus me-2" style="color: var(--brand-teal)"></i>
+            新增訂單
+          </h5>
+          <button class="btn-close" @click="showCreateModal = false"></button>
+        </div>
+        <div class="modal-body-custom">
+          <!-- 會員搜尋 -->
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">會員 <span class="text-danger">*</span></label>
+            <div v-if="selectedMember" class="selected-member-card">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-person-check-fill" style="color: var(--brand-teal); font-size: 1.2rem"></i>
+                <div>
+                  <div class="fw-semibold">{{ selectedMember.fullName || selectedMember.username }}</div>
+                  <div class="text-secondary" style="font-size: 0.75rem">{{ selectedMember.phone || '' }} · ID: {{ selectedMember.memberId }}</div>
+                </div>
+              </div>
+              <button class="btn btn-sm btn-outline-secondary" @click="clearMember">
+                <i class="bi bi-x-lg"></i> 重選
+              </button>
+            </div>
+            <div v-else class="position-relative">
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-search text-secondary"></i></span>
+                <input
+                  v-model="memberKeyword"
+                  type="text"
+                  class="form-control"
+                  placeholder="輸入姓名或手機搜尋會員..."
+                  @input="onMemberInput"
+                  @focus="memberKeyword.length > 0 && (showMemberDropdown = true)"
+                  autocomplete="off"
+                />
+                <span v-if="searchingMember" class="input-group-text bg-white">
+                  <div class="spinner-border spinner-border-sm text-secondary"></div>
+                </span>
+              </div>
+              <!-- 搜尋結果下拉 -->
+              <div v-if="showMemberDropdown && memberResults.length > 0" class="member-dropdown">
+                <button
+                  v-for="m in memberResults"
+                  :key="m.memberId"
+                  class="member-dropdown-item"
+                  @click="pickMember(m)"
+                >
+                  <i class="bi bi-person me-2" style="color: var(--brand-sky)"></i>
+                  <span class="fw-semibold">{{ m.fullName || m.username }}</span>
+                  <span class="text-secondary ms-2" style="font-size: 0.75rem">{{ m.phone || '' }}</span>
+                </button>
+              </div>
+              <div v-else-if="showMemberDropdown && memberKeyword.length > 0 && !searchingMember" class="member-dropdown">
+                <div class="text-center text-secondary py-2" style="font-size: 0.85rem">找不到符合的會員</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">付款方式</label>
+              <select v-model="createForm.paymentType" class="form-select">
+                <option value="">請選擇</option>
+                <option value="CASH">現金</option>
+                <option value="CREDIT_CARD">信用卡</option>
+                <option value="TRANSFER">轉帳</option>
+                <option value="LINE_PAY">LINE Pay</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">備註</label>
+              <input v-model="createForm.note" type="text" class="form-control" placeholder="選填" />
+            </div>
+          </div>
+
+          <hr />
+
+          <!-- 商品選擇區 -->
+          <label class="form-label fw-semibold">
+            <i class="bi bi-cart-plus me-1" style="color: var(--brand-teal)"></i>加入商品
+          </label>
+          <div class="row g-2 mb-3">
+            <div class="col">
+              <select v-model="selectedProductId" class="form-select form-select-sm">
+                <option value="">請選擇商品</option>
+                <option
+                  v-for="p in products"
+                  :key="p.productId"
+                  :value="p.productId"
+                >{{ p.productName }} ({{ p.brand }}) - NT${{ p.price.toLocaleString() }} [庫存:{{ p.stockQty }}]</option>
+              </select>
+            </div>
+            <div class="col-auto" style="width: 80px">
+              <input v-model.number="selectQty" type="number" class="form-control form-control-sm" min="1" placeholder="數量" />
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-sm btn-success" @click="addToCart">
+                <i class="bi bi-plus-lg me-1"></i>加入
+              </button>
+            </div>
+          </div>
+
+          <!-- 購物車明細表 -->
+          <div class="cart-table-wrap">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr style="background: #F8FAFC; font-size: 0.8rem">
+                  <th>商品</th>
+                  <th class="text-center">單價</th>
+                  <th class="text-center" style="width: 120px">數量</th>
+                  <th class="text-end">小計</th>
+                  <th style="width: 40px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="cart.length === 0">
+                  <td colspan="5" class="text-center text-secondary py-3" style="font-size: 0.85rem">
+                    <i class="bi bi-cart me-1"></i>尚未加入商品
+                  </td>
+                </tr>
+                <tr v-for="(item, idx) in cart" :key="item.productId">
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <img
+                        v-if="item.imageUrl"
+                        :src="item.imageUrl.startsWith('/') || item.imageUrl.startsWith('http') ? item.imageUrl : '/' + item.imageUrl"
+                        class="rounded"
+                        style="width: 32px; height: 32px; object-fit: cover"
+                      />
+                      <span class="fw-semibold" style="font-size: 0.85rem">{{ item.name }}</span>
+                    </div>
+                  </td>
+                  <td class="text-center" style="font-size: 0.85rem">NT$ {{ item.price.toLocaleString() }}</td>
+                  <td class="text-center">
+                    <div class="d-flex align-items-center justify-content-center gap-1">
+                      <button class="btn btn-sm btn-outline-secondary" style="padding: 0 6px; font-size: 0.75rem" @click="updateCartQty(idx, -1)">−</button>
+                      <span class="fw-bold" style="min-width: 24px; text-align: center">{{ item.quantity }}</span>
+                      <button class="btn btn-sm btn-outline-secondary" style="padding: 0 6px; font-size: 0.75rem" @click="updateCartQty(idx, 1)">+</button>
+                    </div>
+                  </td>
+                  <td class="text-end fw-bold" style="font-size: 0.85rem; color: var(--brand-teal)">NT$ {{ (item.price * item.quantity).toLocaleString() }}</td>
+                  <td class="text-center">
+                    <button class="btn btn-sm text-danger" style="padding: 0 4px" @click="removeFromCart(idx)">
+                      <i class="bi bi-x-lg" style="font-size: 0.7rem"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot v-if="cart.length > 0">
+                <tr style="border-top: 2px solid #E2E8F0">
+                  <td colspan="3" class="text-end fw-bold" style="font-size: 0.9rem">訂單合計</td>
+                  <td class="text-end fw-bold" style="font-size: 1.1rem; color: var(--brand-teal)">NT$ {{ cartTotal.toLocaleString() }}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer-custom">
+          <button class="btn btn-outline-secondary" @click="showCreateModal = false">取消</button>
+          <button class="btn btn-brand" :disabled="creating || !selectedMember || cart.length === 0" @click="handleCreateOrder">
+            <span v-if="creating" class="spinner-border spinner-border-sm me-1"></span>
+            {{ creating ? '建立中...' : '送出訂單' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -809,5 +1142,52 @@ table td {
 }
 .status-dropdown-item:hover {
   background: #F8FAFC;
+}
+
+/* ===== 新增訂單 — 會員搜尋 ===== */
+.selected-member-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  border-radius: 0.75rem;
+}
+.member-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1060;
+  animation: fadeIn 0.15s ease;
+}
+.member-dropdown-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.member-dropdown-item:hover {
+  background: #F0F9FF;
+}
+
+/* ===== 新增訂單 — 購物車 ===== */
+.cart-table-wrap {
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  overflow: hidden;
 }
 </style>
