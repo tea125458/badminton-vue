@@ -150,6 +150,49 @@ const filteredCourts = computed(() => {
 function onVenueChange() {
   form.value.courtId = ''
 }
+
+// ========== 時間連動 ==========
+// 可選的開始時間（10:00 ~ 21:00）
+const startTimeOptions = [
+  '10:00',
+  '11:00',
+  '12:00',
+  '13:00',
+  '14:00',
+  '15:00',
+  '16:00',
+  '17:00',
+  '18:00',
+  '19:00',
+  '20:00',
+  '21:00',
+  '22:00',
+]
+
+// 根據開始時間，算出可選的結束時間
+const endTimeOptions = computed(() => {
+  if (!form.value.startTime) return []
+  const startHour = parseInt(form.value.startTime)
+  const options = []
+  for (let h = startHour + 1; h <= 22; h++) {
+    options.push(h.toString().padStart(2, '0') + ':00')
+  }
+  return options
+})
+
+// 開始時間變更時，清空結束時間和金額
+function onStartTimeChange() {
+  form.value.endTime = ''
+  form.value.totalAmount = ''
+}
+
+// 結束時間變更時，自動計算金額（每小時 300 元）
+function onEndTimeChange() {
+  if (form.value.startTime && form.value.endTime) {
+    const hours = parseInt(form.value.endTime) - parseInt(form.value.startTime)
+    form.value.totalAmount = hours * 300
+  }
+}
 </script>
 
 <template>
