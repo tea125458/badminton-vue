@@ -196,8 +196,153 @@ function onEndTimeChange() {
 </script>
 
 <template>
-  <div>
-    <h2>🏸 預約管理</h2>
-    <p>功能開發中...</p>
+  <!-- 頁面標題 + 搜尋列 + 新增按鈕 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold mb-0" style="font-size: 1.5rem">
+      <i class="bi bi-calendar-check me-2" style="color: var(--brand-sky)"></i>預約管理
+    </h2>
+    <div class="d-flex gap-2">
+      <input
+        type="text"
+        class="form-control"
+        style="width: 200px"
+        v-model="searchKeyword"
+        placeholder="搜尋會員/球場..."
+        @keyup.enter="searchBookings"
+      />
+      <button class="btn btn-outline-secondary" @click="searchBookings">
+        <i class="bi bi-search"></i>
+      </button>
+      <button class="btn btn-outline-danger" v-if="searchKeyword" @click="clearSearch">
+        <!--這個X要v-if偵測到searchKeyword有值之後才會出現-->
+        <i class="bi bi-x-lg"></i>
+      </button>
+      <button class="btn btn-primary" @click="openCreateModal">
+        <i class="bi bi-plus-lg me-1"></i>新增預約
+      </button>
+    </div>
   </div>
+
+  <!-- 預約資料表格 -->
+  <div class="card card-rounded shadow-sm border-0">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr style="background: var(--brand-dark); color: white">
+            <th class="ps-4">ID</th>
+            <th>會員</th>
+            <th>球場</th>
+            <th>日期</th>
+            <th>時段</th>
+            <th>金額</th>
+            <th>狀態</th>
+            <th style="width: 160px">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- 載入中 -->
+          <tr v-if="loading">
+            <td colspan="8" class="text-center py-4">
+              <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+              載入中...
+            </td>
+          </tr>
+          <!-- 載入錯誤 -->
+          <tr v-else-if="errorMsg">
+            <td colspan="8" class="text-center text-danger py-4">
+              <i class="bi bi-exclamation-triangle me-1"></i>{{ errorMsg }}
+              <br />
+              <button class="btn btn-sm btn-outline-primary mt-2" @click="loadData">重試</button>
+            </td>
+          </tr>
+          <!-- 無資料 -->
+          <tr v-else-if="pagedBookings.length === 0">
+            <td colspan="8" class="text-center text-muted py-4">目前沒有預約資料</td>
+          </tr>
+          <!-- 正常渲染資料 -->
+          <tr v-for="b in pagedBookings" :key="b.bookingId" v-else>
+            <td class="ps-4">{{ b.bookingId }}</td>
+            <td>{{ b.member?.name || '-' }}</td>
+            <td>{{ b.court?.courtName || '-' }}</td>
+            <td>{{ b.bookingDate }}</td>
+            <td>{{ b.startTime }} ~ {{ b.endTime }}</td>
+            <td>{{ b.totalAmount }}</td>
+            <td>
+              <span class="badge" :class="statusClass(b.status)">
+                {{ statusText(b.status) }}
+              </span>
+            </td>
+            <td>
+              <!-- 狀態變更下拉選單 -->
+              <div class="btn-group btn-group-sm">
+                <button
+                  class="btn btn-outline-secondary dropdown-toggle"
+                  data-bs-toggle="dropdown"
+                  title="變更狀態"
+                >
+                  <i class="bi bi-arrow-repeat"></i>
+                </button>
+                <ul class="dropdown-menu">
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      href="#"
+                      @click.prevent="changeStatus(b.bookingId, 'CONFIRMED')"
+                    >
+                      <i class="bi bi-check-circle text-success me-1"></i>已確認
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      href="#"
+                      @click.prevent="changeStatus(b.bookingId, 'COMPLETED')"
+                    >
+                      <i class="bi bi-check-all text-primary me-1"></i>已完成
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      href="#"
+                      @click.prevent="changeStatus(b.bookingId, 'CANCELLED')"
+                    >
+                      <i class="bi bi-x-circle text-danger me-1"></i>已取消
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      href="#"
+                      @click.prevent="changeStatus(b.bookingId, 'NO_SHOW')"
+                    >
+                      <i class="bi bi-exclamation-triangle text-warning me-1"></i>未到場
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 分頁 -->
+  <nav v-if="totalPages > 1" class="d-flex justify-content-center mt-3">
+    <ul class="pagination">
+      <!-- 上一頁 -->
+      <li class="page-item" :class="{ disabled: currentPage === 1 }">
+        <a class="page-link" href="#" @click.prevent="goToPage(currentPage - 1)"><</a>
+      </li>
+      <!-- 頁碼 -->
+      <li class="page-item" v-for="p in totalPages" :key="p" :class="{ active: p === currentPage }">
+        <a class="page-link" href="#" @click.prevent="goToPage(p)">{{ p }}</a>
+      </li>
+      <!-- 下一頁 -->
+      <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+        <a class="page-link" href="#" @click.prevent="goToPage(currentPage + 1)">></a>
+      </li>
+    </ul>
+  </nav>
 </template>
