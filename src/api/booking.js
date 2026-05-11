@@ -10,4 +10,6 @@ export const bookingApi = {
   create: (booking) => api.post('/bookings', booking),
   updateStatus: (id, status) => api.patch(`/bookings/${id}/status`, { status }),
   search: (keyword) => api.get('/bookings/search', { params: { keyword } }),
+  // GET /api/bookings/court/5/date/2026-05-15 — 查詢某球場某天的預約
+  findByCourtAndDate: (courtId, date) => api.get(`/bookings/court/${courtId}/date/${date}`),
 }
