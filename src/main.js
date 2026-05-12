@@ -12,9 +12,16 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 // 自訂前台樣式
 import './assets/css/frontend.css'
 
+import vue3GoogleLogin from 'vue3-google-login'
+
 const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
+
+// 註冊 Google Login
+app.use(vue3GoogleLogin, {
+  clientId: '901309102855-shi28efflfnhvjkjo27askl6ntt3tqv9.apps.googleusercontent.com'
+})
 
 app.mount('#app')

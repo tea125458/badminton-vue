@@ -106,8 +106,11 @@ async function saveMember() {
   if (!editId.value && !d.password) {
     alert('新增會員時請設定密碼！'); return
   }
-  if (!/^[A-Za-z0-9]{8,12}$/.test(d.username)) {
-    alert('帳號必須為 8-12 碼英數字 (不可包含特殊字元)'); return
+  if (d.password && (d.password.length < 6 || d.password.length > 12)) {
+    alert('密碼必須為 6-12 個字元！'); return
+  }
+  if (!/^[A-Za-z0-9]{6,12}$/.test(d.username)) {
+    alert('帳號必須為 6-12 碼英數字 (不可包含特殊字元)'); return
   }
   if (d.birthday > todayDate) {
     alert('生日不可為未來的日期'); return
@@ -309,11 +312,11 @@ function getLevelLabel(l) {
             <div class="form-row">
               <div class="form-col">
                 <label>帳號 <span class="req">*</span></label>
-                <input v-model="form.username" type="text" placeholder="8-12 碼英數字" maxlength="12" :disabled="!!editId" />
+                <input v-model="form.username" type="text" placeholder="6-12 碼英數字" maxlength="12" :disabled="!!editId" />
               </div>
               <div class="form-col">
                 <label>密碼 <span v-if="!editId" class="req">*</span></label>
-                <input v-model="form.password" type="password" :placeholder="editId ? (isManager ? '留空不修改' : '無權限修改') : '請設定密碼'" :disabled="!!editId && !isManager" />
+                <input v-model="form.password" type="password" :placeholder="editId ? (isManager ? '留空不修改' : '無權限修改') : '6-12 碼密碼'" maxlength="12" :disabled="!!editId && !isManager" />
               </div>
             </div>
             <div class="form-row">

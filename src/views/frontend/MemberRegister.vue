@@ -45,12 +45,12 @@ async function handleRegister() {
     return
   }
   
-  if (!/^[A-Za-z0-9]{8,12}$/.test(d.username)) {
-    errorMsg.value = '帳號必須為 8-12 碼英數字 (不可包含特殊字元)'
+  if (!/^[A-Za-z0-9]{6,12}$/.test(d.username)) {
+    errorMsg.value = '帳號必須為 6-12 碼英數字 (不可包含特殊字元)'
     return
   }
-  if (d.password.length < 6) {
-    errorMsg.value = '密碼至少需要 6 個字元'
+  if (d.password.length < 6 || d.password.length > 12) {
+    errorMsg.value = '密碼必須為 6-12 個字元'
     return
   }
   const phoneDigits = d.phone.replace(/\D/g, '')
@@ -117,7 +117,7 @@ async function handleRegister() {
                   <i class="bi bi-person me-1"></i>設定帳號
                 </label>
                 <input v-model="form.username" type="text" class="form-control rounded-3"
-                       placeholder="請輸入 8-12 碼英數字" maxlength="12" autocomplete="off" autofocus />
+                       placeholder="請輸入 6-12 碼英數字" maxlength="12" autocomplete="off" autofocus />
               </div>
 
               <div class="mb-3">
@@ -126,7 +126,7 @@ async function handleRegister() {
                 </label>
                 <div class="position-relative">
                   <input v-model="form.password" :type="showPassword ? 'text' : 'password'"
-                         class="form-control rounded-3" placeholder="請設定 6 位以上密碼"
+                         class="form-control rounded-3" placeholder="請設定 6-12 碼密碼" maxlength="12"
                          autocomplete="new-password" style="padding-right: 48px;" />
                   <button type="button"
                           class="btn btn-link position-absolute end-0 top-50 translate-middle-y text-secondary pe-3"

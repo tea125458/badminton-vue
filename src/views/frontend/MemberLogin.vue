@@ -19,9 +19,15 @@ const errorMsg = ref('')
 const successMsg = ref('')
 const showPassword = ref(false)
 
+// 一鍵登入帶入測試帳號
+function quickFill() {
+  username.value = 'user01'
+  password.value = 'pass123'
+}
+
 onMounted(() => {
   if (route.query.registered) {
-    successMsg.value = '🎉 註冊成功！請使用新帳號登入'
+    successMsg.value = '註冊成功！請使用新帳號登入'
     // 清除 URL 參數以免重整一直出現
     router.replace('/login')
   }
@@ -55,6 +61,26 @@ async function handleLogin() {
     isLoading.value = false
   }
 }
+
+// 處理 Google 登入成功的回呼
+async function handleGoogleLogin(response) {
+  try {
+    isLoading.value = true
+    errorMsg.value = ''
+    
+    // 將 Google 提供的 credential 送到後端驗證並登入/註冊
+    const res = await memberApi.googleLogin(response.credential)
+    
+    localStorage.setItem('memberToken', res.token)
+    localStorage.setItem('memberInfo', JSON.stringify(res.member))
+    router.push('/')
+  } catch (err) {
+    console.error('Google 登入失敗:', err)
+    errorMsg.value = err.response?.data?.message || 'Google 登入失敗，請稍後再試'
+  } finally {
+    isLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -70,7 +96,7 @@ async function handleLogin() {
               <div class="brand-icon-circle mx-auto mb-3">
                 <i class="bi bi-feather"></i>
               </div>
-              <h2 class="fw-bold text-gradient mb-1">會員登入</h2>
+              <h2 class="fw-bold text-gradient mb-1 fs-4">會員登入</h2>
               <p class="text-muted small tracking-wider mb-0">BADMINTON MEMBER LOGIN</p>
             </div>
 
@@ -131,7 +157,22 @@ async function handleLogin() {
                 <span v-if="isLoading">登入中...</span>
                 <span v-else><i class="bi bi-box-arrow-in-right me-2"></i>登入</span>
               </button>
+
+              <button type="button" class="btn btn-outline-secondary w-100 mt-3 py-2 fw-semibold border-dashed" @click="quickFill">
+                <i class="bi bi-lightning-fill text-warning me-1"></i>測試帳號
+              </button>
             </form>
+
+            <div class="d-flex align-items-center my-3">
+              <hr class="flex-grow-1 text-muted">
+              <span class="mx-2 text-muted small">或</span>
+              <hr class="flex-grow-1 text-muted">
+            </div>
+
+            <!-- Google Login Button -->
+            <div class="d-flex justify-content-center">
+              <GoogleLogin :callback="handleGoogleLogin" prompt />
+            </div>
 
             <!-- 忘記密碼 -->
             <div class="text-center mt-3">
@@ -187,6 +228,15 @@ async function handleLogin() {
 .form-control:focus {
   border-color: var(--brand-teal);
   box-shadow: 0 0 0 0.2rem rgba(0, 180, 180, 0.15);
+}
+
+.form-control::placeholder {
+  font-size: 0.9rem;
+}
+
+.border-dashed {
+  border-style: dashed !important;
+  border-width: 2px !important;
 }
 
 .alert-danger {

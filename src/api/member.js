@@ -31,4 +31,7 @@ export const memberApi = {
 
   // POST /api/members/reset-password — 忘記密碼（重設密碼）
   resetPassword: (data) => api.post('/members/reset-password', data),
+
+  // POST /api/members/google-login — Google 第三方登入
+  googleLogin: (credential) => api.post('/members/google-login', { credential }),
 }
