@@ -16,6 +16,10 @@ const router = createRouter({
         { path: 'pickup', name: 'pickup', component: () => import('@/views/frontend/PickupGamePage.vue') },
         { path: 'login', name: 'memberLogin', component: () => import('@/views/frontend/MemberLogin.vue') },
         { path: 'profile', name: 'profile', component: () => import('@/views/frontend/MemberProfile.vue') },
+        { path: 'cart', name: 'cart', component: () => import('@/views/frontend/Cart.vue') },
+        { path: 'checkout', name: 'checkout', component: () => import('@/views/frontend/Checkout.vue') },
+        { path: 'order-success', name: 'orderSuccess', component: () => import('@/views/frontend/OrderSuccess.vue') },
+        { path: 'my-orders', name: 'myOrders', component: () => import('@/views/frontend/MyOrders.vue') },
       ],
     },
 
