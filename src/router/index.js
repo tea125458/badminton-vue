@@ -82,6 +82,7 @@ const router = createRouter({
     {
       path: '/admin',
       component: () => import('@/layouts/AdminLayout.vue'),
+      meta: { requiresAdmin: true },
       children: [
         { path: '', redirect: '/admin/members' },
         {
@@ -142,6 +143,24 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+// ============================
+// 🔒 全域路由守衛：後台需要管理員登入
+// ============================
+router.beforeEach((to, from, next) => {
+  // 檢查目標路由（或其父路由）是否標記為 requiresAdmin
+  if (to.matched.some(record => record.meta.requiresAdmin)) {
+    const adminToken = localStorage.getItem('adminToken')
+    if (!adminToken) {
+      // 沒有管理員 Token → 導向管理員登入頁
+      next({ name: 'adminLogin', query: { redirect: to.fullPath } })
+    } else {
+      next()
+    }
+  } else {
+    next()
+  }
 })
 
 export default router

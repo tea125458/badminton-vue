@@ -144,7 +144,7 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: url('/images/sky-bg.png') center / cover no-repeat fixed;
+  background: linear-gradient(rgba(255,255,255,0.45), rgba(255,255,255,0.45)), url('/images/sky-bg.png') center / cover no-repeat fixed;
   position: relative;
   padding: 1rem;
 }

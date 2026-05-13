@@ -29,7 +29,7 @@ export default defineConfig({
         changeOrigin: true,
       },
       // 商品圖片（Spring Boot 靜態資源）
-      '/images': {
+      '/images/products': {
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
