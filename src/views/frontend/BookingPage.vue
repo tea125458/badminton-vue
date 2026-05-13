@@ -114,12 +114,68 @@ function selectCourt(court) {
   loadBookedSlots()
 }
 
+// Step 2 → Step 3：驗證後才前進
+function goToConfirm() {
+  if (!selectedCourt.value) {
+    alert('請先選擇球場')
+    return
+  }
+  if (!selectedDate.value) {
+    alert('請先選擇日期')
+    return
+  }
+  if (selectedSlots.value.length === 0) {
+    alert('請至少選擇一個時段')
+    return
+  }
+  currentStep.value = 3
+}
+
 // 頁面載入時，從 API 取得場館列表
 onMounted(async () => {
   const all = await venueApi.findAll()
   venues.value = all.filter((v) => v.status === 'ACTIVE')
   allCourts.value = await courtApi.findAll() // ← 加這行
 })
+
+// === Step 3：確認預約 ===
+// 起始時間（取 selectedSlots 的第一個）
+const startTime = computed(() => selectedSlots.value[0] || '')
+
+// 結束時間（取最後一個 +1 小時）
+const endTime = computed(() => {
+  if (selectedSlots.value.length === 0) return ''
+  const lastSlot = selectedSlots.value[selectedSlots.value.length - 1]
+  const h = parseInt(lastSlot) + 1
+  return h.toString().padStart(2, '0') + ':00'
+})
+
+// 總金額 = 選了幾個時段 × 300
+const totalAmount = computed(() => selectedSlots.value.length * 300)
+
+// 送出預約
+async function submitBooking() {
+  const payload = {
+    court: { courtId: selectedCourt.value.courtId },
+    member: { memberId: 1 }, // ⚠️ 暫時寫死，等 Pinia store 再改
+    bookingDate: selectedDate.value,
+    startTime: startTime.value,
+    endTime: endTime.value,
+    totalAmount: totalAmount.value,
+  }
+  try {
+    await bookingApi.create(payload)
+    alert('預約成功!🎉')
+    // 重置所有狀態，回到第一步
+    currentStep.value = 1
+    selectedVenue.value = null
+    selectedCourt.value = null
+    selectedDate.value = ''
+    selectedSlots.value = []
+  } catch (error) {
+    alert('預約失敗：' + error.message)
+  }
+}
 </script>
 
 <template>
@@ -254,24 +310,108 @@ onMounted(async () => {
           已選<strong>{{ selectedSlots.length }}</strong
           >小時， 預估金額：<strong>NT$ {{ selectedSlots.length * 300 }}</strong>
         </div>
+        <!-- Step 2 導航按鈕 -->
+        <div class="d-flex gap-3 mt-4">
+          <button class="btn btn-outline-secondary" @click="currentStep = 1">← 上一步</button>
+          <button class="btn btn-brand" @click="goToConfirm">下一步 →</button>
+        </div>
       </div>
     </div>
     <!-- Step 3：確認預約 -->
     <div v-else>
-      <p class="text-secondary text-center">Step 3 — 確認預約（待實作）</p>
-    </div>
-    <!-- 臨時測試按鈕（第七步美化時移除） -->
-    <div class="d-flex justify-content-center gap-3 mt-4">
-      <button
-        class="btn btn-outline-secondary"
-        :disabled="currentStep === 1"
-        @click="currentStep--"
-      >
-        ← 上一步
-      </button>
-      <button class="btn btn-brand" :disabled="currentStep === 3" @click="currentStep++">
-        下一步 →
-      </button>
+      <div class="row g-4">
+        <!-- 左欄：預約明細 -->
+        <div class="col-lg-7">
+          <div class="card card-rounded shadow-sm border-0 p-4 h-100">
+            <h5 class="fw-bold mb-4">
+              <i class="bi bi-clipboard-check me-2" style="color: var(--brand-sky)"></i>
+              預約摘要
+            </h5>
+            <!-- 摘要表格 -->
+            <table class="table mb-4">
+              <tbody>
+                <tr>
+                  <th class="text-secondary" style="width: 120px;">
+                    <i class="bi bi-building me-1"></i>場館
+                  </th>
+                  <td class="fw-semibold">{{ selectedVenue?.venueName }}</td>
+                </tr>
+                <tr>
+                  <th class="text-secondary">
+                    <i class="bi bi-columns-gap me-1"></i>球場
+                  </th>
+                  <td class="fw-semibold">{{ selectedCourt?.courtName }}</td>
+                </tr>
+                <tr>
+                  <th class="text-secondary">
+                    <i class="bi bi-calendar3 me-1"></i>日期
+                  </th>
+                  <td class="fw-semibold">{{ selectedDate }}</td>
+                </tr>
+                <tr>
+                  <th class="text-secondary">
+                    <i class="bi bi-clock me-1"></i>時段
+                  </th>
+                  <td class="fw-semibold">{{ startTime }} ~ {{ endTime }}（{{ selectedSlots.length }} 小時）</td>
+                </tr>
+              </tbody>
+            </table>
+            <!-- 注意事項 -->
+            <div class="p-3 rounded-3 mb-4" style="background-color: #F0F9FF;">
+              <p class="fw-bold mb-2" style="font-size: 0.85rem; color: var(--brand-sky);">
+                <i class="bi bi-info-circle me-1"></i>預約須知
+              </p>
+              <ul class="mb-0 text-secondary" style="font-size: 0.8rem; padding-left: 1.2rem;">
+                <li>請於預約時段前 10 分鐘抵達場館</li>
+                <li>如需取消，請於預約日前一天通知</li>
+                <li>場館提供球拍租借服務（另計費用）</li>
+              </ul>
+            </div>
+            <!-- 送出按鈕 -->
+            <div class="d-flex gap-3">
+              <button class="btn btn-outline-secondary" @click="currentStep = 2">← 上一步</button>
+              <button class="btn btn-brand" @click="submitBooking">✅ 確認預約</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右欄：場館圖片 + 金額 -->
+        <div class="col-lg-5">
+          <!-- 場館圖片卡片 -->
+          <div class="card card-rounded shadow-sm border-0 overflow-hidden mb-4">
+            <div class="img-zoom" style="height: 200px;">
+              <img
+                :src="getVenueImage(selectedVenue?.venueId)"
+                :alt="selectedVenue?.venueName"
+                class="w-100 h-100"
+                style="object-fit: cover;"
+              />
+            </div>
+            <div class="card-body p-3 text-center">
+              <h6 class="fw-bold mb-1">{{ selectedVenue?.venueName }}</h6>
+              <p class="text-secondary mb-0" style="font-size: 0.8rem;">
+                <i class="bi bi-geo-alt me-1"></i>{{ selectedVenue?.address }}
+              </p>
+            </div>
+          </div>
+
+          <!-- 金額摘要卡片 -->
+          <div class="card card-rounded shadow-sm border-0 p-4" style="background: linear-gradient(135deg, var(--brand-teal-dark), var(--brand-sky-dark)); color: white;">
+            <p class="mb-2" style="font-size: 0.85rem; opacity: 0.9;">
+              <i class="bi bi-receipt me-1"></i>費用明細
+            </p>
+            <div class="d-flex justify-content-between mb-2" style="font-size: 0.9rem;">
+              <span>場地費 × {{ selectedSlots.length }} 小時</span>
+              <span>NT$ {{ totalAmount }}</span>
+            </div>
+            <hr style="border-color: rgba(255,255,255,0.3);" />
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="fw-bold">應付金額</span>
+              <span class="fw-bold" style="font-size: 1.5rem;">NT$ {{ totalAmount }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -318,5 +458,41 @@ onMounted(async () => {
   font-size: 0.8rem;
   color: #64748b;
   white-space: nowrap;
+}
+
+/* ----- 時段格子 ----- */
+.slot-btn {
+  width: 80px;
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.slot-available {
+  background-color: white;
+  color: var(--brand-teal);
+  border: 2px solid var(--brand-teal);
+}
+
+.slot-available:hover {
+  background-color: #f0fdfa;
+  transform: translateY(-2px);
+}
+
+.slot-selected {
+  background-color: var(--brand-sky);
+  color: white;
+  border: 2px solid var(--brand-sky);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+.slot-booked {
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  border: 2px solid #e2e8f0;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 </style>
