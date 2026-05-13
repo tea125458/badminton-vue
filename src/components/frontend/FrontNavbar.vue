@@ -5,19 +5,38 @@
  * - 中間：預約球場 / 臨打揪團與報名 / 天晴商城 / 最新公告
  * - 右側：
  *   - 未登入 → 登入按鈕
- *   - 已登入 → 通知鈴鐺 + 頭像 + 名字 + 下拉選單（會員中心 / 登出）
+ *   - 已登入 → 姓名 + 下拉選單（會員中心 / 登出）
  */
-import { ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { ref, watch } from 'vue'
+import { RouterLink, useRouter, useRoute } from 'vue-router'
 
-// TODO: 之後接入真實登入狀態 (Pinia store)
+const router = useRouter()
+const route = useRoute()
+
 const isLoggedIn = ref(false)
-const memberName = ref('陳大文')
-const memberAvatar = ref('https://i.pravatar.cc/100?img=12')
+const memberName = ref('會員')
 
-// 模擬登入切換（開發用）
-const toggleLogin = () => {
-  isLoggedIn.value = !isLoggedIn.value
+// 每次切換路由時重新讀取 localStorage
+function checkLoginState() {
+  const token = localStorage.getItem('memberToken')
+  isLoggedIn.value = !!token
+  try {
+    const info = JSON.parse(localStorage.getItem('memberInfo'))
+    memberName.value = info?.fullName || '會員'
+  } catch {
+    memberName.value = '會員'
+  }
+}
+
+// 初始化 + 監聽路由變化
+checkLoginState()
+watch(() => route.path, checkLoginState)
+
+function handleLogout() {
+  localStorage.removeItem('memberToken')
+  localStorage.removeItem('memberInfo')
+  isLoggedIn.value = false
+  router.push('/login')
 }
 </script>
 
@@ -68,17 +87,8 @@ const toggleLogin = () => {
             </RouterLink>
           </template>
 
-          <!-- 已登入：通知 + 頭像下拉選單 -->
+          <!-- 已登入：姓名 + 下拉選單 -->
           <template v-else>
-            <!-- 通知鈴鐺 -->
-            <button class="btn btn-link text-secondary position-relative p-1" type="button">
-              <i class="bi bi-bell fs-5"></i>
-              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.55rem;">
-                3
-              </span>
-            </button>
-
-            <!-- 會員頭像 + 名字 + 下拉選單 -->
             <div class="dropdown">
               <button
                 class="btn btn-link text-decoration-none d-flex align-items-center gap-2 p-0 dropdown-toggle"
@@ -86,7 +96,9 @@ const toggleLogin = () => {
                 data-bs-toggle="dropdown"
                 aria-expanded="false"
               >
-                <img :src="memberAvatar" :alt="memberName" class="avatar-sm" />
+                <div class="avatar-circle">
+                  <i class="bi bi-person-fill"></i>
+                </div>
                 <span class="text-dark fw-semibold d-none d-md-inline" style="font-size: 0.875rem;">
                   {{ memberName }}
                 </span>
@@ -99,23 +111,13 @@ const toggleLogin = () => {
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                  <button class="dropdown-item py-2 text-danger" @click="toggleLogin">
+                  <button class="dropdown-item py-2 text-danger" @click="handleLogout">
                     <i class="bi bi-box-arrow-right me-2"></i>登出
                   </button>
                 </li>
               </ul>
             </div>
           </template>
-
-          <!-- 開發用：切換登入狀態 -->
-          <button
-            class="btn btn-sm btn-outline-secondary ms-2 d-none d-lg-block"
-            @click="toggleLogin"
-            style="font-size: 0.7rem;"
-            :title="isLoggedIn ? '點擊模擬登出' : '點擊模擬登入'"
-          >
-            {{ isLoggedIn ? '🔓 DEV:登出' : '🔒 DEV:登入' }}
-          </button>
         </div>
       </div>
     </div>
@@ -141,5 +143,17 @@ const toggleLogin = () => {
 
 .dropdown-item:active {
   background-color: var(--brand-teal);
+}
+
+.avatar-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand-sky), var(--brand-teal));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.9rem;
 }
 </style>

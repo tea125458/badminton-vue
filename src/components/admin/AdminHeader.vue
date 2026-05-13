@@ -5,15 +5,18 @@
  * - 右側：通知 + 管理員名字 + 登出按鈕
  */
 import { useRouter, useRoute } from 'vue-router'
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { useNotificationStore } from '../../stores/notificationStore'
 
 const router = useRouter()
 const route = useRoute()
+const notificationStore = useNotificationStore()
 
 // 頁面標題映射
 const pageTitles = {
   '/admin/dashboard': '數據儀表板',
   '/admin/members': '會員管理',
+  '/admin/admins': '職員管理',
   '/admin/venues': '場館管理',
   '/admin/courts': '場地管理',
   '/admin/bookings': '預約管理',
@@ -25,8 +28,31 @@ const pageTitles = {
 
 const currentTitle = computed(() => pageTitles[route.path] || '管理後台')
 
+const adminName = ref('管理員')
+
+onMounted(() => {
+  try {
+    const adminInfo = JSON.parse(localStorage.getItem('adminInfo'))
+    if (adminInfo) {
+      adminName.value = adminInfo.fullName || adminInfo.username || '管理員'
+    }
+  } catch (e) {
+    console.error('Failed to parse adminInfo from localStorage', e)
+  }
+
+  // 啟動 WebSocket 連線
+  notificationStore.connect()
+})
+
+onUnmounted(() => {
+  // 元件銷毀時斷開連線
+  notificationStore.disconnect()
+})
+
 function handleLogout() {
   // TODO: 呼叫登出 API，清除登入狀態
+  localStorage.removeItem('adminToken')
+  localStorage.removeItem('adminInfo')
   router.push('/admin/login')
 }
 </script>
@@ -39,18 +65,45 @@ function handleLogout() {
 
     <div class="d-flex align-items-center gap-3">
       <!-- 通知 -->
-      <button class="btn btn-icon" type="button">
-        <i class="bi bi-bell"></i>
-        <span class="notification-dot"></span>
-      </button>
+      <div class="dropdown">
+        <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+          <i class="bi bi-bell"></i>
+          <span v-if="notificationStore.unreadCount > 0" class="notification-dot"></span>
+        </button>
+        
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm notification-menu">
+          <li><h6 class="dropdown-header">系統通知 ({{ notificationStore.unreadCount }})</h6></li>
+          
+          <li v-if="notificationStore.unreadCount === 0">
+            <span class="dropdown-item text-muted text-center py-3">目前沒有新通知</span>
+          </li>
+          
+          <div class="notification-list">
+            <li v-for="n in notificationStore.notifications" :key="n.id">
+              <div class="dropdown-item notification-item">
+                <strong class="d-block text-truncate">{{ n.title }}</strong>
+                <p class="mb-1 text-muted small text-wrap">{{ n.content }}</p>
+                <small class="text-secondary">{{ new Date(n.time).toLocaleString() }}</small>
+              </div>
+            </li>
+          </div>
+          
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <button class="dropdown-item text-center text-primary py-2 fw-bold" @click="notificationStore.clearAll()">
+              全部標示為已讀
+            </button>
+          </li>
+        </ul>
+      </div>
 
-      <!-- 管理員資訊 -->
-      <div class="admin-info">
-        <div class="admin-avatar">
+      <!-- 管理員資訊 (點擊前往個人中心) -->
+      <RouterLink to="/admin/profile" class="admin-info text-decoration-none">
+        <div class="admin-avatar" title="個人中心">
           <i class="bi bi-person-gear"></i>
         </div>
-        <span class="admin-name d-none d-md-inline">管理員您好</span>
-      </div>
+        <span class="admin-name d-none d-md-inline">{{ adminName }} 您好</span>
+      </RouterLink>
 
       <!-- 登出 -->
       <button class="btn btn-logout" @click="handleLogout">
@@ -119,6 +172,12 @@ function handleLogout() {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.admin-info:hover {
+  opacity: 0.8;
 }
 
 .admin-avatar {
@@ -131,6 +190,11 @@ function handleLogout() {
   justify-content: center;
   color: var(--brand-sky);
   font-size: 1rem;
+  transition: transform 0.2s;
+}
+
+.admin-info:hover .admin-avatar {
+  transform: scale(1.05);
 }
 
 .admin-name {
@@ -154,5 +218,34 @@ function handleLogout() {
   background: #EF4444;
   color: white;
   border-color: #EF4444;
+}
+
+/* 通知選單樣式 */
+.notification-menu {
+  width: 320px;
+  padding: 0;
+  border: none;
+  border-radius: 0.75rem;
+}
+
+.notification-list {
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  white-space: normal;
+  border-bottom: 1px solid #f1f5f9;
+  padding: 0.75rem 1rem;
+  cursor: default;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item:active {
+  background-color: transparent;
+  color: inherit;
 }
 </style>

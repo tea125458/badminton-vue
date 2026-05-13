@@ -1,44 +1,63 @@
 <script setup>
 /**
- * 會員管理頁 — 完整 CRUD
- * 參照 templates/member/list.html 邏輯，遷移至 Vue 3
+ * 職員管理頁 — 完整 CRUD
+ * 參照 templates/admin/list.html 邏輯，遷移至 Vue 3
  */
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { adminApi } from '@/api/admin'
-import { memberApi } from '@/api/member'
 import Swal from 'sweetalert2'
 
+const router = useRouter()
+
 // ===== 狀態 =====
-const members = ref([])
+const admins = ref([])
 const isLoading = ref(false)
 const keyword = ref('')
 const isSearching = ref(false)
 
-// 目前登入者角色
-const isManager = ref(false)
-try {
-  const info = JSON.parse(localStorage.getItem('adminInfo'))
-  isManager.value = info?.role === 'MANAGER'
-} catch {}
+// 目前登入的管理員 ID（不能刪除自己、不能改自己狀態）
+const currentAdminId = ref(null)
+const adminInfo = localStorage.getItem('adminInfo')
+if (adminInfo) {
+  try { currentAdminId.value = JSON.parse(adminInfo).adminId } catch (e) {}
+}
+
+function isSelf(id) {
+  return id === currentAdminId.value
+}
 
 // Modal 狀態
 const showModal = ref(false)
-const modalTitle = ref('新增會員')
+const modalTitle = ref('新增職員')
 const editId = ref(null)
-const form = ref({ username: '', password: '', fullName: '', gender: '男', membershipLevel: 'NORMAL', birthday: '', phone: '', email: '' })
+const form = ref({ username: '', password: '', fullName: '', role: 'STAFF', gender: '男', birthday: '', phone: '', email: '' })
 
 // 備註 Modal
 const showNoteModal = ref(false)
 const noteTarget = ref({ id: null, name: '', note: '' })
 
-// 取得今天的日期字串 (YYYY-MM-DD)，用於限制 HTML 日期選擇器最大值
-const todayDate = new Date().toISOString().split('T')[0]
+// ===== 權限檢查：只有 MANAGER 才能看此頁 =====
+onMounted(() => {
+  try {
+    const info = JSON.parse(localStorage.getItem('adminInfo'))
+    if (!info || info.role !== 'MANAGER') {
+      alert('此頁面僅限主管存取')
+      router.replace('/admin/members')
+      return
+    }
+  } catch {
+    router.replace('/admin/members')
+    return
+  }
+  loadData()
+})
 
 // ===== 載入資料 =====
 async function loadData() {
   isLoading.value = true
   try {
-    members.value = await adminApi.getAllMembers()
+    admins.value = await adminApi.getAll()
   } catch (e) {
     alert('載入失敗：' + e.message)
   } finally {
@@ -46,14 +65,12 @@ async function loadData() {
   }
 }
 
-onMounted(loadData)
-
 // ===== 搜尋 =====
-async function searchMembers() {
+async function searchAdmins() {
   if (!keyword.value.trim()) { resetSearch(); return }
   isLoading.value = true
   try {
-    members.value = await adminApi.searchMembers(keyword.value.trim())
+    admins.value = await adminApi.search(keyword.value.trim())
     isSearching.value = true
   } catch (e) {
     alert('搜尋失敗：' + e.message)
@@ -70,80 +87,64 @@ function resetSearch() {
 
 // ===== 新增 Modal =====
 function openCreateModal() {
-  modalTitle.value = '新增會員'
+  modalTitle.value = '新增職員'
   editId.value = null
-  form.value = { username: '', password: '', fullName: '', gender: '男', membershipLevel: 'NORMAL', birthday: '', phone: '', email: '' }
+  form.value = { username: '', password: '', fullName: '', role: 'STAFF', gender: '男', birthday: '', phone: '', email: '' }
   showModal.value = true
 }
 
 // ===== 編輯 Modal =====
 async function openEditModal(id) {
   try {
-    const m = await adminApi.getMemberById(id)
-    modalTitle.value = '編輯會員'
-    editId.value = m.memberId
+    const a = await adminApi.getById(id)
+    modalTitle.value = '編輯職員'
+    editId.value = a.adminId
     form.value = {
-      username: m.username || '',
+      username: a.username || '',
       password: '',
-      fullName: m.fullName || '',
-      gender: m.gender || '男',
-      membershipLevel: m.membershipLevel || 'NORMAL',
-      birthday: m.birthday || '',
-      phone: m.phone || '',
-      email: m.email || '',
+      fullName: a.fullName || '',
+      role: a.role || 'STAFF',
+      gender: a.gender || '男',
+      birthday: a.birthday || '',
+      phone: a.phone || '',
+      email: a.email || '',
     }
     showModal.value = true
   } catch (e) {
-    alert('無法取得會員資料')
+    alert('無法取得職員資料')
   }
 }
 
 // ===== 儲存 =====
-async function saveMember() {
+async function saveAdmin() {
   const d = { ...form.value }
   if (!d.username || !d.fullName || !d.gender || !d.birthday || !d.phone || !d.email) {
     alert('請填寫所有必填欄位！'); return
   }
   if (!editId.value && !d.password) {
-    alert('新增會員時請設定密碼！'); return
-  }
-  if (d.password && (d.password.length < 6 || d.password.length > 12)) {
-    alert('密碼必須為 6-12 個字元！'); return
-  }
-  if (!/^[A-Za-z0-9]{6,12}$/.test(d.username)) {
-    alert('帳號必須為 6-12 碼英數字 (不可包含特殊字元)'); return
-  }
-  if (d.birthday > todayDate) {
-    alert('生日不可為未來的日期'); return
-  }
-  const phoneDigits = d.phone.replace(/\D/g, '')
-  if (phoneDigits.length !== 10 || !phoneDigits.startsWith('09')) {
-    alert('電話格式錯誤！必須為 09 開頭的 10 位數字'); return
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) {
-    alert('Email 格式錯誤！'); return
+    alert('新增職員時請設定密碼！'); return
   }
   if (!d.password) delete d.password
 
   try {
     if (editId.value) {
-      await adminApi.updateMember(editId.value, d)
+      await adminApi.update(editId.value, d)
     } else {
-      await memberApi.register(d)
+      await adminApi.add(d)
     }
     showModal.value = false
     loadData()
-    alert(editId.value ? '會員更新成功！' : '會員新增成功！')
+    alert(editId.value ? '職員更新成功！' : '職員新增成功！')
   } catch (e) {
     alert('操作失敗：' + (e.response?.data || e.message))
   }
 }
 
 // ===== 刪除 =====
-async function deleteMember(id, name) {
+async function deleteAdmin(id, name) {
   const result = await Swal.fire({
-    title: '確定要刪除嗎？',
-    text: `您即將刪除會員「${name}」`,
+    title: '確定要刪除職員嗎？',
+    text: `您即將刪除職員「${name}」`,
     icon: 'warning',
     iconColor: '#0ea5e9',
     showCancelButton: true,
@@ -166,7 +167,7 @@ async function deleteMember(id, name) {
 
   if (result.isConfirmed) {
     try {
-      await adminApi.deleteMember(id)
+      await adminApi.delete(id)
       loadData()
       Swal.fire({
         title: '已刪除！',
@@ -191,7 +192,7 @@ async function deleteMember(id, name) {
 // ===== 變更狀態 =====
 async function changeStatus(id, status) {
   try {
-    await adminApi.updateMemberStatus(id, status)
+    await adminApi.updateStatus(id, status)
     loadData()
   } catch (e) {
     alert('狀態更新失敗')
@@ -206,7 +207,7 @@ function openNoteModal(id, name, note) {
 
 async function saveNote() {
   try {
-    await adminApi.updateMemberNote(noteTarget.value.id, noteTarget.value.note)
+    await adminApi.updateNote(noteTarget.value.id, noteTarget.value.note)
     showNoteModal.value = false
     loadData()
   } catch (e) {
@@ -214,42 +215,31 @@ async function saveNote() {
   }
 }
 
-// ===== 電話自動格式化 =====
-function formatPhone() {
-  let v = form.value.phone.replace(/\D/g, '')
-  if (v.length > 10) v = v.substring(0, 10)
-  let f = ''
-  if (v.length > 0) f = v.substring(0, 4)
-  if (v.length > 4) f += '-' + v.substring(4, 7)
-  if (v.length > 7) f += '-' + v.substring(7, 10)
-  form.value.phone = f
-}
-
 // ===== Badge 工具 =====
 function getStatusClass(s) {
-  return { ACTIVE: 'badge-active', INACTIVE: 'badge-inactive' }[s] || 'badge-default'
+  return { ACTIVE: 'badge-active', INACTIVE: 'badge-inactive', RESIGNED: 'badge-resigned' }[s] || 'badge-default'
 }
 function getStatusLabel(s) {
-  return { ACTIVE: '正常', INACTIVE: '停權' }[s] || s
+  return { ACTIVE: '在職', INACTIVE: '停權', RESIGNED: '已離職' }[s] || s
 }
-function getLevelClass(l) {
-  return l === 'VIP' ? 'badge-vip' : 'badge-normal'
+function getRoleClass(r) {
+  return r === 'MANAGER' ? 'badge-manager' : 'badge-staff'
 }
-function getLevelLabel(l) {
-  return l === 'VIP' ? 'VIP' : '一般'
+function getRoleLabel(r) {
+  return r === 'MANAGER' ? '主管' : '職員'
 }
 </script>
 
 <template>
-  <div class="member-manage">
+  <div class="admin-manage">
     <!-- 頁面標題 + 搜尋列 -->
     <div class="page-header">
-      <h2><i class="bi bi-people"></i> 會員管理</h2>
+      <h2><i class="bi bi-person-badge"></i> 職員管理</h2>
       <div class="header-actions">
         <div class="search-box">
           <input v-model="keyword" type="text" placeholder="搜尋 ID、帳號、姓名..."
-                 @keydown.enter="searchMembers" />
-          <button class="btn-search" @click="searchMembers">
+                 @keydown.enter="searchAdmins" />
+          <button class="btn-search" @click="searchAdmins">
             <i class="bi bi-search"></i>
           </button>
         </div>
@@ -257,89 +247,91 @@ function getLevelLabel(l) {
           <i class="bi bi-x-lg"></i> 清除
         </button>
         <button class="btn-add" @click="openCreateModal">
-          <i class="bi bi-plus-lg"></i> 新增會員
+          <i class="bi bi-plus-lg"></i> 新增職員
         </button>
       </div>
     </div>
 
-    <!-- 會員表格 -->
+    <!-- 職員表格 -->
     <div class="table-card">
-      <!-- Loading -->
       <div v-if="isLoading" class="loading-state">
         <div class="spinner"></div>
         <span>載入中...</span>
       </div>
 
-      <!-- 空資料 -->
-      <div v-else-if="members.length === 0" class="empty-state">
+      <div v-else-if="admins.length === 0" class="empty-state">
         <i class="bi bi-inbox"></i>
-        <p>目前沒有會員資料</p>
+        <p>目前沒有職員資料</p>
       </div>
 
-      <!-- 表格 -->
       <table v-else class="data-table">
         <thead>
           <tr>
             <th>ID</th>
             <th>帳號 / 姓名</th>
-            <th>等級</th>
+            <th>職位權限</th>
             <th>性別 / 生日</th>
             <th>聯絡資訊</th>
             <th>創建時間</th>
+            <th>最後登入</th>
             <th>狀態</th>
             <th>操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="m in members" :key="m.memberId">
-            <td class="td-id">{{ m.memberId }}</td>
+          <tr v-for="a in admins" :key="a.adminId">
+            <td class="td-id">{{ a.adminId }}</td>
             <td>
-              <strong>{{ m.username }}</strong>
-              <div class="text-sub">{{ m.fullName || '' }}</div>
+              <strong>{{ a.username }}</strong>
+              <div class="text-sub">{{ a.fullName || '' }}</div>
             </td>
-            <td><span class="badge" :class="getLevelClass(m.membershipLevel)">{{ getLevelLabel(m.membershipLevel) }}</span></td>
+            <td><span class="badge" :class="getRoleClass(a.role)">{{ getRoleLabel(a.role) }}</span></td>
             <td>
-              <div>{{ m.gender || '-' }}</div>
-              <div class="text-sub">{{ m.birthday || '-' }}</div>
+              <div>{{ a.gender || '-' }}</div>
+              <div class="text-sub">{{ a.birthday || '-' }}</div>
             </td>
             <td>
-              <div class="text-sm">{{ m.phone || '-' }}</div>
-              <div class="text-sub">{{ m.email || '-' }}</div>
+              <div class="text-sm">{{ a.phone || '-' }}</div>
+              <div class="text-sub">{{ a.email || '-' }}</div>
             </td>
-            <td class="text-sm">{{ m.createdAt || '-' }}</td>
-            <td><span class="badge" :class="getStatusClass(m.status)">{{ getStatusLabel(m.status) }}</span></td>
+            <td class="text-sm">{{ a.createdAt || '-' }}</td>
+            <td class="text-sm">{{ a.lastLoginAt || '-' }}</td>
+            <td><span class="badge" :class="getStatusClass(a.status)">{{ getStatusLabel(a.status) }}</span></td>
             <td>
               <div class="action-btns">
                 <div class="tooltip-container">
-                  <button class="btn-icon btn-edit" @click="openEditModal(m.memberId)">
+                  <button class="btn-icon btn-edit" @click="openEditModal(a.adminId)">
                     <i class="bi bi-pencil"></i>
                   </button>
-                  <div class="custom-tooltip">編輯會員</div>
+                  <div class="custom-tooltip">編輯職員</div>
                 </div>
                 <div class="tooltip-container">
-                  <button class="btn-icon btn-note" @click="openNoteModal(m.memberId, m.fullName || m.username, m.note)">
+                  <button class="btn-icon btn-note" @click="openNoteModal(a.adminId, a.fullName || a.username, a.note)">
                     <i class="bi bi-sticky"></i>
                   </button>
-                  <div v-if="m.note && m.note !== 'null'" class="custom-tooltip">
-                    {{ m.note }}
+                  <div v-if="a.note && a.note !== 'null'" class="custom-tooltip">
+                    {{ a.note }}
                   </div>
                 </div>
                 <div class="tooltip-container">
-                  <button class="btn-icon btn-delete" :class="{ 'btn-disabled': !isManager }" :disabled="!isManager" @click="isManager && deleteMember(m.memberId, m.username)">
+                  <button class="btn-icon btn-delete" :class="{ 'btn-disabled': isSelf(a.adminId) }" :disabled="isSelf(a.adminId)" @click="!isSelf(a.adminId) && deleteAdmin(a.adminId, a.username)">
                     <i class="bi bi-trash"></i>
                   </button>
-                  <div class="custom-tooltip">{{ isManager ? '刪除會員' : '權限不足' }}</div>
+                  <div class="custom-tooltip">{{ isSelf(a.adminId) ? '不能刪除自己' : '刪除職員' }}</div>
                 </div>
-                <div class="status-dropdown" :class="{ 'disabled-dropdown': !isManager }">
-                  <button class="btn-icon btn-status" :class="{ 'btn-disabled': !isManager }" title="變更狀態" :disabled="!isManager">
+                <div class="status-dropdown" :class="{ 'disabled-dropdown': isSelf(a.adminId) }">
+                  <button class="btn-icon btn-status" :class="{ 'btn-disabled': isSelf(a.adminId) }" title="變更狀態" :disabled="isSelf(a.adminId)">
                     <i class="bi bi-arrow-repeat"></i>
                   </button>
-                  <div v-if="isManager" class="dropdown-menu-custom">
-                    <button @click="changeStatus(m.memberId, 'ACTIVE')">
-                      <i class="bi bi-check-circle text-success"></i> 正常
+                  <div v-if="!isSelf(a.adminId)" class="dropdown-menu-custom">
+                    <button @click="changeStatus(a.adminId, 'ACTIVE')">
+                      <i class="bi bi-check-circle text-success"></i> 在職
                     </button>
-                    <button @click="changeStatus(m.memberId, 'INACTIVE')">
-                      <i class="bi bi-x-circle text-danger"></i> 停權
+                    <button @click="changeStatus(a.adminId, 'INACTIVE')">
+                      <i class="bi bi-x-circle text-warning"></i> 停權
+                    </button>
+                    <button @click="changeStatus(a.adminId, 'RESIGNED')">
+                      <i class="bi bi-dash-circle text-danger"></i> 已離職
                     </button>
                   </div>
                 </div>
@@ -362,41 +354,41 @@ function getLevelLabel(l) {
             <div class="form-row">
               <div class="form-col">
                 <label>帳號 <span class="req">*</span></label>
-                <input v-model="form.username" type="text" placeholder="6-12 碼英數字" maxlength="12" :disabled="!!editId" />
+                <input v-model="form.username" type="text" placeholder="登入帳號" :disabled="!!editId" />
               </div>
               <div class="form-col">
                 <label>密碼 <span v-if="!editId" class="req">*</span></label>
-                <input v-model="form.password" type="password" :placeholder="editId ? (isManager ? '留空不修改' : '無權限修改') : '6-12 碼密碼'" maxlength="12" :disabled="!!editId && !isManager" />
+                <input v-model="form.password" type="password" :placeholder="editId ? '留空不修改' : '請設定密碼'" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-col">
                 <label>姓名 <span class="req">*</span></label>
-                <input v-model="form.fullName" type="text" placeholder="請輸入姓名" :disabled="!!editId && !isManager" />
+                <input v-model="form.fullName" type="text" placeholder="請輸入姓名" />
               </div>
               <div class="form-col-half">
-                <label>性別 <span class="req">*</span></label>
-                <select v-model="form.gender" :disabled="!!editId && !isManager">
-                  <option value="男">男</option>
-                  <option value="女">女</option>
+                <label>職位權限 <span class="req">*</span></label>
+                <select v-model="form.role">
+                  <option value="STAFF">一般職員</option>
+                  <option value="MANAGER">主管</option>
                 </select>
               </div>
               <div class="form-col-half">
-                <label>會員等級 <span class="req">*</span></label>
-                <select v-model="form.membershipLevel" :disabled="!!editId && !isManager">
-                  <option value="NORMAL">一般會員</option>
-                  <option value="VIP">VIP 會員</option>
+                <label>性別 <span class="req">*</span></label>
+                <select v-model="form.gender">
+                  <option value="男">男</option>
+                  <option value="女">女</option>
                 </select>
               </div>
             </div>
             <div class="form-row">
               <div class="form-col-third">
                 <label>生日 <span class="req">*</span></label>
-                <input v-model="form.birthday" type="date" :max="todayDate" :disabled="!!editId && !isManager" />
+                <input v-model="form.birthday" type="date" />
               </div>
               <div class="form-col-third">
                 <label>電話 <span class="req">*</span></label>
-                <input v-model="form.phone" type="text" placeholder="09xx-xxx-xxx" maxlength="12" @input="formatPhone" />
+                <input v-model="form.phone" type="text" placeholder="09xx-xxx-xxx" maxlength="12" />
               </div>
               <div class="form-col-third">
                 <label>Email <span class="req">*</span></label>
@@ -406,7 +398,7 @@ function getLevelLabel(l) {
           </div>
           <div class="modal-footer">
             <button class="btn-cancel" @click="showModal = false">取消</button>
-            <button class="btn-save" @click="saveMember"><i class="bi bi-check-lg"></i> 儲存</button>
+            <button class="btn-save" @click="saveAdmin"><i class="bi bi-check-lg"></i> 儲存</button>
           </div>
         </div>
       </div>
@@ -434,18 +426,15 @@ function getLevelLabel(l) {
 </template>
 
 <style scoped>
-/* ===== Page Header ===== */
+/* ===== 複用 MemberManage 的樣式 ===== */
 .page-header {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;
 }
-.page-header h2 {
-  margin: 0; font-size: 1.4rem; font-weight: 700; color: var(--brand-dark);
-}
+.page-header h2 { margin: 0; font-size: 1.4rem; font-weight: 700; color: var(--brand-dark); }
 .page-header h2 i { margin-right: 0.4rem; }
 .header-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 
-/* ===== Search ===== */
 .search-box {
   display: flex; border: 2px solid #E2E8F0; border-radius: 0.75rem; overflow: hidden;
   transition: border-color 0.2s;
@@ -455,32 +444,31 @@ function getLevelLabel(l) {
   border: none; outline: none; padding: 0.5rem 0.75rem; font-size: 0.85rem; width: 200px;
   background: #F8FAFC;
 }
-.btn-search {
-  border: none; background: none; padding: 0.5rem 0.75rem; color: #64748B; cursor: pointer;
-}
+.btn-search { border: none; background: none; padding: 0.5rem 0.75rem; color: #64748B; cursor: pointer; }
 .btn-search:hover { color: var(--brand-sky); }
 
-/* ===== Buttons ===== */
 .btn-clear {
   padding: 0.45rem 0.85rem; border: 1px solid #FDE68A; background: #FFFBEB;
   color: #D97706; border-radius: 0.6rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;
 }
+.btn-back {
+  padding: 0.5rem 1rem; border: 1px solid #E2E8F0; background: white;
+  color: #475569; border-radius: 0.75rem; font-size: 0.85rem; font-weight: 600;
+  text-decoration: none; transition: all 0.2s;
+}
+.btn-back:hover { background: #F8FAFC; color: var(--brand-sky); }
 .btn-add {
   padding: 0.5rem 1rem; border: none; border-radius: 0.75rem;
   background: linear-gradient(135deg, var(--brand-sky), var(--brand-teal));
-  color: white; font-size: 0.85rem; font-weight: 700; cursor: pointer;
-  transition: all 0.2s;
+  color: white; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.2s;
 }
 .btn-add:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(14,165,233,0.3); }
 
-/* ===== Table Card ===== */
 .table-card {
   background: white; border-radius: 1rem; overflow: visible;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid #F1F5F9;
 }
-.loading-state, .empty-state {
-  text-align: center; padding: 3rem; color: #94A3B8;
-}
+.loading-state, .empty-state { text-align: center; padding: 3rem; color: #94A3B8; }
 .loading-state .spinner {
   display: inline-block; width: 24px; height: 24px;
   border: 3px solid #E2E8F0; border-top-color: var(--brand-sky);
@@ -489,7 +477,6 @@ function getLevelLabel(l) {
 @keyframes spin { to { transform: rotate(360deg); } }
 .empty-state i { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
 
-/* ===== Data Table ===== */
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table thead { background: var(--brand-dark); color: white; }
 .data-table th {
@@ -506,18 +493,17 @@ function getLevelLabel(l) {
 .text-sub { color: #94A3B8; font-size: 0.8rem; }
 .text-sm { font-size: 0.8rem; }
 
-/* ===== Badges ===== */
 .badge {
   display: inline-block; padding: 0.3rem 0.7rem; border-radius: 9999px;
   font-size: 0.75rem; font-weight: 700;
 }
 .badge-active { background: #DCFCE7; color: #16A34A; }
 .badge-inactive { background: #F1F5F9; color: #64748B; }
-.badge-vip { background: #FEF9C3; color: #CA8A04; }
-.badge-normal { background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; }
+.badge-resigned { background: #FEE2E2; color: #DC2626; }
+.badge-manager { background: #FEF9C3; color: #CA8A04; }
+.badge-staff { background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; }
 .badge-default { background: #F1F5F9; color: #64748B; }
 
-/* ===== Action Buttons ===== */
 .action-btns { display: flex; gap: 0.3rem; align-items: center; }
 .btn-icon {
   width: 32px; height: 32px; border: 1px solid #E2E8F0; border-radius: 0.5rem;
@@ -538,7 +524,7 @@ function getLevelLabel(l) {
   visibility: hidden;
   position: absolute;
   top: 50%;
-  right: 125%; /* 改為向左側顯示 */
+  right: 125%; /* 向左側顯示 */
   transform: translateY(-50%) translateX(10px);
   background-color: rgba(15, 23, 42, 0.95);
   color: white;
@@ -549,19 +535,18 @@ function getLevelLabel(l) {
   white-space: pre-wrap;
   word-break: break-all;
   width: max-content;
-  max-width: 260px; /* 寬度稍微放寬一點 */
+  max-width: 260px;
   z-index: 100;
   opacity: 0;
   transition: opacity 0.2s, transform 0.2s;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
   pointer-events: none;
 }
-/* 箭頭改為指向右側 */
 .custom-tooltip::after {
   content: "";
   position: absolute;
   top: 50%;
-  left: 100%; /* 箭頭在提示框右邊 */
+  left: 100%;
   margin-top: -5px;
   border-width: 5px;
   border-style: solid;
@@ -576,15 +561,12 @@ function getLevelLabel(l) {
   opacity: 0.3; cursor: not-allowed !important; pointer-events: none;
 }
 .disabled-dropdown { pointer-events: none; }
-.modal-body select:disabled { opacity: 0.5; }
 
-/* ===== Status Dropdown ===== */
 .status-dropdown { position: relative; }
 .dropdown-menu-custom {
   display: none; position: absolute; right: 0; top: 100%; margin-top: 4px;
   background: white; border: 1px solid #E2E8F0; border-radius: 0.75rem;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.08); z-index: 50; min-width: 120px;
-  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.08); z-index: 50; min-width: 120px; overflow: hidden;
 }
 .status-dropdown:hover .dropdown-menu-custom { display: block; }
 .dropdown-menu-custom button {
@@ -594,7 +576,6 @@ function getLevelLabel(l) {
 }
 .dropdown-menu-custom button:hover { background: #F8FAFC; }
 
-/* ===== Modal ===== */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(15,23,42,0.4); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem;
@@ -618,7 +599,6 @@ function getLevelLabel(l) {
   padding: 1rem 1.5rem; border-top: 1px solid #F1F5F9;
 }
 
-/* ===== Form Inside Modal ===== */
 .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
 .form-col { flex: 1; }
 .form-col-half { flex: 0.5; }
@@ -643,12 +623,12 @@ function getLevelLabel(l) {
 .btn-save {
   padding: 0.55rem 1.25rem; border: none; border-radius: 0.6rem;
   background: linear-gradient(135deg, var(--brand-sky), var(--brand-teal));
-  color: white; font-size: 0.85rem; font-weight: 700; cursor: pointer;
-  transition: all 0.2s;
+  color: white; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.2s;
 }
 .btn-save:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(14,165,233,0.3); }
 
 .text-success { color: #16A34A; }
+.text-warning { color: #D97706; }
 .text-danger { color: #EF4444; }
 
 /* SweetAlert2 客製化樣式補丁 */
