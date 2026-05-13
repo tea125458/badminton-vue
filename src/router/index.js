@@ -18,6 +18,10 @@ const router = createRouter({
         { path: 'register', name: 'memberRegister', component: () => import('@/views/frontend/MemberRegister.vue') },
         { path: 'reset-password', name: 'resetPassword', component: () => import('@/views/frontend/MemberResetPwd.vue') },
         { path: 'profile', name: 'profile', component: () => import('@/views/frontend/MemberProfile.vue') },
+        { path: 'cart', name: 'cart', component: () => import('@/views/frontend/Cart.vue') },
+        { path: 'checkout', name: 'checkout', component: () => import('@/views/frontend/Checkout.vue') },
+        { path: 'order-success', name: 'orderSuccess', component: () => import('@/views/frontend/OrderSuccess.vue') },
+        { path: 'my-orders', name: 'myOrders', component: () => import('@/views/frontend/MyOrders.vue') },
       ],
     },
 
