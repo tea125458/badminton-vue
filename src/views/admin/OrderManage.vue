@@ -341,6 +341,26 @@ function getProgressWidth(currentStatus) {
   return (index / (progressSteps.length - 1)) * 100 + '%'
 }
 
+// 取得各進度節點的時間
+const stepTimeFields = {
+  UNPAID: 'createdAt',
+  PAID: 'paidAt',
+  SHIPPED: 'shippedAt',
+  COMPLETED: 'completedAt',
+}
+function getStepTime(order, step) {
+  if (!order) return ''
+  const field = stepTimeFields[step]
+  const val = order[field]
+  if (!val) return ''
+  const d = new Date(val)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${mm}/${dd} ${hh}:${min}`
+}
+
 // ===================== 方法 =====================
 async function loadOrders() {
   loading.value = true
@@ -639,6 +659,10 @@ onUnmounted(() => {
                       </div>
                       <div class="step-label" :style="selectedOrder.status === step ? { color: 'var(--brand-sky)', fontWeight: '700' } : {}">
                         {{ statusMap[step]?.label }}
+                      </div>
+                      <div class="step-time" v-if="isStepActive(selectedOrder.status, step) && getStepTime(selectedOrder, step)"
+                        :style="selectedOrder.status === step ? { color: 'var(--brand-sky)', fontWeight: '700' } : {}">
+                        {{ getStepTime(selectedOrder, step) }}
                       </div>
                     </div>
                   </div>
@@ -1368,6 +1392,13 @@ table td {
 }
 .progress-step.active .step-label {
   color: var(--brand-dark);
+}
+.step-time {
+  font-size: 0.7rem;
+  color: #94A3B8;
+  margin-top: 0.15rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 /* 堆疊長條比例圖 */

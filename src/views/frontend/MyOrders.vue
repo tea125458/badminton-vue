@@ -47,6 +47,25 @@ function getProgressWidth(currentStatus) {
   return (index / (progressSteps.length - 1)) * 100 + '%'
 }
 
+// 取得各進度節點的時間
+const stepTimeFields = {
+  UNPAID: 'createdAt',
+  PAID: 'paidAt',
+  SHIPPED: 'shippedAt',
+  COMPLETED: 'completedAt',
+}
+function getStepTime(order, step) {
+  const field = stepTimeFields[step]
+  const val = order[field]
+  if (!val) return ''
+  const d = new Date(val)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${mm}/${dd} ${hh}:${min}`
+}
+
 onMounted(async () => {
   try {
     orders.value = await orderApi.findByMemberId(memberId)
@@ -174,6 +193,10 @@ function formatDate(dateStr) {
                   <div class="step-text"
                     :style="order.status === step ? { color: 'var(--brand-sky)', fontWeight: '700' } : {}">
                     {{ statusMap[step]?.label }}
+                  </div>
+                  <div class="step-time" v-if="isStepActive(order.status, step) && getStepTime(order, step)"
+                    :style="order.status === step ? { color: 'var(--brand-sky)', fontWeight: '700' } : {}">
+                    {{ getStepTime(order, step) }}
                   </div>
                 </div>
               </div>
@@ -356,6 +379,14 @@ function formatDate(dateStr) {
   font-size: 0.65rem;
   color: #94A3B8;
   font-weight: 600;
+}
+
+.step-time {
+  font-size: 0.6rem;
+  color: #94A3B8;
+  margin-top: 0.1rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 /* ===== 明細列 ===== */
