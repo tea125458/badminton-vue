@@ -1,14 +1,6 @@
 <script setup>
 /**
- * 商品管理 — 卡片式 CRUD + 圖片上傳 + 分頁 + 搜尋篩選
- *
- * 功能清單：
- * 1. 載入商品列表（productApi.findAll）
- * 2. 搜尋 + 分類篩選 + 狀態篩選
- * 3. 卡片式顯示 + 分頁
- * 4. 新增 / 編輯商品（Modal 表單 + 圖片上傳）
- * 5. 刪除商品（ConfirmDialog）
- * 6. 快速切換上下架狀態
+ * 商品管理 — 列表式 CRUD + 圖片上傳 + 分頁 + 搜尋篩選
  */
 import { ref, computed, onMounted } from 'vue'
 import { productApi } from '@/api/product'
@@ -23,7 +15,7 @@ const filterStatus = ref('')
 
 // ===================== 分頁 =====================
 const currentPage = ref(1)
-const pageSize = 8 // 每頁 8 張卡片（4x2）
+const pageSize = 10 // 每頁 10 筆
 
 // ===================== Modal 狀態 =====================
 const showModal = ref(false)
@@ -166,11 +158,11 @@ async function handleDelete() {
   }
 }
 
-// 快速切換狀態
-async function toggleStatus(product) {
-  const next = product.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+// 下拉選單切換狀態
+async function changeStatus(product, newStatus) {
+  if (newStatus === product.status) return
   try {
-    await productApi.updateStatus(product.productId, next)
+    await productApi.updateStatus(product.productId, newStatus)
     await loadProducts()
   } catch (e) {
     console.error('狀態更新失敗', e)
@@ -266,81 +258,90 @@ onMounted(loadProducts)
       </p>
     </div>
 
-    <!-- ====== 商品卡片列表 ====== -->
-    <div v-else class="row g-4">
-      <div v-for="product in pagedProducts" :key="product.productId" class="col-sm-6 col-lg-4 col-xl-3">
-        <div class="card card-rounded shadow-sm border-0 h-100 product-card">
-          <!-- 商品圖片 -->
-          <div class="product-img-wrap">
-            <img
-              v-if="product.imageUrl"
-              :src="product.imageUrl.startsWith('/') || product.imageUrl.startsWith('http') ? product.imageUrl : '/' + product.imageUrl"
-              :alt="product.productName"
-              class="product-img"
-            />
-            <div v-else class="product-img-placeholder">
-              <i class="bi bi-image" style="font-size: 2.5rem; color: #CBD5E1"></i>
-            </div>
-            <!-- 狀態角標 -->
-            <span
-              class="product-status-badge"
-              :style="{ backgroundColor: statusMap[product.status]?.bg, color: statusMap[product.status]?.color }"
-            >
-              {{ statusMap[product.status]?.label || product.status }}
-            </span>
-            <!-- 分類標籤 -->
-            <span class="product-category-badge">
-              {{ categoryMap[product.category] || product.category }}
-            </span>
-          </div>
-
-          <!-- 卡片內容 -->
-          <div class="card-body p-3 d-flex flex-column">
-            <div class="d-flex align-items-start justify-content-between mb-1">
-              <h6 class="fw-bold mb-0 line-clamp-1" style="font-size: 0.95rem">{{ product.productName }}</h6>
-            </div>
-            <p v-if="product.brand" class="text-secondary mb-2" style="font-size: 0.75rem">
-              <i class="bi bi-tag me-1"></i>{{ product.brand }}
-            </p>
-            <p v-if="product.description" class="text-secondary line-clamp-2 mb-2" style="font-size: 0.8rem">
-              {{ product.description }}
-            </p>
-
-            <!-- 價格 + 庫存 -->
-            <div class="mt-auto">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="fw-bold" style="font-size: 1.1rem; color: var(--brand-teal)">
-                  {{ formatPrice(product.price) }}
-                </span>
-                <span
-                  class="small fw-semibold"
-                  :style="{ color: product.stockQty <= 5 ? '#EF4444' : '#64748B' }"
-                >
-                  <i class="bi bi-boxes me-1"></i>庫存 {{ product.stockQty ?? 0 }}
-                </span>
+    <!-- ====== 商品列表（表格式）====== -->
+    <div v-else class="card card-rounded shadow-sm border-0 overflow-hidden">
+      <table class="table table-hover align-middle mb-0 product-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>商品圖片</th>
+            <th>商品名稱</th>
+            <th>分類</th>
+            <th>品牌</th>
+            <th>價格</th>
+            <th>庫存</th>
+            <th>狀態</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="product in pagedProducts" :key="product.productId">
+            <td class="text-secondary fw-semibold">{{ product.productId }}</td>
+            <td>
+              <img
+                v-if="product.imageUrl"
+                :src="product.imageUrl.startsWith('/') || product.imageUrl.startsWith('http') ? product.imageUrl : '/' + product.imageUrl"
+                :alt="product.productName"
+                class="product-list-img"
+              />
+              <div v-else class="product-list-img-placeholder">
+                <i class="bi bi-image" style="color: #CBD5E1"></i>
               </div>
-
-              <!-- 操作按鈕 -->
-              <div class="d-flex gap-2">
-                <button
-                  class="btn btn-sm flex-fill"
-                  :class="product.status === 'ACTIVE' ? 'btn-outline-warning' : 'btn-outline-success'"
-                  @click="toggleStatus(product)"
-                >
-                  <i :class="product.status === 'ACTIVE' ? 'bi bi-arrow-down-circle' : 'bi bi-arrow-up-circle'" class="me-1"></i>
-                  {{ product.status === 'ACTIVE' ? '下架' : '上架' }}
-                </button>
-                <button class="btn btn-sm btn-outline-primary" @click="openEdit(product)">
+            </td>
+            <td class="fw-bold">{{ product.productName }}</td>
+            <td class="text-secondary">{{ categoryMap[product.category] || product.category }}</td>
+            <td class="text-secondary">{{ product.brand || '—' }}</td>
+            <td class="fw-semibold" style="color: var(--brand-teal)">${{ Number(product.price).toLocaleString() }}</td>
+            <td :class="product.stockQty <= 5 ? 'text-danger fw-semibold' : 'text-secondary'">
+              {{ product.stockQty ?? 0 }}
+            </td>
+            <td>
+              <span
+                class="list-status-badge"
+                :style="{ backgroundColor: statusMap[product.status]?.bg, color: statusMap[product.status]?.color }"
+              >
+                {{ statusMap[product.status]?.label || product.status }}
+              </span>
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-primary" title="編輯" @click="openEdit(product)">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-danger" @click="confirmDelete(product)">
+                <button class="btn btn-sm btn-outline-danger" title="刪除" @click="confirmDelete(product)">
                   <i class="bi bi-trash3"></i>
                 </button>
+                <div class="dropdown">
+                  <button
+                    class="btn btn-sm btn-outline-secondary"
+                    data-bs-toggle="dropdown"
+                    title="切換狀態"
+                  >
+                    <i class="bi bi-arrow-repeat"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                      <button class="dropdown-item" :class="{ active: product.status === 'ACTIVE' }" @click="changeStatus(product, 'ACTIVE')">
+                        上架中
+                      </button>
+                    </li>
+                    <li>
+                      <button class="dropdown-item" :class="{ active: product.status === 'INACTIVE' }" @click="changeStatus(product, 'INACTIVE')">
+                        已下架
+                      </button>
+                    </li>
+                    <li>
+                      <button class="dropdown-item" :class="{ active: product.status === 'PREPARING' }" @click="changeStatus(product, 'PREPARING')">
+                        備貨中
+                      </button>
+                    </li>
+                  </ul>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- ====== 分頁 ====== -->
@@ -461,64 +462,60 @@ onMounted(loadProducts)
 </template>
 
 <style scoped>
-/* ===== 商品卡片 ===== */
-.product-card {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  overflow: hidden;
+/* ===== 列表表格 ===== */
+.product-table thead tr {
+  background: #1E293B;
+  color: white;
 }
-.product-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(14, 165, 233, 0.12);
+.product-table thead th {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.85rem 1rem;
+  border: none;
+  white-space: nowrap;
 }
-
-/* ===== 商品圖片 ===== */
-.product-img-wrap {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
+.product-table tbody td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #F1F5F9;
+  font-size: 0.875rem;
+}
+.product-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.product-table tbody tr:hover td {
   background: #F8FAFC;
 }
-.product-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.5s ease;
+
+/* ===== 列表縮圖 ===== */
+.product-list-img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
+  padding: 4px;
 }
-.product-card:hover .product-img {
-  transform: scale(1.06);
-}
-.product-img-placeholder {
-  width: 100%;
-  height: 100%;
+.product-list-img-placeholder {
+  width: 72px;
+  height: 72px;
+  border-radius: 0.5rem;
+  border: 1px solid #E2E8F0;
+  background: #F8FAFC;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #F8FAFC, #F1F5F9);
+  font-size: 1.5rem;
 }
 
-/* ===== 角標 ===== */
-.product-status-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  font-size: 0.7rem;
+/* ===== 狀態標籤 ===== */
+.list-status-badge {
+  font-size: 0.75rem;
   font-weight: 700;
-  padding: 0.25rem 0.6rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 9999px;
-  backdrop-filter: blur(4px);
-}
-.product-category-badge {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 0.25rem 0.6rem;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #64748B;
-  backdrop-filter: blur(4px);
+  white-space: nowrap;
 }
 
 /* ===== 自訂分頁 ===== */

@@ -12,6 +12,7 @@ const router = createRouter({
       children: [
         { path: '', name: 'home', component: () => import('@/views/frontend/HomePage.vue') },
         { path: 'products', name: 'products', component: () => import('@/views/frontend/ProductBrowse.vue') },
+        { path: 'cart', name: 'cart', component: () => import('@/views/frontend/ProductCart.vue') },
         { path: 'booking', name: 'booking', component: () => import('@/views/frontend/BookingPage.vue') },
         { path: 'pickup', name: 'pickup', component: () => import('@/views/frontend/PickupGamePage.vue') },
         { path: 'pickup/:id', name: 'pickupDetail', component: () => import('@/views/frontend/PickupGameDetail.vue') },
