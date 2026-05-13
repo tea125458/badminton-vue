@@ -16,6 +16,8 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 // 自訂前台樣式
 import './assets/css/frontend.css'
 
+import vue3GoogleLogin from 'vue3-google-login'
+
 // 2. 先建立 app 執行體
 const app = createApp(App)
 
@@ -23,6 +25,11 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.use(VCalendar, {})
+
+// 註冊 Google Login
+app.use(vue3GoogleLogin, {
+  clientId: '901309102855-shi28efflfnhvjkjo27askl6ntt3tqv9.apps.googleusercontent.com'
+})
 
 // 4. 最後才 mount
 app.mount('#app')

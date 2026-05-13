@@ -1,10 +1,621 @@
 <script setup>
-// TODO: 商品管理 — 串接 productApi CRUD + 圖片上傳
+/**
+ * 商品管理 — 卡片式 CRUD + 圖片上傳 + 分頁 + 搜尋篩選
+ *
+ * 功能清單：
+ * 1. 載入商品列表（productApi.findAll）
+ * 2. 搜尋 + 分類篩選 + 狀態篩選
+ * 3. 卡片式顯示 + 分頁
+ * 4. 新增 / 編輯商品（Modal 表單 + 圖片上傳）
+ * 5. 刪除商品（ConfirmDialog）
+ * 6. 快速切換上下架狀態
+ */
+import { ref, computed, onMounted } from 'vue'
+import { productApi } from '@/api/product'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+
+// ===================== 資料狀態 =====================
+const products = ref([])
+const loading = ref(true)
+const keyword = ref('')
+const filterCategory = ref('')
+const filterStatus = ref('')
+
+// ===================== 分頁 =====================
+const currentPage = ref(1)
+const pageSize = 8 // 每頁 8 張卡片（4x2）
+
+// ===================== Modal 狀態 =====================
+const showModal = ref(false)
+const isEditing = ref(false)
+const saving = ref(false)
+const imageFile = ref(null)
+const imagePreview = ref('')
+const formData = ref(createEmptyForm())
+
+// ===================== 刪除確認 =====================
+const showConfirm = ref(false)
+const deleteTarget = ref(null)
+
+// ===================== 常數 =====================
+const categoryMap = {
+  RACKET: '球拍', SHUTTLECOCK: '羽球', GRIP: '握把布',
+  STRING: '球線', ACCESSORY: '配件', OTHER: '其他',
+}
+const categoryOptions = Object.entries(categoryMap)
+
+const statusMap = {
+  ACTIVE: { label: '上架中', color: '#10B981', bg: '#ECFDF5' },
+  INACTIVE: { label: '已下架', color: '#EF4444', bg: '#FEF2F2' },
+  PREPARING: { label: '備貨中', color: '#F59E0B', bg: '#FFFBEB' },
+}
+
+// ===================== 計算屬性 =====================
+const filteredProducts = computed(() => {
+  return products.value.filter((p) => {
+    const matchKeyword =
+      !keyword.value ||
+      p.productName?.toLowerCase().includes(keyword.value.toLowerCase()) ||
+      p.brand?.toLowerCase().includes(keyword.value.toLowerCase())
+    const matchCategory = !filterCategory.value || p.category === filterCategory.value
+    const matchStatus = !filterStatus.value || p.status === filterStatus.value
+    return matchKeyword && matchCategory && matchStatus
+  })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredProducts.value.length / pageSize)))
+
+const pagedProducts = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredProducts.value.slice(start, start + pageSize)
+})
+
+const totalCount = computed(() => products.value.length)
+const filteredCount = computed(() => filteredProducts.value.length)
+
+// ===================== 方法 =====================
+function createEmptyForm() {
+  return {
+    productId: null, productName: '', category: 'RACKET',
+    brand: '', price: '', stockQty: '', description: '',
+    imageUrl: '', status: 'ACTIVE',
+  }
+}
+
+async function loadProducts() {
+  loading.value = true
+  try {
+    products.value = await productApi.findAll()
+  } catch (e) {
+    console.error('載入商品失敗', e)
+    alert('載入商品失敗，請確認後端是否已啟動')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 打開新增 Modal
+function openCreate() {
+  isEditing.value = false
+  formData.value = createEmptyForm()
+  imageFile.value = null
+  imagePreview.value = ''
+  showModal.value = true
+}
+
+// 打開編輯 Modal
+function openEdit(product) {
+  isEditing.value = true
+  formData.value = { ...product }
+  imageFile.value = null
+  imagePreview.value = product.imageUrl || ''
+  showModal.value = true
+}
+
+// 圖片選取
+function onImageChange(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  imageFile.value = file
+  imagePreview.value = URL.createObjectURL(file)
+}
+
+// 儲存（新增 / 更新）
+async function handleSave() {
+  if (!formData.value.productName || !formData.value.price) {
+    alert('請填寫商品名稱和價格')
+    return
+  }
+  saving.value = true
+  try {
+    // 如果有選擇新圖片，先上傳
+    if (imageFile.value) {
+      const res = await productApi.uploadImage(imageFile.value)
+      formData.value.imageUrl = res.imageUrl
+    }
+    if (isEditing.value) {
+      await productApi.update(formData.value.productId, formData.value)
+    } else {
+      await productApi.create(formData.value)
+    }
+    showModal.value = false
+    await loadProducts()
+  } catch (e) {
+    console.error('儲存失敗', e)
+    alert('儲存失敗：' + (e.response?.data?.error || e.message))
+  } finally {
+    saving.value = false
+  }
+}
+
+// 刪除
+function confirmDelete(product) {
+  deleteTarget.value = product
+  showConfirm.value = true
+}
+
+async function handleDelete() {
+  try {
+    await productApi.delete(deleteTarget.value.productId)
+    showConfirm.value = false
+    deleteTarget.value = null
+    await loadProducts()
+  } catch (e) {
+    console.error('刪除失敗', e)
+    alert('刪除失敗')
+  }
+}
+
+// 快速切換狀態
+async function toggleStatus(product) {
+  const next = product.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+  try {
+    await productApi.updateStatus(product.productId, next)
+    await loadProducts()
+  } catch (e) {
+    console.error('狀態更新失敗', e)
+  }
+}
+
+function goToPage(page) {
+  if (page >= 1 && page <= totalPages.value) currentPage.value = page
+}
+
+// 篩選條件改變時重置到第一頁
+function onFilterChange() {
+  currentPage.value = 1
+}
+
+function formatPrice(val) {
+  return val != null ? `NT$ ${Number(val).toLocaleString()}` : 'NT$ 0'
+}
+
+onMounted(loadProducts)
 </script>
 
 <template>
-  <div>
-    <h2>📦 商品管理</h2>
-    <p>功能開發中...</p>
+  <div class="product-manage">
+    <!-- ====== 頁面標題 ====== -->
+    <div class="mb-4">
+      <h2 class="fw-bold mb-1" style="font-size: 1.5rem">
+        <i class="bi bi-box-seam me-2" style="color: var(--brand-sky)"></i>商品管理
+      </h2>
+      <p class="text-secondary mb-0" style="font-size: 0.85rem">
+        管理所有羽球商品，共 {{ totalCount }} 件商品
+        <span v-if="filteredCount !== totalCount">，篩選結果 {{ filteredCount }} 件</span>
+      </p>
+    </div>
+
+    <!-- ====== 工具列 ====== -->
+    <div class="card card-rounded shadow-sm border-0 mb-4">
+      <div class="card-body p-3">
+        <div class="row g-3 align-items-end">
+          <!-- 搜尋 -->
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold text-secondary">搜尋商品</label>
+            <div class="input-group">
+              <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-secondary"></i></span>
+              <input
+                v-model="keyword"
+                type="text"
+                class="form-control border-start-0"
+                placeholder="輸入名稱或品牌..."
+                @input="onFilterChange"
+              />
+            </div>
+          </div>
+          <!-- 分類篩選 -->
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold text-secondary">分類</label>
+            <select v-model="filterCategory" class="form-select" @change="onFilterChange">
+              <option value="">全部分類</option>
+              <option v-for="[val, label] in categoryOptions" :key="val" :value="val">{{ label }}</option>
+            </select>
+          </div>
+          <!-- 狀態篩選 -->
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold text-secondary">狀態</label>
+            <select v-model="filterStatus" class="form-select" @change="onFilterChange">
+              <option value="">全部狀態</option>
+              <option value="ACTIVE">上架中</option>
+              <option value="INACTIVE">已下架</option>
+              <option value="PREPARING">備貨中</option>
+            </select>
+          </div>
+          <!-- 新增按鈕 -->
+          <div class="col-md-4 text-end">
+            <button class="btn btn-brand" @click="openCreate">
+              <i class="bi bi-plus-lg me-1"></i>新增商品
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== Loading ====== -->
+    <div v-if="loading" class="text-center py-5">
+      <div class="spinner-border" style="color: var(--brand-sky)" role="status"></div>
+      <p class="text-secondary mt-2">載入商品中...</p>
+    </div>
+
+    <!-- ====== 空狀態 ====== -->
+    <div v-else-if="filteredProducts.length === 0" class="text-center py-5">
+      <i class="bi bi-inbox" style="font-size: 3rem; color: #CBD5E1"></i>
+      <p class="text-secondary mt-2">
+        {{ products.length === 0 ? '尚未新增任何商品' : '沒有符合條件的商品' }}
+      </p>
+    </div>
+
+    <!-- ====== 商品卡片列表 ====== -->
+    <div v-else class="row g-4">
+      <div v-for="product in pagedProducts" :key="product.productId" class="col-sm-6 col-lg-4 col-xl-3">
+        <div class="card card-rounded shadow-sm border-0 h-100 product-card">
+          <!-- 商品圖片 -->
+          <div class="product-img-wrap">
+            <img
+              v-if="product.imageUrl"
+              :src="product.imageUrl.startsWith('/') || product.imageUrl.startsWith('http') ? product.imageUrl : '/' + product.imageUrl"
+              :alt="product.productName"
+              class="product-img"
+            />
+            <div v-else class="product-img-placeholder">
+              <i class="bi bi-image" style="font-size: 2.5rem; color: #CBD5E1"></i>
+            </div>
+            <!-- 狀態角標 -->
+            <span
+              class="product-status-badge"
+              :style="{ backgroundColor: statusMap[product.status]?.bg, color: statusMap[product.status]?.color }"
+            >
+              {{ statusMap[product.status]?.label || product.status }}
+            </span>
+            <!-- 分類標籤 -->
+            <span class="product-category-badge">
+              {{ categoryMap[product.category] || product.category }}
+            </span>
+          </div>
+
+          <!-- 卡片內容 -->
+          <div class="card-body p-3 d-flex flex-column">
+            <div class="d-flex align-items-start justify-content-between mb-1">
+              <h6 class="fw-bold mb-0 line-clamp-1" style="font-size: 0.95rem">{{ product.productName }}</h6>
+            </div>
+            <p v-if="product.brand" class="text-secondary mb-2" style="font-size: 0.75rem">
+              <i class="bi bi-tag me-1"></i>{{ product.brand }}
+            </p>
+            <p v-if="product.description" class="text-secondary line-clamp-2 mb-2" style="font-size: 0.8rem">
+              {{ product.description }}
+            </p>
+
+            <!-- 價格 + 庫存 -->
+            <div class="mt-auto">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="fw-bold" style="font-size: 1.1rem; color: var(--brand-teal)">
+                  {{ formatPrice(product.price) }}
+                </span>
+                <span
+                  class="small fw-semibold"
+                  :style="{ color: product.stockQty <= 5 ? '#EF4444' : '#64748B' }"
+                >
+                  <i class="bi bi-boxes me-1"></i>庫存 {{ product.stockQty ?? 0 }}
+                </span>
+              </div>
+
+              <!-- 操作按鈕 -->
+              <div class="d-flex gap-2">
+                <button
+                  class="btn btn-sm flex-fill"
+                  :class="product.status === 'ACTIVE' ? 'btn-outline-warning' : 'btn-outline-success'"
+                  @click="toggleStatus(product)"
+                >
+                  <i :class="product.status === 'ACTIVE' ? 'bi bi-arrow-down-circle' : 'bi bi-arrow-up-circle'" class="me-1"></i>
+                  {{ product.status === 'ACTIVE' ? '下架' : '上架' }}
+                </button>
+                <button class="btn btn-sm btn-outline-primary" @click="openEdit(product)">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" @click="confirmDelete(product)">
+                  <i class="bi bi-trash3"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== 分頁 ====== -->
+    <nav v-if="totalPages > 1" class="d-flex justify-content-center mt-4">
+      <ul class="pagination pagination-custom">
+        <li class="page-item" :class="{ disabled: currentPage === 1 }">
+          <button class="page-link" @click="goToPage(currentPage - 1)">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+        </li>
+        <li
+          v-for="page in totalPages"
+          :key="page"
+          class="page-item"
+          :class="{ active: currentPage === page }"
+        >
+          <button class="page-link" @click="goToPage(page)">{{ page }}</button>
+        </li>
+        <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+          <button class="page-link" @click="goToPage(currentPage + 1)">
+            <i class="bi bi-chevron-right"></i>
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- ====== 新增/編輯 Modal ====== -->
+    <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
+      <div class="modal-container">
+        <div class="modal-header-custom">
+          <h5 class="fw-bold mb-0">
+            <i :class="isEditing ? 'bi bi-pencil-square' : 'bi bi-plus-circle'" class="me-2" style="color: var(--brand-sky)"></i>
+            {{ isEditing ? '編輯商品' : '新增商品' }}
+          </h5>
+          <button class="btn-close" @click="showModal = false"></button>
+        </div>
+
+        <div class="modal-body-custom">
+          <div class="row g-3">
+            <!-- 商品名稱 -->
+            <div class="col-md-8">
+              <label class="form-label small fw-semibold">商品名稱 <span class="text-danger">*</span></label>
+              <input v-model="formData.productName" type="text" class="form-control" placeholder="例：YONEX ASTROX 88D PRO" />
+            </div>
+            <!-- 品牌 -->
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">品牌</label>
+              <input v-model="formData.brand" type="text" class="form-control" placeholder="例：YONEX" />
+            </div>
+            <!-- 分類 -->
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">分類</label>
+              <select v-model="formData.category" class="form-select">
+                <option v-for="[val, label] in categoryOptions" :key="val" :value="val">{{ label }}</option>
+              </select>
+            </div>
+            <!-- 價格 -->
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">價格 <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">NT$</span>
+                <input v-model="formData.price" type="number" class="form-control" placeholder="0" min="0" />
+              </div>
+            </div>
+            <!-- 庫存 -->
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">庫存數量</label>
+              <input v-model="formData.stockQty" type="number" class="form-control" placeholder="0" min="0" />
+            </div>
+            <!-- 狀態 -->
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">狀態</label>
+              <select v-model="formData.status" class="form-select">
+                <option value="ACTIVE">上架中</option>
+                <option value="INACTIVE">已下架</option>
+                <option value="PREPARING">備貨中</option>
+              </select>
+            </div>
+            <!-- 說明 -->
+            <div class="col-md-8">
+              <label class="form-label small fw-semibold">商品描述</label>
+              <textarea v-model="formData.description" class="form-control" rows="3" placeholder="商品說明..."></textarea>
+            </div>
+            <!-- 圖片上傳 -->
+            <div class="col-12">
+              <label class="form-label small fw-semibold">商品圖片</label>
+              <div class="upload-area" @click="$refs.fileInput.click()">
+                <img v-if="imagePreview" :src="imagePreview" class="upload-preview" />
+                <div v-else class="upload-placeholder">
+                  <i class="bi bi-cloud-arrow-up" style="font-size: 2rem; color: var(--brand-sky)"></i>
+                  <p class="text-secondary mt-1 mb-0" style="font-size: 0.85rem">點擊上傳商品圖片</p>
+                </div>
+              </div>
+              <input ref="fileInput" type="file" accept="image/*" class="d-none" @change="onImageChange" />
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer-custom">
+          <button class="btn btn-outline-secondary" @click="showModal = false">取消</button>
+          <button class="btn btn-brand" :disabled="saving" @click="handleSave">
+            <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+            {{ saving ? '儲存中...' : '儲存' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== 刪除確認 ====== -->
+    <ConfirmDialog
+      :visible="showConfirm"
+      title="確認刪除"
+      :message="`確定要刪除「${deleteTarget?.productName}」嗎？此操作無法復原。`"
+      @confirm="handleDelete"
+      @cancel="showConfirm = false"
+    />
   </div>
 </template>
+
+<style scoped>
+/* ===== 商品卡片 ===== */
+.product-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+}
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(14, 165, 233, 0.12);
+}
+
+/* ===== 商品圖片 ===== */
+.product-img-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: #F8FAFC;
+}
+.product-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+.product-card:hover .product-img {
+  transform: scale(1.06);
+}
+.product-img-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #F8FAFC, #F1F5F9);
+}
+
+/* ===== 角標 ===== */
+.product-status-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  backdrop-filter: blur(4px);
+}
+.product-category-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #64748B;
+  backdrop-filter: blur(4px);
+}
+
+/* ===== 自訂分頁 ===== */
+.pagination-custom .page-link {
+  border: none;
+  color: #64748B;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.5rem;
+  margin: 0 2px;
+  transition: all 0.2s ease;
+}
+.pagination-custom .page-link:hover {
+  background: #F0F9FF;
+  color: var(--brand-sky);
+}
+.pagination-custom .active .page-link {
+  background: var(--brand-sky);
+  color: white;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+}
+.pagination-custom .disabled .page-link {
+  color: #CBD5E1;
+}
+
+/* ===== Modal ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  animation: fadeIn 0.2s ease;
+}
+.modal-container {
+  background: white;
+  border-radius: 1.25rem;
+  width: 95%;
+  max-width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.3s ease;
+}
+.modal-header-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #F1F5F9;
+}
+.modal-body-custom {
+  padding: 1.5rem;
+}
+.modal-footer-custom {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #F1F5F9;
+}
+
+/* ===== 圖片上傳區 ===== */
+.upload-area {
+  border: 2px dashed #E2E8F0;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upload-area:hover {
+  border-color: var(--brand-sky);
+  background: #F0F9FF;
+}
+.upload-preview {
+  max-height: 160px;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 0.5rem;
+}
+
+/* ===== 動畫 ===== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

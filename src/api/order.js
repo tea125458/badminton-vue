@@ -7,6 +7,7 @@ import api from './index'
 export const orderApi = {
   // ===== 訂單 CRUD =====
   findAll: () => api.get('/orders'),
+  findByMemberId: (memberId) => api.get(`/orders?memberId=${memberId}`),
   findById: (id) => api.get(`/orders/${id}`),
   create: (order) => api.post('/orders', order),
   update: (id, order) => api.put(`/orders/${id}`, order),

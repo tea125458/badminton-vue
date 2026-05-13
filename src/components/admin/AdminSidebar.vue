@@ -9,17 +9,26 @@
  * 5. 公告管理
  * 6. 統計數據（儀表板）
  */
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const isCollapsed = ref(false)
+
+// 從 localStorage 取得目前登入者的角色
+const currentRole = computed(() => {
+  try {
+    const info = localStorage.getItem('adminInfo')
+    return info ? JSON.parse(info).role : null
+  } catch { return null }
+})
 
 const menuGroups = [
   {
     label: '會員管理',
     items: [
       { icon: 'bi-people', label: '會員管理', to: '/admin/members' },
+      { icon: 'bi-person-badge', label: '職員管理', to: '/admin/admins', requiredRole: 'MANAGER' },
     ],
   },
   {
@@ -76,7 +85,7 @@ const menuGroups = [
         <div v-if="!isCollapsed" class="nav-group-label">{{ group.label }}</div>
 
         <RouterLink
-          v-for="item in group.items"
+          v-for="item in group.items.filter(i => !i.requiredRole || i.requiredRole === currentRole)"
           :key="item.to"
           :to="item.to"
           class="nav-item"
