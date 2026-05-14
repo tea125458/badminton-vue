@@ -16,8 +16,10 @@ import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
 import { orderApi } from '@/api/order'
 import CreditCardMock from '@/components/payment/CreditCardMock.vue'
+import { useLinePay } from '@/composables/useLinePay'
 
 const router = useRouter()
+const { requestPayment } = useLinePay()
 const cart = useCartStore()
 const isSubmitting = ref(false)
 const isEmpty = computed(() => cart.items.length === 0)
@@ -82,12 +84,22 @@ async function processOrder() {
       })
     }
 
-    // Step 3: 清空購物車 → 跳轉成功頁
-    cart.clear()
-    router.push({
-      path: '/order-success',
-      query: { orderId: newOrder.orderId }
-    })
+    // Step 3: 判斷金流跳轉
+    if (paymentType.value === 'LINE_PAY') {
+      // 🚀 進入 LINE Pay 流程
+      await requestPayment({
+        orderId: `ORD-${newOrder.orderId}`,
+        amount: cart.total,
+        productName: `羽過天晴商品訂單 #${newOrder.orderId}`
+      })
+    } else {
+      // 現金、轉帳、信用卡(已模擬成功) → 直接導向成功頁
+      cart.clear()
+      router.push({
+        path: '/order-success',
+        query: { orderId: newOrder.orderId }
+      })
+    }
 
   } catch (e) {
     console.error('訂單建立失敗', e)
