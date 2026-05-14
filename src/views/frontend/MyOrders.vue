@@ -162,10 +162,10 @@ function formatDate(dateStr) {
 
           <!-- 金額 + 付款方式 -->
           <div class="d-flex justify-content-between align-items-center">
-            <span class="text-secondary" style="font-size: 0.8rem;">
+            <span class="text-secondary" style="font-size: 1rem;">
               <i class="bi bi-credit-card me-1"></i>{{ paymentMap[order.paymentType] || '未設定' }}
             </span>
-            <span class="fw-bold" style="color: var(--brand-teal); font-size: 1.15rem;">
+            <span class="fw-bold" style="color: var(--brand-teal); font-size: 1.3rem;">
               {{ formatPrice(order.totalAmount) }}
             </span>
           </div>
@@ -189,7 +189,7 @@ function formatDate(dateStr) {
                     :style="isStepActive(order.status, step) ? { borderColor: 'var(--brand-sky)', backgroundColor: (order.status === step && step !== 'COMPLETED') ? 'white' : 'var(--brand-sky)' } : {}">
                     <div v-if="order.status === step && step !== 'COMPLETED'" class="step-dot-inner"
                       style="background-color: var(--brand-sky);"></div>
-                    <i v-else-if="isStepActive(order.status, step)" class="bi bi-check" style="color: white; font-size: 0.8rem;"></i>
+                    <i v-else-if="isStepActive(order.status, step)" class="bi bi-check" style="color: white; font-size: 1rem;"></i>
                   </div>
                   <div class="step-text"
                     :style="(order.status === step && step !== 'COMPLETED') ? { color: 'var(--brand-sky)', fontWeight: '700' } : {}">
@@ -202,7 +202,7 @@ function formatDate(dateStr) {
                 </div>
               </div>
               <div v-if="order.status === 'CANCELLED'" class="text-center text-danger fw-bold mt-2"
-                style="font-size: 0.8rem;">
+                style="font-size: 1rem;">
                 <i class="bi bi-x-circle me-1"></i>此訂單已取消
               </div>
             </div>
@@ -225,19 +225,19 @@ function formatDate(dateStr) {
                       <i class="bi bi-box-seam" style="color: #CBD5E1; font-size: 1.3rem;"></i>
                     </div>
                     <div class="flex-grow-1">
-                      <div class="fw-semibold" style="font-size: 0.88rem; color: var(--brand-dark); line-height: 1.4;">{{ item.product?.productName || '未知商品' }}
+                      <div class="fw-semibold" style="font-size: 1rem; color: var(--brand-dark); line-height: 1.4;">{{ item.product?.productName || '未知商品' }}
                       </div>
-                      <div class="text-secondary mt-1" style="font-size: 0.75rem;">
+                      <div class="text-secondary mt-1" style="font-size: 0.9rem;">
                         單價 {{ formatPrice(item.unitPrice) }} × {{ item.quantity }} 件
                       </div>
                     </div>
-                    <div class="fw-bold" style="color: var(--brand-teal); font-size: 0.95rem; white-space: nowrap;">
+                    <div class="fw-bold" style="color: var(--brand-teal); font-size: 1.1rem; white-space: nowrap;">
                       {{ formatPrice(item.subtotal) }}
                     </div>
                   </div>
                 </div>
               </div>
-              <div v-else class="text-center text-secondary py-2" style="font-size: 0.85rem;">
+              <div v-else class="text-center text-secondary py-2" style="font-size: 1rem;">
                 尚無明細
               </div>
             </div>
@@ -377,7 +377,7 @@ function formatDate(dateStr) {
 }
 
 .step-text {
-  font-size: 0.65rem;
+  font-size: 0.85rem;
   color: #94A3B8;
   font-weight: 600;
 }
@@ -386,7 +386,7 @@ function formatDate(dateStr) {
 }
 
 .step-time {
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   color: #94A3B8;
   margin-top: 0.1rem;
   font-variant-numeric: tabular-nums;
@@ -411,7 +411,7 @@ function formatDate(dateStr) {
   padding: 0.6rem 0.85rem;
   background: #FFFBEB;
   border-radius: 0.5rem;
-  font-size: 0.8rem;
+  font-size: 1rem;
   color: #92400E;
 }
 </style>

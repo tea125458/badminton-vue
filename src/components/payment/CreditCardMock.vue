@@ -45,20 +45,20 @@ const formatCvc = (e) => {
 
 const isValid = computed(() => {
   return cardNumber.value.length === 19 &&
-         cardHolder.value.length > 0 &&
-         expiryDate.value.length === 5 &&
-         cvc.value.length === 3
+    cardHolder.value.length > 0 &&
+    expiryDate.value.length === 5 &&
+    cvc.value.length === 3
 })
 
 const handlePay = () => {
   if (!isValid.value) return
   isProcessing.value = true
-  
+
   // 模擬授權過程
   setTimeout(() => {
     isProcessing.value = false
     isSuccess.value = true
-    
+
     // 成功後延遲 1.5 秒再關閉 Modal 並通知父層
     setTimeout(() => {
       emit('payment-success')
@@ -70,7 +70,7 @@ const handlePay = () => {
 <template>
   <div class="cc-modal-overlay" @click.self="$emit('close')">
     <div class="cc-modal-content">
-      
+
       <!-- 關閉按鈕 -->
       <button class="btn-close-modal" @click="$emit('close')" :disabled="isProcessing || isSuccess">
         <i class="bi bi-x-lg"></i>
@@ -82,7 +82,7 @@ const handlePay = () => {
       <!-- 翻轉卡片動畫區塊 -->
       <div class="card-scene">
         <div class="card-container" :class="{ 'is-flipped': isFlipped }">
-          
+
           <!-- 卡片正面 -->
           <div class="card-face card-front">
             <div class="card-chip"></div>
@@ -116,59 +116,31 @@ const handlePay = () => {
       <div v-if="!isSuccess" class="payment-form">
         <div class="form-group">
           <label>信用卡號</label>
-          <input 
-            type="text" 
-            :value="cardNumber" 
-            @input="formatCardNumber" 
-            placeholder="0000 0000 0000 0000"
-            @focus="isFlipped = false"
-            :disabled="isProcessing"
-          />
+          <input type="text" :value="cardNumber" @input="formatCardNumber" placeholder="0000 0000 0000 0000"
+            @focus="isFlipped = false" :disabled="isProcessing" maxlength="19" />
         </div>
-        
+
         <div class="form-group">
           <label>持卡人姓名</label>
-          <input 
-            type="text" 
-            v-model="cardHolder" 
-            placeholder="請輸入英文姓名"
-            @focus="isFlipped = false"
-            :disabled="isProcessing"
-          />
+          <input type="text" v-model="cardHolder" placeholder="請輸入姓名" @focus="isFlipped = false"
+            :disabled="isProcessing" />
         </div>
 
         <div class="form-row">
           <div class="form-group half">
             <label>有效期限</label>
-            <input 
-              type="text" 
-              :value="expiryDate" 
-              @input="formatExpiry" 
-              placeholder="MM/YY"
-              @focus="isFlipped = false"
-              :disabled="isProcessing"
-            />
+            <input type="text" :value="expiryDate" @input="formatExpiry" placeholder="MM/YY" @focus="isFlipped = false"
+              :disabled="isProcessing" />
           </div>
           <div class="form-group half">
             <label>安全碼 (CVC)</label>
-            <input 
-              type="text" 
-              :value="cvc" 
-              @input="formatCvc" 
-              placeholder="123"
-              @focus="isFlipped = true"
-              @blur="isFlipped = false"
-              :disabled="isProcessing"
-            />
+            <input type="text" :value="cvc" @input="formatCvc" placeholder="123" @focus="isFlipped = true"
+              @blur="isFlipped = false" :disabled="isProcessing" />
           </div>
         </div>
 
-        <button 
-          class="btn-pay" 
-          :class="{ 'processing': isProcessing }"
-          :disabled="!isValid || isProcessing"
-          @click="handlePay"
-        >
+        <button class="btn-pay" :class="{ 'processing': isProcessing }" :disabled="!isValid || isProcessing"
+          @click="handlePay">
           <span v-if="!isProcessing">確認付款 NT$ {{ amount.toLocaleString() }}</span>
           <span v-else><i class="bi bi-arrow-repeat spinner"></i> 授權連線中...</span>
         </button>
@@ -216,8 +188,15 @@ const handlePay = () => {
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .btn-close-modal {
@@ -296,11 +275,17 @@ const handlePay = () => {
   position: relative;
   overflow: hidden;
 }
+
 .card-chip::after {
   content: '';
   position: absolute;
-  top: 50%; left: 0; right: 0; height: 1px; background: rgba(0,0,0,0.1);
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.1);
 }
+
 .card-logo {
   position: absolute;
   top: 1.5rem;
@@ -314,7 +299,7 @@ const handlePay = () => {
   font-size: 1.4rem;
   letter-spacing: 2px;
   font-family: monospace;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
   margin-top: 1rem;
 }
 
@@ -330,6 +315,7 @@ const handlePay = () => {
   display: block;
   margin-bottom: 0.2rem;
 }
+
 .detail-group div {
   font-size: 0.85rem;
   letter-spacing: 1px;
@@ -443,7 +429,9 @@ const handlePay = () => {
 }
 
 @keyframes spin {
-  100% { transform: rotate(360deg); }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* --- 成功狀態 --- */
@@ -457,8 +445,13 @@ const handlePay = () => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .success-circle {
