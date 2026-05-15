@@ -563,6 +563,11 @@ function onFilterChange(status) {
   currentPage.value = 1
 }
 
+// 搜尋時自動跳回第 1 頁
+watch(keyword, () => {
+  currentPage.value = 1
+})
+
 function goToPage(page) {
   if (page >= 1 && page <= totalPages.value) currentPage.value = page
 }

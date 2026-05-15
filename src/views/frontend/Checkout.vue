@@ -31,10 +31,17 @@ const note = ref('')
 
 // 付款方式選項（對應後端 PaymentType Enum）
 const paymentOptions = [
-  { value: 'CASH',        label: '現場現金支付', icon: 'bi-cash-stack',  desc: '打球時至櫃檯付款' },
-  { value: 'CREDIT_CARD', label: '信用卡',       icon: 'bi-credit-card', desc: '支援 VISA / MasterCard' },
-  { value: 'TRANSFER',    label: '銀行轉帳',     icon: 'bi-bank',        desc: '下單後請於 24 小時內完成匯款' },
-  { value: 'LINE_PAY',    label: 'LINE Pay',     icon: 'bi-chat-fill',   desc: '使用 LINE Pay 行動支付' },
+  { value: 'CASH', label: '現場現金支付', icon: 'bi-cash-stack', desc: '打球時至櫃檯付款' },
+  { value: 'CREDIT_CARD', label: '信用卡', icon: 'bi-credit-card', desc: '支援 VISA / MasterCard/ JCB/ American Express' },
+  { value: 'TRANSFER', label: '銀行轉帳', icon: 'bi-bank', desc: '下單後請於 24 小時內完成匯款' },
+  { value: 'LINE_PAY', label: 'LINE Pay', icon: 'bi-chat-fill', desc: '使用 LINE Pay 行動支付' },
+]
+
+const cardLogos = [
+  { name: 'Visa', src: 'https://img.icons8.com/color/96/visa.png' },
+  { name: 'MasterCard', src: 'https://img.icons8.com/color/96/mastercard-logo.png' },
+  { name: 'JCB', src: 'https://img.icons8.com/color/96/jcb.png' },
+  { name: 'Amex', src: 'https://img.icons8.com/color/96/amex.png' }
 ]
 
 onMounted(() => {
@@ -153,18 +160,27 @@ async function processOrder() {
             </div>
             <div class="section-body">
               <div class="payment-list">
-                <label
-                  v-for="opt in paymentOptions" :key="opt.value"
-                  class="payment-option"
-                  :class="{ active: paymentType === opt.value }"
-                >
+                <label v-for="opt in paymentOptions" :key="opt.value" class="payment-option"
+                  :class="{ active: paymentType === opt.value }">
                   <input type="radio" v-model="paymentType" :value="opt.value" />
                   <div class="payment-radio-circle">
                     <div class="payment-radio-dot"></div>
                   </div>
                   <div class="payment-info">
                     <span class="payment-label">{{ opt.label }}</span>
-                    <span class="payment-desc">{{ opt.desc }}</span>
+                    <div v-if="opt.value === 'CREDIT_CARD'" class="payment-desc-wrap">
+                      <span class="payment-desc">支援</span>
+                      <span class="card-inline-logos">
+                        <template v-for="(logo, idx) in cardLogos" :key="logo.name">
+                          <span class="card-name-logo">{{ logo.name }}<img :src="logo.src" :alt="logo.name" class="card-logo-sm" /></span>
+                          <span v-if="idx < cardLogos.length - 1" class="card-sep">/</span>
+                        </template>
+                      </span>
+                    </div>
+                    <span v-else-if="opt.value === 'LINE_PAY'" class="payment-desc">
+                      使用 LINE Pay <img src="https://img.icons8.com/color/96/line-me.png" alt="LINE Pay" class="card-logo-sm" style="height: 19px;" /> 行動支付
+                    </span>
+                    <span v-else class="payment-desc">{{ opt.desc }}</span>
                   </div>
                 </label>
               </div>
@@ -181,12 +197,7 @@ async function processOrder() {
               <span class="section-step">步驟 3/3</span>
             </div>
             <div class="section-body">
-              <textarea
-                v-model="note"
-                class="note-textarea"
-                rows="3"
-                placeholder="有什麼想告訴我們的嗎？（選填）"
-              ></textarea>
+              <textarea v-model="note" class="note-textarea" rows="3" placeholder="有什麼想告訴我們的嗎？（選填）"></textarea>
             </div>
           </section>
 
@@ -208,12 +219,9 @@ async function processOrder() {
             <div class="order-products">
               <div v-for="item in cart.items" :key="item.id" class="order-product-item">
                 <div class="product-img-wrap">
-                  <img
-                    v-if="item.imageUrl"
+                  <img v-if="item.imageUrl"
                     :src="item.imageUrl.startsWith('/') || item.imageUrl.startsWith('http') ? item.imageUrl : '/' + item.imageUrl"
-                    :alt="item.name"
-                    class="product-img"
-                  />
+                    :alt="item.name" class="product-img" />
                   <div v-else class="product-img-placeholder">
                     <i class="bi bi-box-seam"></i>
                   </div>
@@ -250,11 +258,7 @@ async function processOrder() {
 
             <!-- 下單按鈕 -->
             <div class="order-submit-wrap">
-              <button
-                @click="handleSubmit"
-                class="submit-btn"
-                :disabled="isSubmitting || isEmpty"
-              >
+              <button @click="handleSubmit" class="submit-btn" :disabled="isSubmitting || isEmpty">
                 <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
                 {{ isSubmitting ? '訂單處理中...' : '確認下單' }}
               </button>
@@ -265,12 +269,8 @@ async function processOrder() {
     </div>
 
     <!-- 信用卡虛擬刷卡機 Modal -->
-    <CreditCardMock 
-      v-if="showCreditCardModal" 
-      :amount="cart.total"
-      @close="showCreditCardModal = false"
-      @payment-success="() => { showCreditCardModal = false; processOrder() }"
-    />
+    <CreditCardMock v-if="showCreditCardModal" :amount="cart.total" @close="showCreditCardModal = false"
+      @payment-success="() => { showCreditCardModal = false; processOrder() }" />
   </div>
 </template>
 
@@ -684,6 +684,42 @@ async function processOrder() {
   font-size: 1.25rem;
   font-weight: 800;
   color: var(--brand-dark, #1E293B);
+}
+
+/* ===== 信用卡圖示 ===== */
+.payment-desc-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 2px;
+}
+
+.card-inline-logos {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.card-name-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.card-logo-sm {
+  height: 17px;
+  width: auto;
+  vertical-align: middle;
+}
+
+.card-sep {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  margin: 0 1px;
 }
 
 /* ===== 下單按鈕（右側卡片內） ===== */

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 
 const props = defineProps({
   amount: {
@@ -10,60 +10,133 @@ const props = defineProps({
 
 const emit = defineEmits(['payment-success', 'close'])
 
-const cardNumber = ref('')
+// 分組輸入：每個框裝多個數字
+const cardGroup = ref(['', '', '', ''])  // 4 組，每組 4 碼
 const cardHolder = ref('')
-const expiryDate = ref('')
+const expiryMM = ref('')
+const expiryYY = ref('')
 const cvc = ref('')
+
 const isFlipped = ref(false)
 const isProcessing = ref(false)
 const isSuccess = ref(false)
 
-// 格式化卡號 (XXXX XXXX XXXX XXXX)
-const formatCardNumber = (e) => {
-  let val = e.target.value.replace(/\D/g, '')
-  if (val.length > 16) val = val.slice(0, 16)
-  cardNumber.value = val.replace(/(\d{4})(?=\d)/g, '$1 ')
+// 卡別選擇
+const cardType = ref('VISA')
+const cardTypes = [
+  { value: 'VISA',    label: 'VISA',             logo: 'https://img.icons8.com/color/96/visa.png' },
+  { value: 'MASTER',  label: 'MasterCard',        logo: 'https://img.icons8.com/color/96/mastercard-logo.png' },
+  { value: 'JCB',     label: 'JCB',               logo: 'https://img.icons8.com/color/96/jcb.png' },
+  { value: 'AMEX',    label: 'American Express',   logo: 'https://img.icons8.com/color/96/amex.png' },
+]
+
+const isDropdownOpen = ref(false)
+const toggleDropdown = () => {
+  if (!isProcessing.value) isDropdownOpen.value = !isDropdownOpen.value
+}
+const selectCardType = (val) => {
+  cardType.value = val
+  isDropdownOpen.value = false
 }
 
-// 格式化有效期限 (MM/YY)
-const formatExpiry = (e) => {
+// --- refs ---
+const cardGroupRefs = ref([])
+const expiryMMRef = ref(null)
+const expiryYYRef = ref(null)
+
+// --- 卡號分組輸入 ---
+function onCardGroupInput(index, e) {
   let val = e.target.value.replace(/\D/g, '')
   if (val.length > 4) val = val.slice(0, 4)
-  if (val.length >= 2) {
-    expiryDate.value = val.slice(0, 2) + '/' + val.slice(2)
-  } else {
-    expiryDate.value = val
+  cardGroup.value[index] = val
+  // 輸滿 4 碼自動跳下一組
+  if (val.length === 4 && index < 3) {
+    nextTick(() => cardGroupRefs.value[index + 1]?.focus())
   }
 }
 
-// 格式化 CVC
-const formatCvc = (e) => {
+function onCardGroupKeydown(index, e) {
+  // Backspace 在空格時跳回上一組
+  if (e.key === 'Backspace' && !cardGroup.value[index] && index > 0) {
+    nextTick(() => cardGroupRefs.value[index - 1]?.focus())
+  }
+}
+
+function onCardGroupPaste(e) {
+  e.preventDefault()
+  const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 16)
+  for (let i = 0; i < 4; i++) {
+    cardGroup.value[i] = paste.slice(i * 4, i * 4 + 4)
+  }
+}
+
+// --- 有效期限 ---
+function onExpiryMMInput(e) {
+  let val = e.target.value.replace(/\D/g, '')
+  if (val.length > 2) val = val.slice(0, 2)
+  expiryMM.value = val
+  if (val.length === 2) {
+    nextTick(() => expiryYYRef.value?.focus())
+  }
+}
+
+function onExpiryYYInput(e) {
+  let val = e.target.value.replace(/\D/g, '')
+  if (val.length > 2) val = val.slice(0, 2)
+  expiryYY.value = val
+}
+
+function onExpiryYYKeydown(e) {
+  if (e.key === 'Backspace' && !expiryYY.value) {
+    nextTick(() => expiryMMRef.value?.focus())
+  }
+}
+
+// --- CVC ---
+function onCvcInput(e) {
   let val = e.target.value.replace(/\D/g, '')
   if (val.length > 3) val = val.slice(0, 3)
   cvc.value = val
 }
 
-const isValid = computed(() => {
-  return cardNumber.value.length === 19 &&
-    cardHolder.value.length > 0 &&
-    expiryDate.value.length === 5 &&
-    cvc.value.length === 3
+// --- 顯示用計算屬性 ---
+const cardNumberDisplay = computed(() => {
+  const full = cardGroup.value.join('')
+  if (!full) return ''
+  return cardGroup.value.map(g => g.padEnd(4, ' ')).join(' ').trim()
 })
 
+const expiryDisplay = computed(() => {
+  const mm = expiryMM.value || ''
+  const yy = expiryYY.value || ''
+  if (!mm && !yy) return ''
+  return mm + '/' + yy
+})
+
+// --- 驗證 ---
+const isValid = computed(() => {
+  return cardGroup.value.every(g => g.length === 4) &&
+         cardHolder.value.length > 0 &&
+         expiryMM.value.length === 2 &&
+         expiryYY.value.length === 2 &&
+         cvc.value.length === 3
+})
+
+// --- 付款處理 ---
 const handlePay = () => {
   if (!isValid.value) return
   isProcessing.value = true
 
-  // 模擬授權過程
+  // 模擬授權過程（4 秒，讓報告有展示時間）
   setTimeout(() => {
     isProcessing.value = false
     isSuccess.value = true
 
-    // 成功後延遲 1.5 秒再關閉 Modal 並通知父層
+    // 成功畫面展示 3 秒後再跳轉
     setTimeout(() => {
       emit('payment-success')
-    }, 1500)
-  }, 2000)
+    }, 3000)
+  }, 4000)
 }
 </script>
 
@@ -86,8 +159,10 @@ const handlePay = () => {
           <!-- 卡片正面 -->
           <div class="card-face card-front">
             <div class="card-chip"></div>
-            <div class="card-logo"><i class="bi bi-credit-card-2-front"></i> VISA</div>
-            <div class="card-number-display">{{ cardNumber || 'XXXX XXXX XXXX XXXX' }}</div>
+            <div class="card-logo">
+              <img :src="cardTypes.find(c => c.value === cardType)?.logo" class="card-logo-img" :alt="cardType" />
+            </div>
+            <div class="card-number-display">{{ cardNumberDisplay || 'XXXX XXXX XXXX XXXX' }}</div>
             <div class="card-details">
               <div class="detail-group">
                 <label>持卡人姓名</label>
@@ -95,7 +170,7 @@ const handlePay = () => {
               </div>
               <div class="detail-group text-end">
                 <label>有效期限</label>
-                <div>{{ expiryDate || 'MM/YY' }}</div>
+                <div>{{ expiryDisplay || 'MM/YY' }}</div>
               </div>
             </div>
           </div>
@@ -114,28 +189,117 @@ const handlePay = () => {
 
       <!-- 表單區塊 -->
       <div v-if="!isSuccess" class="payment-form">
+
+        <!-- 卡別選擇 -->
         <div class="form-group">
-          <label>信用卡號</label>
-          <input type="text" :value="cardNumber" @input="formatCardNumber" placeholder="0000 0000 0000 0000"
-            @focus="isFlipped = false" :disabled="isProcessing" maxlength="19" />
+          <label>卡別</label>
+          <div class="custom-dropdown" :class="{ 'is-open': isDropdownOpen, 'is-disabled': isProcessing }">
+            <div class="dropdown-selected" @click="isDropdownOpen = !isDropdownOpen">
+              <div class="selected-content">
+                <img :src="cardTypes.find(c => c.value === cardType)?.logo" class="type-logo" />
+                <span>{{ cardTypes.find(c => c.value === cardType)?.label }}</span>
+              </div>
+              <i class="bi bi-chevron-down dropdown-arrow"></i>
+            </div>
+            <div v-if="isDropdownOpen" class="dropdown-list">
+              <div 
+                v-for="ct in cardTypes" 
+                :key="ct.value" 
+                class="dropdown-item" 
+                :class="{ active: cardType === ct.value }"
+                @click="selectCardType(ct.value)"
+              >
+                <img :src="ct.logo" class="type-logo" />
+                <span>{{ ct.label }}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
+        <!-- 信用卡號：4 個框，每框 4 碼 -->
+        <div class="form-group">
+          <label>信用卡號</label>
+          <div class="card-group-row">
+            <template v-for="(g, i) in 4" :key="i">
+              <input
+                :ref="el => { if (el) cardGroupRefs[i] = el }"
+                type="text"
+                inputmode="numeric"
+                class="card-group-input"
+                :value="cardGroup[i]"
+                @input="onCardGroupInput(i, $event)"
+                @keydown="onCardGroupKeydown(i, $event)"
+                @paste="onCardGroupPaste"
+                @focus="isFlipped = false"
+                :disabled="isProcessing"
+                maxlength="4"
+                placeholder="0000"
+                autocomplete="off"
+              />
+              <span v-if="i < 3" class="card-group-sep">-</span>
+            </template>
+          </div>
+        </div>
+
+        <!-- 持卡人姓名 -->
         <div class="form-group">
           <label>持卡人姓名</label>
           <input type="text" v-model="cardHolder" placeholder="請輸入姓名" @focus="isFlipped = false"
-            :disabled="isProcessing" />
+            :disabled="isProcessing" autocomplete="off" />
         </div>
 
         <div class="form-row">
-          <div class="form-group half">
+          <!-- 有效期限：MM / YY -->
+          <div class="form-group" style="flex: 3; min-width: 0;">
             <label>有效期限</label>
-            <input type="text" :value="expiryDate" @input="formatExpiry" placeholder="MM/YY" @focus="isFlipped = false"
-              :disabled="isProcessing" />
+            <div class="expiry-group-row">
+              <input
+                ref="expiryMMRef"
+                type="text"
+                inputmode="numeric"
+                class="expiry-input"
+                :value="expiryMM"
+                @input="onExpiryMMInput"
+                @focus="isFlipped = false"
+                :disabled="isProcessing"
+                maxlength="2"
+                placeholder="MM"
+                autocomplete="off"
+              />
+              <span class="expiry-sep">/</span>
+              <input
+                ref="expiryYYRef"
+                type="text"
+                inputmode="numeric"
+                class="expiry-input"
+                :value="expiryYY"
+                @input="onExpiryYYInput"
+                @keydown="onExpiryYYKeydown"
+                @focus="isFlipped = false"
+                :disabled="isProcessing"
+                maxlength="2"
+                placeholder="YY"
+                autocomplete="off"
+              />
+            </div>
           </div>
-          <div class="form-group half">
+
+          <!-- CVC：1 個框裝 3 碼 -->
+          <div class="form-group" style="flex: 2; min-width: 0;">
             <label>安全碼 (CVC)</label>
-            <input type="text" :value="cvc" @input="formatCvc" placeholder="123" @focus="isFlipped = true"
-              @blur="isFlipped = false" :disabled="isProcessing" />
+            <input
+              type="text"
+              inputmode="numeric"
+              class="cvc-input"
+              :value="cvc"
+              @input="onCvcInput"
+              @focus="isFlipped = true"
+              @blur="isFlipped = false"
+              :disabled="isProcessing"
+              maxlength="3"
+              placeholder="000"
+              autocomplete="off"
+            />
           </div>
         </div>
 
@@ -188,15 +352,8 @@ const handlePay = () => {
 }
 
 @keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .btn-close-modal {
@@ -275,31 +432,28 @@ const handlePay = () => {
   position: relative;
   overflow: hidden;
 }
-
 .card-chip::after {
   content: '';
   position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: rgba(0, 0, 0, 0.1);
+  top: 50%; left: 0; right: 0; height: 1px; background: rgba(0,0,0,0.1);
 }
-
 .card-logo {
   position: absolute;
   top: 1.5rem;
   right: 1.5rem;
-  font-style: italic;
-  font-weight: 800;
-  font-size: 1.2rem;
+}
+
+.card-logo-img {
+  height: 29px;
+  width: auto;
+  object-fit: contain;
 }
 
 .card-number-display {
   font-size: 1.4rem;
   letter-spacing: 2px;
   font-family: monospace;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
   margin-top: 1rem;
 }
 
@@ -315,7 +469,6 @@ const handlePay = () => {
   display: block;
   margin-bottom: 0.2rem;
 }
-
 .detail-group div {
   font-size: 0.85rem;
   letter-spacing: 1px;
@@ -371,7 +524,7 @@ const handlePay = () => {
   display: block;
 }
 
-.form-group input {
+.form-group > input:not(.card-group-input):not(.expiry-input):not(.cvc-input) {
   width: 100%;
   padding: 0.75rem 1rem;
   border: 1px solid #cbd5e1;
@@ -381,9 +534,93 @@ const handlePay = () => {
   outline: none;
 }
 
-.form-group input:focus {
+.form-group > input:not(.card-group-input):not(.expiry-input):not(.cvc-input):focus {
   border-color: #0d9488;
   box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+/* ===== 卡別下拉選單 (Custom) ===== */
+.custom-dropdown {
+  position: relative;
+  width: 100%;
+  user-select: none;
+}
+
+.dropdown-selected {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+  background: #f8fafc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.custom-dropdown.is-open .dropdown-selected {
+  border-color: #0d9488;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+.selected-content, .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.type-logo {
+  height: 22px;
+  width: 34px;
+  object-fit: contain;
+}
+
+.dropdown-arrow {
+  font-size: 0.8rem;
+  color: #64748b;
+  transition: transform 0.2s;
+}
+
+.custom-dropdown.is-open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  overflow: hidden;
+}
+
+.dropdown-item {
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+  background: #f1f5f9;
+}
+
+.dropdown-item.active {
+  background: #f0fdfa;
+  color: #0d9488;
+}
+
+.custom-dropdown.is-disabled {
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .form-row {
@@ -395,6 +632,120 @@ const handlePay = () => {
   flex: 1;
 }
 
+/* ===== 卡號分組輸入：4 個框各裝 4 碼 ===== */
+.card-group-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.card-group-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.65rem 0.5rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: monospace;
+  letter-spacing: 2px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s;
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.card-group-input:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+  background: #fff;
+}
+
+.card-group-input:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.card-group-sep {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #94a3b8;
+  margin: 0 4px;
+  user-select: none;
+}
+
+/* ===== 有效期限：MM / YY ===== */
+.expiry-group-row {
+  display: flex;
+  align-items: center;
+}
+
+.expiry-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.65rem 0.5rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: monospace;
+  letter-spacing: 1px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s;
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.expiry-input:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+  background: #fff;
+}
+
+.expiry-input:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.expiry-sep {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #94a3b8;
+  margin: 0 6px;
+  user-select: none;
+}
+
+/* ===== CVC：1 個框裝 3 碼 ===== */
+.cvc-input {
+  width: 100%;
+  padding: 0.65rem 0.5rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: monospace;
+  letter-spacing: 3px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s;
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.cvc-input:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+  background: #fff;
+}
+
+.cvc-input:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+/* --- 付款按鈕 --- */
 .btn-pay {
   margin-top: 1rem;
   width: 100%;
@@ -429,9 +780,7 @@ const handlePay = () => {
 }
 
 @keyframes spin {
-  100% {
-    transform: rotate(360deg);
-  }
+  100% { transform: rotate(360deg); }
 }
 
 /* --- 成功狀態 --- */
@@ -445,13 +794,8 @@ const handlePay = () => {
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .success-circle {
