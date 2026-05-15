@@ -115,16 +115,46 @@ export function usePickupGameApi() {
   // ============================
   const fetchMemberBookings = async (memberId) => {
     try {
-      // 🌟 TODO：等後端 API 開好後，替換成真正的 API 呼叫
-      // const res = await axios.get(`/api/bookings/member/${memberId}/available`)
-      // memberBookings.value = res.data
+      // 🌟 同時撈取所有預約 + 所有揪團（用於排除已被使用的預約）
+      const [bookingsRes, gamesRes] = await Promise.all([
+        axios.get('/api/bookings'),
+        axios.get('/api/pickup-games'),
+      ])
+      const allBookings = bookingsRes.data
+      const allGames = gamesRes.data
+      const todayStr = new Date().toISOString().split('T')[0]
 
-      // 暫時使用模擬資料（後端完成後刪除這段）
-      memberBookings.value = [
-        { bookingId: 201, courtId: 1, venueName: '總館', courtName: '總館第一場地', bookingDate: '2026-05-20', startTime: '19:00', endTime: '21:00' },
-        { bookingId: 202, courtId: 2, venueName: '總館', courtName: '總館第二場地', bookingDate: '2026-05-22', startTime: '14:00', endTime: '16:00' },
-        { bookingId: 203, courtId: 3, venueName: '分館', courtName: '分館第一場地', bookingDate: '2026-05-25', startTime: '10:00', endTime: '12:00' },
-      ]
+      // 🌟 找出已經被揪團綁定的 bookingId（排除已取消的揪團）
+      const usedBookingIds = new Set(
+        allGames
+          .filter(g => g.bookingId && g.status !== 'CANCELLED')
+          .map(g => g.bookingId)
+      )
+
+      // 篩選條件：該會員 + 已確認 + 日期未過期 + 尚未被揪團使用 + 時間未過
+      const now = new Date()
+      memberBookings.value = allBookings
+        .filter(b => {
+          if (b.member?.memberId !== memberId) return false
+          if (b.status !== 'CONFIRMED') return false
+          if (b.bookingDate < todayStr) return false
+          if (usedBookingIds.has(b.bookingId)) return false
+          // 🌟 今天的預約：開始時間已過就不能再拿來開團
+          if (b.bookingDate === todayStr && b.startTime) {
+            const startDt = new Date(`${b.bookingDate}T${b.startTime}`)
+            if (startDt <= now) return false
+          }
+          return true
+        })
+        .map(b => ({
+          bookingId: b.bookingId,
+          courtId: b.court?.courtId,
+          venueName: b.court?.venue?.venueName || '未指定場館',
+          courtName: b.court?.courtName || '未指定場地',
+          bookingDate: b.bookingDate,
+          startTime: b.startTime,
+          endTime: b.endTime,
+        }))
     } catch (err) {
       console.error('抓取會員預約失敗', err)
       memberBookings.value = []

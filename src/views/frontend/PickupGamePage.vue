@@ -5,6 +5,7 @@ import { Modal } from 'bootstrap'
 import Swal from 'sweetalert2'
 import PickupGameRow from '@/components/frontend/PickupGameRow.vue'
 import CreateGameModal from '@/components/frontend/CreateGameModal.vue'
+import ManageMatchModal from '@/components/frontend/ManageMatchModal.vue'
 import { usePickupGameApi } from '@/composables/usePickupGameApi'
 
 const router = useRouter()
@@ -14,6 +15,8 @@ const { pickupGames, fetchGames, joinPickupGame } = usePickupGameApi()
 const searchQuery = ref('')
 const selectedDateFilter = ref('全部') // 記錄目前點了哪個日期，可能是 '全部', '今天', '明天', '本週末', 或是自訂的 'YYYY-MM-DD'
 const createModalRef = ref(null)
+const manageModalRef = ref(null)
+const managedGame = ref(null)
 
 // 進階篩選變數
 const advancedFilters = ref({
@@ -245,6 +248,14 @@ const confirmSignup = async () => {
 onMounted(() => {
   fetchGames()
 })
+
+// 🌟 管理揪團 Modal
+const handleManageGame = (game) => {
+  managedGame.value = game
+  if (manageModalRef.value) {
+    manageModalRef.value.showModal()
+  }
+}
 </script>
 <template>
   <div class="container py-5 mt-5">
@@ -342,6 +353,7 @@ onMounted(() => {
         :game="game"
         @open-quick-view="handleOpenQuickView"
         @view-details="handleViewDetails"
+        @manage-game="handleManageGame"
       />
       <!-- 如果沒有場次的時候顯示 -->
       <div v-if="availableGames.length === 0" class="text-center py-5 text-secondary">
@@ -558,6 +570,9 @@ onMounted(() => {
       </div>
     </div>
   </div>
+
+  <!-- 🌟 管理揪團 Modal -->
+  <ManageMatchModal ref="manageModalRef" :game="managedGame" @refresh-list="fetchGames" />
 </template>
 <style scoped>
 /* 日期選擇器觸發範圍放大 */
