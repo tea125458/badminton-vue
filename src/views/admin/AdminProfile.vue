@@ -5,6 +5,7 @@ import { adminApi } from '@/api/admin'
 const isLoading = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
+const isAdmin = ref(false) // 是否為主管 (MANAGER)
 
 const form = ref({
   username: '',
@@ -40,6 +41,12 @@ async function loadProfile() {
 }
 
 onMounted(() => {
+  // 從 localStorage 取得目前的管理員角色
+  try {
+    const adminInfo = JSON.parse(localStorage.getItem('adminInfo'))
+    isAdmin.value = adminInfo?.role === 'MANAGER'
+  } catch (e) {}
+
   loadProfile()
 })
 
@@ -155,17 +162,17 @@ async function handleSave() {
                   <h5 class="section-title-bar mb-4">個人資料</h5>
                   <div class="row g-4 mb-4">
                     <div class="col-md-6">
-                      <label class="form-label-gray">真實姓名 <span class="text-danger">*</span></label>
-                      <input v-model="form.fullName" type="text" class="form-control-styled" placeholder="請輸入姓名" required />
+                      <label class="form-label-gray">姓名</label>
+                      <input v-model="form.fullName" type="text" class="form-control-styled" placeholder="請輸入姓名" :disabled="!isAdmin" required />
                     </div>
                     <div class="col-md-6">
-                      <label class="form-label-gray">性別 <span class="text-danger">*</span></label>
+                      <label class="form-label-gray">性別</label>
                       <div class="d-flex gap-4 pt-2">
                         <label class="radio-label">
-                          <input v-model="form.gender" type="radio" value="男" /> 男
+                          <input v-model="form.gender" type="radio" value="男" :disabled="!isAdmin" /> 男
                         </label>
                         <label class="radio-label">
-                          <input v-model="form.gender" type="radio" value="女" /> 女
+                          <input v-model="form.gender" type="radio" value="女" :disabled="!isAdmin" /> 女
                         </label>
                       </div>
                     </div>
@@ -173,18 +180,18 @@ async function handleSave() {
 
                   <div class="row g-4 mb-4">
                     <div class="col-md-6">
-                      <label class="form-label-gray">生日 <span class="text-danger">*</span></label>
-                      <input v-model="form.birthday" type="date" class="form-control-styled" :max="todayDate" required @click="$event.target.showPicker()" />
+                      <label class="form-label-gray">生日</label>
+                      <input v-model="form.birthday" type="date" class="form-control-styled" :max="todayDate" :disabled="!isAdmin" required @click="$event.target.showPicker()" />
                     </div>
                     <div class="col-md-6">
-                      <label class="form-label-gray">聯絡電話 <span class="text-danger">*</span></label>
+                      <label class="form-label-gray">手機號碼</label>
                       <input v-model="form.phone" type="text" class="form-control-styled" placeholder="09xx-xxx-xxx" maxlength="12" @input="formatPhone" required />
                     </div>
                   </div>
 
                   <div class="row g-4">
                     <div class="col-12">
-                      <label class="form-label-gray">電子信箱 <span class="text-danger">*</span></label>
+                      <label class="form-label-gray">電子信箱</label>
                       <input v-model="form.email" type="email" class="form-control-styled" placeholder="example@mail.com" required />
                     </div>
                   </div>

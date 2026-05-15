@@ -72,7 +72,7 @@ function resetSearch() {
 function openCreateModal() {
   modalTitle.value = '新增會員'
   editId.value = null
-  form.value = { username: '', password: '', fullName: '', gender: '男', membershipLevel: 'NORMAL', birthday: '', phone: '', email: '' }
+  form.value = { username: '', password: '', fullName: '', gender: '男', membershipLevel: 'NORMAL', birthday: '2000-01-01', phone: '', email: '' }
   showModal.value = true
 }
 
@@ -129,13 +129,32 @@ async function saveMember() {
     if (editId.value) {
       await adminApi.updateMember(editId.value, d)
     } else {
-      await memberApi.register(d)
+      await adminApi.addMember(d)
     }
     showModal.value = false
     loadData()
-    alert(editId.value ? '會員更新成功！' : '會員新增成功！')
+    
+    // 使用 SweetAlert2 顯示成功訊息
+    Swal.fire({
+      title: editId.value ? '更新成功！' : '新增成功！',
+      text: editId.value ? '會員資料已同步' : '新會員已加入羽過天晴',
+      icon: 'success',
+      iconColor: '#0ea5e9',
+      showConfirmButton: false,
+      timer: 1500,
+      borderRadius: '1.25rem',
+      width: '350px',
+      background: '#ffffff',
+      color: '#334155',
+    })
   } catch (e) {
-    alert('操作失敗：' + (e.response?.data || e.message))
+    Swal.fire({
+      title: '操作失敗',
+      text: e.response?.data || e.message,
+      icon: 'error',
+      borderRadius: '1.25rem',
+      confirmButtonColor: '#0ea5e9',
+    })
   }
 }
 
@@ -361,28 +380,28 @@ function getLevelLabel(l) {
           <div class="modal-body">
             <div class="form-row">
               <div class="form-col">
-                <label>帳號 <span class="req">*</span></label>
+                <label>帳號</label>
                 <input v-model="form.username" type="text" placeholder="6-12 碼英數字" maxlength="12" :disabled="!!editId" />
               </div>
               <div class="form-col">
-                <label>密碼 <span v-if="!editId" class="req">*</span></label>
+                <label>密碼</label>
                 <input v-model="form.password" type="password" :placeholder="editId ? (isManager ? '留空不修改' : '無權限修改') : '6-12 碼密碼'" maxlength="12" :disabled="!!editId && !isManager" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-col">
-                <label>姓名 <span class="req">*</span></label>
+                <label>姓名</label>
                 <input v-model="form.fullName" type="text" placeholder="請輸入姓名" :disabled="!!editId && !isManager" />
               </div>
               <div class="form-col-half">
-                <label>性別 <span class="req">*</span></label>
+                <label>性別</label>
                 <select v-model="form.gender" :disabled="!!editId && !isManager">
                   <option value="男">男</option>
                   <option value="女">女</option>
                 </select>
               </div>
               <div class="form-col-half">
-                <label>會員等級 <span class="req">*</span></label>
+                <label>會員等級</label>
                 <select v-model="form.membershipLevel" :disabled="!!editId && !isManager">
                   <option value="NORMAL">一般會員</option>
                   <option value="VIP">VIP 會員</option>
@@ -391,15 +410,15 @@ function getLevelLabel(l) {
             </div>
             <div class="form-row">
               <div class="form-col-third">
-                <label>生日 <span class="req">*</span></label>
-                <input v-model="form.birthday" type="date" :max="todayDate" :disabled="!!editId && !isManager" />
+                <label>生日</label>
+                <input v-model="form.birthday" type="date" :max="todayDate" @click="$event.target.showPicker()" />
               </div>
               <div class="form-col-third">
-                <label>電話 <span class="req">*</span></label>
-                <input v-model="form.phone" type="text" placeholder="09xx-xxx-xxx" maxlength="12" @input="formatPhone" />
+                <label>電話</label>
+                <input v-model="form.phone" type="text" placeholder="0912-345-678" maxlength="12" @input="formatPhone" />
               </div>
               <div class="form-col-third">
-                <label>Email <span class="req">*</span></label>
+                <label>Email</label>
                 <input v-model="form.email" type="email" placeholder="abc@mail.com" />
               </div>
             </div>
@@ -491,7 +510,7 @@ function getLevelLabel(l) {
 
 /* ===== Data Table ===== */
 .data-table { width: 100%; border-collapse: collapse; }
-.data-table thead { background: var(--brand-dark); color: white; }
+.data-table thead { background: #1b4767; color: white; }
 .data-table th {
   padding: 0.75rem 1rem; font-size: 0.8rem; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;

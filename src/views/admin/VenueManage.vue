@@ -67,19 +67,35 @@ async function changeStatus(id, newStatus) {
 const showModal = ref(false)
 const modalTitle = ref('新增場館')
 const editId = ref(null)
+const saving = ref(false)
+
+// 圖片上傳狀態
+const imageFile = ref(null)
+const imagePreview = ref('')
 
 // 表單欄位
 const form = ref({
   venueName: '',
   address: '',
   phone: '',
+  imageUrl: '',
 })
+
+// 圖片選取
+function onImageChange(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  imageFile.value = file
+  imagePreview.value = URL.createObjectURL(file)
+}
 
 // 打開新增 Modal
 function openCreateModal() {
   modalTitle.value = '新增場館'
   editId.value = null
-  form.value = { venueName: '', address: '', phone: '' }
+  form.value = { venueName: '', address: '', phone: '', imageUrl: '' }
+  imageFile.value = null
+  imagePreview.value = ''
   showModal.value = true
 }
 
@@ -91,7 +107,11 @@ function openEditModal(venue) {
     venueName: venue.venueName,
     address: venue.address || '',
     phone: venue.phone || '',
+    imageUrl: venue.imageUrl || '',
   }
+  imageFile.value = null
+  // 編輯時顯示現有圖片
+  imagePreview.value = venue.imageUrl || ''
   showModal.value = true
 }
 
@@ -102,7 +122,13 @@ async function saveVenue() {
     return
   }
 
+  saving.value = true
   try {
+    // 如果有選擇新圖片，先上傳（並刪除舊圖）
+    if (imageFile.value) {
+      const res = await venueApi.uploadImage(imageFile.value, form.value.imageUrl)
+      form.value.imageUrl = res.imageUrl
+    }
     if (editId.value) {
       await venueApi.update(editId.value, form.value)
     } else {
@@ -113,6 +139,8 @@ async function saveVenue() {
     loadData()
   } catch (error) {
     alert('操作失敗：' + error.message)
+  } finally {
+    saving.value = false
   }
 }
 </script>
@@ -135,6 +163,7 @@ async function saveVenue() {
         <thead>
           <tr style="background: var(--brand-dark); color: white">
             <th class="ps-4">ID</th>
+            <th>圖片</th>
             <th>場館名稱</th>
             <th>地址</th>
             <th>電話</th>
@@ -145,7 +174,7 @@ async function saveVenue() {
         <tbody>
           <!-- 載入中 -->
           <tr v-if="loading">
-            <td colspan="6" class="text-center py-4">
+            <td colspan="7" class="text-center py-4">
               <div class="spinner-border spinner-border-sm text-primary me-2"></div>
               載入中...
             </td>
@@ -153,7 +182,7 @@ async function saveVenue() {
 
           <!-- 載入錯誤 -->
           <tr v-else-if="errorMsg">
-            <td colspan="6" class="text-center text-danger py-4">
+            <td colspan="7" class="text-center text-danger py-4">
               <i class="bi bi-exclamation-triangle me-1"></i>{{ errorMsg }}
               <br />
               <button class="btn btn-sm btn-outline-primary mt-2" @click="loadData">重試</button>
@@ -162,7 +191,7 @@ async function saveVenue() {
 
           <!-- 無資料 -->
           <tr v-else-if="venues.length === 0">
-            <td colspan="6" class="text-center text-muted py-4">
+            <td colspan="7" class="text-center text-muted py-4">
               目前沒有場館資料，請點擊「新增場館」按鈕
             </td>
           </tr>
@@ -170,6 +199,15 @@ async function saveVenue() {
           <!-- 正常渲染資料 -->
           <tr v-for="venue in venues" :key="venue.venueId" v-else>
             <td class="ps-4">{{ venue.venueId }}</td>
+            <td>
+              <img
+                v-if="venue.imageUrl"
+                :src="venue.imageUrl.startsWith('/') || venue.imageUrl.startsWith('http') ? venue.imageUrl : '/' + venue.imageUrl"
+                :alt="venue.venueName"
+                style="width: 56px; height: 40px; object-fit: cover; border-radius: 0.5rem; border: 1px solid #E2E8F0;"
+              />
+              <span v-else class="text-muted" style="font-size: 0.8rem;">無圖片</span>
+            </td>
             <td>
               <strong>{{ venue.venueName }}</strong>
             </td>
@@ -270,14 +308,59 @@ async function saveVenue() {
               placeholder="例：02-2733-1369"
             />
           </div>
+          <div class="mb-3">
+            <label class="form-label">場館圖片</label>
+            <div class="venue-upload-area" @click="$refs.venueFileInput.click()">
+              <img v-if="imagePreview" :src="imagePreview.startsWith('blob:') || imagePreview.startsWith('/') || imagePreview.startsWith('http') ? imagePreview : '/' + imagePreview" class="venue-upload-preview" />
+              <div v-else class="venue-upload-placeholder">
+                <i class="bi bi-cloud-arrow-up" style="font-size: 2rem; color: var(--brand-sky)"></i>
+                <p class="text-secondary mt-1 mb-0" style="font-size: 0.85rem">點擊上傳場館圖片</p>
+              </div>
+            </div>
+            <input ref="venueFileInput" type="file" accept="image/*" class="d-none" @change="onImageChange" />
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" @click="showModal = false">取消</button>
-          <button type="button" class="btn btn-primary" @click="saveVenue">
-            <i class="bi bi-check-lg me-1"></i>儲存
+          <button type="button" class="btn btn-primary" :disabled="saving" @click="saveVenue">
+            <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+            {{ saving ? '儲存中...' : '儲存' }}
           </button>
         </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.venue-upload-area {
+  border: 2px dashed #E2E8F0;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.venue-upload-area:hover {
+  border-color: var(--brand-sky);
+  background: #F0F9FF;
+}
+
+.venue-upload-preview {
+  max-height: 160px;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 0.75rem;
+}
+
+.venue-upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+</style>

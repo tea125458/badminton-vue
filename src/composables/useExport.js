@@ -6,7 +6,12 @@ import Swal from 'sweetalert2'
  * 負責處理將資料轉換為 JSON, EXCEL, PDF 格式並觸發下載或列印
  */
 export function useExport() {
-  const exportData = (dataToExport, format) => {
+  /**
+   * @param {Array} dataToExport - 要匯出的資料陣列
+   * @param {string} format - 匯出格式：'JSON' | 'EXCEL' | 'PDF'
+   * @param {string} [title='匯出資料'] - 匯出的標題／檔名前綴，各組員可自訂
+   */
+  const exportData = (dataToExport, format, title = '匯出資料') => {
     if (!dataToExport || dataToExport.length === 0) {
       Swal.fire({ icon: 'warning', title: '目前沒有資料可以導出' })
       return
@@ -21,15 +26,15 @@ export function useExport() {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `揪團名單_${timestamp}.json`
+      link.download = `${title}_${timestamp}.json`
       link.click()
       URL.revokeObjectURL(url)
     } else if (format === 'EXCEL') {
       // 【導出 Excel】
       const worksheet = XLSX.utils.json_to_sheet(dataToExport)
       const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, worksheet, '揪團名單')
-      XLSX.writeFile(workbook, `揪團名單_${timestamp}.xlsx`)
+      XLSX.utils.book_append_sheet(workbook, worksheet, title)
+      XLSX.writeFile(workbook, `${title}_${timestamp}.xlsx`)
     } else if (format === 'PDF') {
       // 【導出 PDF (原生列印解法，完美支援中文)】
       const printWindow = window.open('', '_blank')
@@ -37,7 +42,7 @@ export function useExport() {
         <!DOCTYPE html>
         <html>
         <head>
-          <title>揪團名單_${timestamp}</title>
+          <title>${title}_${timestamp}</title>
           <style>
             body { 
               font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Heiti TC", "Microsoft JhengHei", sans-serif; 
@@ -52,7 +57,7 @@ export function useExport() {
           </style>
         </head>
         <body>
-          <h2>揪團名單 (${timestamp})</h2>
+          <h2>${title} (${timestamp})</h2>
           <table>
             <thead>
               <tr>${Object.keys(dataToExport[0]).map((key) => `<th>${key}</th>`).join('')}</tr>

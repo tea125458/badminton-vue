@@ -77,7 +77,27 @@ const finalButtonText = computed(() => {
 const handleSubmit = () => {
   if (isButtonDisabled.value) return
   
-  // 觸發事件給父層 (PickupGameDetail.vue) 處理真實 API 邏輯
+  // 🌟 程度防呆驗證
+  const requiredLevel = props.game.skillLevel || 'ALL'
+  const levelMapReverse = {
+    '初級': 'BEGINNER',
+    '中級': 'INTERMEDIATE',
+    '高級': 'ADVANCED'
+  }
+  const userLevelCode = levelMapReverse[selectedLevel.value]
+
+  // 如果團主有設定限制（不是 ALL），且玩家選的跟限制不同，就擋下來
+  if (requiredLevel !== 'ALL' && requiredLevel !== userLevelCode) {
+    const levelMap = {
+      'BEGINNER': '初級',
+      'INTERMEDIATE': '中級',
+      'ADVANCED': '高級'
+    }
+    alert(`⚠️ 報名失敗！\n本團長限定程度為「${levelMap[requiredLevel]}」\n您選擇的程度不符合，無法報名。`)
+    return
+  }
+
+  // 觸發事件給父層處理真實 API 邏輯
   emit('submit-signup', {
     level: selectedLevel.value
   })

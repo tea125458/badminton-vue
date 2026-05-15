@@ -62,6 +62,7 @@ const menuGroups = [
     label: '統計數據',
     items: [
       { icon: 'bi-bar-chart-line', label: '數據儀表板', to: '/admin/dashboard' },
+      { icon: 'bi-clock-history', label: '操作日誌', to: '/admin/logs', requiredRole: 'MANAGER' },
     ],
   },
 ]

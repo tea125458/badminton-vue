@@ -36,6 +36,10 @@ export function usePickupGameApi() {
   const signupSearchResults = ref([])
   const selectedSignupMember = ref(null)
 
+  // 🌟 主揪的可用預約清單（選完主揪後載入）
+  const memberBookings = ref([])
+  const selectedBookingId = ref(null)
+
   // 編輯揪團相關
   const editGame = ref(null)           // 正在編輯的揪團資料（深拷貝）
   const editMemberKeyword = ref('')    // 編輯表單裡主揪的顯示文字
@@ -50,6 +54,7 @@ export function usePickupGameApi() {
     endTime: '',
     maxPlayers: 4,
     skillLevel: 'ALL',
+    requiredGender: 'ALL',
   })
 
   // ============================
@@ -94,12 +99,82 @@ export function usePickupGameApi() {
     }
   }
 
-  // 選中會員後：填入表單
+  // 選中會員後：填入表單 + 載入該會員的可用預約
   const selectMember = (member) => {
     selectedMember.value = member
     newGame.value.host.memberId = member.memberId
     memberKeyword.value = member.fullName
     memberResults.value = []
+    // 🌟 選完主揪後，自動載入該主揪的可用預約
+    selectedBookingId.value = null
+    fetchMemberBookings(member.memberId)
+  }
+
+  // ============================
+  // 🔌 GET：抓取指定會員的可用預約（未過期、已確認、尚未綁定揪團）
+  // ============================
+  const fetchMemberBookings = async (memberId) => {
+    try {
+      // 🌟 同時撈取所有預約 + 所有揪團（用於排除已被使用的預約）
+      const [bookingsRes, gamesRes] = await Promise.all([
+        axios.get('/api/bookings'),
+        axios.get('/api/pickup-games'),
+      ])
+      const allBookings = bookingsRes.data
+      const allGames = gamesRes.data
+      const todayStr = new Date().toISOString().split('T')[0]
+
+      // 🌟 找出已經被揪團綁定的 bookingId（排除已取消的揪團）
+      const usedBookingIds = new Set(
+        allGames
+          .filter(g => g.bookingId && g.status !== 'CANCELLED')
+          .map(g => g.bookingId)
+      )
+
+      // 篩選條件：該會員 + 已確認 + 日期未過期 + 尚未被揪團使用 + 時間未過
+      const now = new Date()
+      memberBookings.value = allBookings
+        .filter(b => {
+          if (b.member?.memberId !== memberId) return false
+          if (b.status !== 'CONFIRMED') return false
+          if (b.bookingDate < todayStr) return false
+          if (usedBookingIds.has(b.bookingId)) return false
+          // 🌟 今天的預約：開始時間已過就不能再拿來開團
+          if (b.bookingDate === todayStr && b.startTime) {
+            const startDt = new Date(`${b.bookingDate}T${b.startTime}`)
+            if (startDt <= now) return false
+          }
+          return true
+        })
+        .map(b => ({
+          bookingId: b.bookingId,
+          courtId: b.court?.courtId,
+          venueName: b.court?.venue?.venueName || '未指定場館',
+          courtName: b.court?.courtName || '未指定場地',
+          bookingDate: b.bookingDate,
+          startTime: b.startTime,
+          endTime: b.endTime,
+        }))
+    } catch (err) {
+      console.error('抓取會員預約失敗', err)
+      memberBookings.value = []
+    }
+  }
+
+  // 🌟 選擇預約後：自動帶入場地、日期、時間
+  const selectAdminBooking = (bookingId) => {
+    const b = memberBookings.value.find(x => x.bookingId === bookingId)
+    if (b) {
+      selectedBookingId.value = b.bookingId
+      newGame.value.bookingId = b.bookingId
+      newGame.value.court.courtId = b.courtId
+      newGame.value.gameDate = b.bookingDate
+      newGame.value.startTime = b.startTime
+      newGame.value.endTime = b.endTime
+      // 暫存場地名稱供顯示用
+      newGame.value._venueName = b.venueName
+      newGame.value._courtName = b.courtName
+    }
   }
 
   // ============================
@@ -107,7 +182,13 @@ export function usePickupGameApi() {
   // ============================
   const createPickupGame = async () => {
     try {
-      await axios.post('/api/pickup-games', newGame.value)
+      // 🌟 送出前清理：移除前端暫存的顯示用欄位（後端 Entity 不認識這些）
+      const payload = { ...newGame.value }
+      delete payload.venueName
+      delete payload.courtName
+      delete payload._venueName
+      delete payload._courtName
+      await axios.post('/api/pickup-games', payload)
       Swal.fire({
         icon: 'success',
         title: '建立成功！',
@@ -125,9 +206,13 @@ export function usePickupGameApi() {
         endTime: '',
         maxPlayers: 4,
         skillLevel: 'ALL',
+        requiredGender: 'ALL',
+        bookingId: null,
       }
       selectedMember.value = null
       memberKeyword.value = ''
+      memberBookings.value = []
+      selectedBookingId.value = null
     } catch (error) {
       console.error('新增失敗：', error)
       Swal.fire({
@@ -186,9 +271,14 @@ export function usePickupGameApi() {
     })
     if (result.isConfirmed) {
       try {
+        const token = localStorage.getItem('adminToken') || localStorage.getItem('memberToken');
         await axios.put(`/api/pickup-games/${game.gameId}`, {
           ...game,
           status: 'CANCELLED',
+        }, {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : ''
+          }
         })
         Swal.fire({
           icon: 'success',
@@ -200,7 +290,8 @@ export function usePickupGameApi() {
         fetchGames()
       } catch (err) {
         console.error('取消失敗', err)
-        Swal.fire({ icon: 'error', title: '取消失敗', confirmButtonText: '我知道了' })
+        const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || '未知錯誤';
+        Swal.fire({ icon: 'error', title: '取消失敗', text: errMsg, confirmButtonText: '我知道了' })
       }
     }
   }
@@ -220,10 +311,13 @@ export function usePickupGameApi() {
     })
     if (result.isConfirmed) {
       try {
+        const token = localStorage.getItem('adminToken') || localStorage.getItem('memberToken');
         await Promise.all(
           selectedIds.map((id) => {
             const game = pickupGames.value.find((g) => g.gameId === id)
-            return axios.put(`/api/pickup-games/${id}`, { ...game, status: 'CANCELLED' })
+            return axios.put(`/api/pickup-games/${id}`, { ...game, status: 'CANCELLED' }, {
+              headers: { Authorization: token ? `Bearer ${token}` : '' }
+            })
           }),
         )
         Swal.fire({ icon: 'success', title: `已取消 ${selectedIds.length} 場揪團` })
@@ -279,6 +373,41 @@ export function usePickupGameApi() {
       Swal.fire({ icon: 'warning', title: '請先搜尋並選擇一位會員', confirmButtonText: '好的' })
       return
     }
+
+    // 🌟 後台代報名性別防呆檢查 (改為軟性警告，允許強制報名)
+    const game = pickupGames.value.find(g => g.gameId === gameId)
+    if (game) {
+      const reqGender = game.requiredGender || game.genderLimit
+      const memberGender = selectedSignupMember.value.gender
+      let isConflict = false;
+      let conflictMsg = '';
+      
+      if (reqGender === 'FEMALE' && memberGender !== 'FEMALE' && memberGender !== '女') {
+        isConflict = true;
+        conflictMsg = '本場次為主揪設定之「女性專屬場次」，但您選擇的會員為男性。';
+      } else if (reqGender === 'MALE' && memberGender !== 'MALE' && memberGender !== '男') {
+        isConflict = true;
+        conflictMsg = '本場次為主揪設定之「男性專屬場次」，但您選擇的會員為女性。';
+      }
+
+      if (isConflict) {
+        const result = await Swal.fire({
+          icon: 'warning',
+          title: '性別條件衝突',
+          text: `${conflictMsg} 管理員可不受限制，是否要強制報名？`,
+          showCancelButton: true,
+          confirmButtonText: '是，強制報名',
+          cancelButtonText: '取消',
+          confirmButtonColor: '#dc3545',
+          cancelButtonColor: '#6c757d',
+        });
+        
+        if (!result.isConfirmed) {
+          return;
+        }
+      }
+    }
+
     try {
       await axios.post('/api/pickup-game-signups', {
         game: { gameId: gameId },
@@ -408,6 +537,8 @@ export function usePickupGameApi() {
     today,
     inlineEdit,
     joinPickupGame,
+    memberBookings,       // 🌟 主揪的可用預約清單
+    selectedBookingId,    // 🌟 選中的預約 ID
 
     // API 方法
     fetchGames,
@@ -426,5 +557,7 @@ export function usePickupGameApi() {
     removeSignup,
     startInlineEdit,
     saveInlineEdit,
+    fetchMemberBookings,  // 🌟 抓取會員預約
+    selectAdminBooking,   // 🌟 選擇預約後帶入資料
   }
 }

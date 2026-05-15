@@ -9,9 +9,11 @@
  */
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
+import { memberApi } from '@/api/member'
 
 const router = useRouter()
 const route = useRoute()
+const notificationStore = useNotificationStore()
 
 const isLoggedIn = ref(false)
 const memberName = ref('會員')
@@ -31,13 +33,29 @@ function handleClickOutside(e) {
   }
 }
 
-onMounted(() => document.addEventListener('click', handleClickOutside))
-onUnmounted(() => document.removeEventListener('click', handleClickOutside))
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+  if (isLoggedIn.value) {
+    notificationStore.connect()
+  }
+})
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+  notificationStore.disconnect()
+})
 
 // 每次切換路由時重新讀取 localStorage
 function checkLoginState() {
   const token = localStorage.getItem('memberToken')
+  const wasLoggedIn = isLoggedIn.value
   isLoggedIn.value = !!token
+  
+  if (isLoggedIn.value && !wasLoggedIn) {
+    notificationStore.connect()
+  } else if (!isLoggedIn.value && wasLoggedIn) {
+    notificationStore.disconnect()
+  }
+  
   try {
     const info = JSON.parse(localStorage.getItem('memberInfo'))
     memberName.value = info?.fullName || '會員'
@@ -55,11 +73,19 @@ watch(() => route.path, () => {
   showDropdown.value = false  // 換頁時關閉選單
 })
 
-function handleLogout() {
+async function handleLogout() {
+  try {
+    // 呼叫登出 API 以記錄日誌
+    await memberApi.logout()
+  } catch (e) {
+    console.error('Logout API failed:', e)
+  }
+  
   localStorage.removeItem('memberToken')
   localStorage.removeItem('memberInfo')
   isLoggedIn.value = false
   showDropdown.value = false
+  notificationStore.disconnect()
   router.push('/login')
 }
 </script>
@@ -116,6 +142,39 @@ function handleLogout() {
 
           <!-- 已登入：姓名 + 下拉選單 -->
           <template v-else>
+            <!-- 小鈴鐺通知 -->
+            <div class="dropdown me-2">
+              <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                <i class="bi bi-bell"></i>
+                <span v-if="notificationStore.unreadCount > 0" class="notification-dot"></span>
+              </button>
+              
+              <ul class="dropdown-menu dropdown-menu-end shadow-sm notification-menu">
+                <li><h6 class="dropdown-header">系統通知 ({{ notificationStore.unreadCount }})</h6></li>
+                
+                <li v-if="notificationStore.unreadCount === 0">
+                  <span class="dropdown-item text-muted text-center py-3">目前沒有新通知</span>
+                </li>
+                
+                <div class="notification-list">
+                  <li v-for="n in notificationStore.notifications" :key="n.id">
+                    <div class="dropdown-item notification-item">
+                      <strong class="d-block text-truncate">{{ n.title }}</strong>
+                      <p class="mb-1 text-muted small text-wrap">{{ n.content }}</p>
+                      <small class="text-secondary">{{ new Date(n.time).toLocaleString() }}</small>
+                    </div>
+                  </li>
+                </div>
+                
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <button class="dropdown-item text-center text-primary py-2 fw-bold" @click="notificationStore.clearAll()">
+                    全部標示為已讀
+                  </button>
+                </li>
+              </ul>
+            </div>
+
             <div class="user-dropdown" style="position: relative;">
               <button
                 class="btn btn-link text-decoration-none d-flex align-items-center gap-2 p-0"
@@ -183,5 +242,68 @@ function handleLogout() {
   justify-content: center;
   color: white;
   font-size: 0.9rem;
+}
+
+/* 通知鈴鐺與選單樣式 */
+.btn-icon {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border: none;
+  background: #F8FAFC;
+  border-radius: 0.75rem;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-icon:hover {
+  background-color: #F0F9FF;
+  color: var(--brand-sky);
+}
+
+.btn-icon i {
+  font-size: 1.1rem;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background-color: #EF4444;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+.notification-menu {
+  width: 320px;
+  padding: 0;
+  border: none;
+  border-radius: 0.75rem;
+}
+
+.notification-list {
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  white-space: normal;
+  border-bottom: 1px solid #f1f5f9;
+  padding: 0.75rem 1rem;
+  cursor: default;
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item:active {
+  background-color: transparent;
+  color: inherit;
 }
 </style>

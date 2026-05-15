@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { venueApi } from '@/api/venue'
 import { courtApi } from '@/api/court'
 
@@ -8,6 +8,18 @@ const courts = ref([]) //球場列表
 const venues = ref([]) // 場館列表（給下拉選單用
 const loading = ref(true) //載入中
 const errorMsg = ref('') //錯誤訊息
+
+// ========== 分頁狀態 ==========
+const currentPage = ref(1)
+const pageSize = 10 // 每頁顯示幾筆
+
+// ========== 分頁計算屬性 ==========
+const totalPages = computed(() => Math.max(1, Math.ceil(courts.value.length / pageSize)))
+
+const pagedCourts = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return courts.value.slice(start, start + pageSize)
+})
 
 // ========== 頁面載入時呼叫 ==========
 onMounted(() => {
@@ -21,11 +33,20 @@ async function loadData() {
   try {
     courts.value = await courtApi.findAll()
     venues.value = await venueApi.findAll()
+    // 載入後若當前頁超過總頁數，自動回到最後一頁
+    if (currentPage.value > totalPages.value) {
+      currentPage.value = totalPages.value
+    }
   } catch (error) {
     errorMsg.value = '載入失敗:' + error.message
   } finally {
     loading.value = false
   }
+}
+
+// ========== 分頁切換 ==========
+function goToPage(page) {
+  if (page >= 1 && page <= totalPages.value) currentPage.value = page
 }
 
 // ========== 狀態顯示 ==========
@@ -170,7 +191,7 @@ async function saveCourt() {
           </tr>
 
           <!-- 正常渲染資料 -->
-          <tr v-for="court in courts" :key="court.courtId" v-else>
+          <tr v-for="court in pagedCourts" :key="court.courtId" v-else>
             <td class="ps-4">{{ court.courtId }}</td>
             <td>
               <strong>{{ court.courtName }}</strong>
@@ -233,6 +254,24 @@ async function saveCourt() {
         </tbody>
       </table>
     </div>
+
+    <!-- 分頁 -->
+    <nav v-if="totalPages > 1" class="d-flex justify-content-center mt-3">
+      <ul class="pagination">
+        <!-- 上一頁 -->
+        <li class="page-item" :class="{ disabled: currentPage === 1 }">
+          <a class="page-link" href="#" @click.prevent="goToPage(currentPage - 1)">‹</a>
+        </li>
+        <!-- 頁碼 -->
+        <li class="page-item" v-for="p in totalPages" :key="p" :class="{ active: p === currentPage }">
+          <a class="page-link" href="#" @click.prevent="goToPage(p)">{{ p }}</a>
+        </li>
+        <!-- 下一頁 -->
+        <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+          <a class="page-link" href="#" @click.prevent="goToPage(currentPage + 1)">›</a>
+        </li>
+      </ul>
+    </nav>
   </div>
   <!-- 新增/編輯 Modal -->
   <div v-if="showModal" class="modal-backdrop fade show" @click="showModal = false"></div>

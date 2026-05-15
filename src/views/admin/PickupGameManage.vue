@@ -30,11 +30,13 @@ const {
   memberKeyword, memberResults, selectedMember,
   signupKeyword, signupSearchResults, selectedSignupMember,
   editGame, editMemberKeyword, newGame, today, inlineEdit,
+  memberBookings, selectedBookingId,
   fetchGames, fetchCourts, searchMembers, selectMember,
   createPickupGame, openEditModal, updatePickupGame,
   cancelPickupGame, batchCancel: doBatchCancel,
   fetchSignups, searchSignupMembers, selectSignupMember,
   addSignup, removeSignup, startInlineEdit, saveInlineEdit,
+  fetchMemberBookings, selectAdminBooking,
 } = usePickupGameApi()
 // ============================
 // ⏰ 時間下拉選單的邏輯 (與前台同步的嚴謹連動防呆邏輯)
@@ -105,6 +107,39 @@ watch(() => editGame.value?.startTime, (newVal, oldVal) => {
     editGame.value.endTime = ''
   }
 })
+
+// 🌟 性別衝突「軟性警告」（後台不鎖死，僅提示）
+const isNewGameHostMale = computed(() => {
+  if (!selectedMember.value) return false;
+  return selectedMember.value.gender === 'MALE' || selectedMember.value.gender === '男';
+});
+const isNewGameHostFemale = computed(() => {
+  if (!selectedMember.value) return false;
+  return selectedMember.value.gender === 'FEMALE' || selectedMember.value.gender === '女';
+});
+const isNewGameGenderConflict = computed(() => {
+  const g = newGame.value.requiredGender
+  if (isNewGameHostMale.value && g === 'FEMALE') return true
+  if (isNewGameHostFemale.value && g === 'MALE') return true
+  return false
+});
+
+const isEditGameHostMale = computed(() => {
+  if (!editGame.value || !editGame.value.host) return false;
+  return editGame.value.host.gender === 'MALE' || editGame.value.host.gender === '男';
+});
+const isEditGameHostFemale = computed(() => {
+  if (!editGame.value || !editGame.value.host) return false;
+  return editGame.value.host.gender === 'FEMALE' || editGame.value.host.gender === '女';
+});
+const isEditGameGenderConflict = computed(() => {
+  if (!editGame.value) return false
+  const g = editGame.value.requiredGender
+  if (isEditGameHostMale.value && g === 'FEMALE') return true
+  if (isEditGameHostFemale.value && g === 'MALE') return true
+  return false
+});
+
 // ============================================================
 // 搜尋 + 狀態篩選 + 分頁 邏輯
 // ============================================================
@@ -122,7 +157,7 @@ const {
 // 🔍 Step 3: 初始化篩選 + 排序 + 分頁層
 // ============================
 const {
-  searchQuery, statusFilter, sortBy,
+  searchQuery, statusFilter, filterGender, sortBy,
   currentPage, pageSize, selectedIds, expandedGameId,
   isRefreshing,
   toggleSelectAll, toggleSignups: doToggleSignups,
@@ -155,7 +190,7 @@ const exportData = (format) => {
     程度: game.level || '不限',
     狀態: getDisplayStatus(game),
   }))
-  doExport(dataToExport, format)
+  doExport(dataToExport, format, '揪團名單')
 }
 
 // ============================
@@ -259,6 +294,19 @@ onMounted(() => {
                   <option value="ADVANCED">高級</option>
                 </select>
               </div>
+              <!-- 性別限制 -->
+              <div class="col-md-6">
+                <label class="form-label fw-bold">性別限制</label>
+                <select class="form-select" v-model="editGame.requiredGender">
+                  <option value="ALL">不限</option>
+                  <option value="MALE">限男性</option>
+                  <option value="FEMALE">限女性</option>
+                </select>
+                <div v-if="isEditGameGenderConflict" class="alert alert-warning d-flex align-items-start mt-2 py-2 px-3 mb-0" style="font-size: 0.82rem;">
+                  <i class="bi bi-exclamation-triangle-fill me-2 mt-1 flex-shrink-0"></i>
+                  <span>⚠️ 系統提示：您選擇的性別限制與主揪性別衝突。主揪預設會佔用一個名額，請確認此特例操作是否正確。</span>
+                </div>
+              </div>
             </form>
           </div>
           <div class="modal-footer">
@@ -304,47 +352,57 @@ onMounted(() => {
         <i class="bi bi-x-lg"></i>
       </button>
     </div>
-    <!-- 📅 日期選擇 + 排序（左右分區） -->
+    <!-- 📅 日期選擇 + 性別條件篩選 + 排序（左右分區） -->
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-      <!-- ← 左側：日期篩選（輸入區） -->
-      <div style="position: relative">
-        <button
-          class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2"
-          @click="openDatePanel"
-        >
-          <i class="bi bi-calendar3"></i>
-          {{ datePresetLabel }}
-          <i class="bi bi-chevron-down" style="font-size: 0.7em"></i>
-        </button>
-        <!-- 彈出面板 -->
-        <div v-if="showDatePanel" class="date-panel shadow-lg">
-          <div class="d-flex">
-            <!-- 左側：快捷選項 -->
-            <div class="date-panel-presets">
-              <button class="date-preset-btn" @click="setDateRange('today')">今天</button>
-              <button class="date-preset-btn" @click="setDateRange('yesterday')">昨天</button>
-              <button class="date-preset-btn" @click="setDateRange('thisWeek')">本週</button>
-              <button class="date-preset-btn" @click="setDateRange('lastWeek')">上週</button>
-              <button class="date-preset-btn" @click="setDateRange('thisMonth')">本月</button>
-              <button class="date-preset-btn" @click="setDateRange('lastMonth')">上月</button>
-              <button class="date-preset-btn" @click="setDateRange('all')">全部</button>
+      <!-- ← 左側：日期篩選 + 性別篩選 -->
+      <div class="d-flex align-items-center gap-2">
+        <div style="position: relative">
+          <button
+            class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-2"
+            @click="openDatePanel"
+          >
+            <i class="bi bi-calendar3"></i>
+            {{ datePresetLabel }}
+            <i class="bi bi-chevron-down" style="font-size: 0.7em"></i>
+          </button>
+          
+          <!-- 彈出面板 -->
+          <div v-if="showDatePanel" class="date-panel shadow-lg">
+            <div class="d-flex">
+              <!-- 左側：快捷選項 -->
+              <div class="date-panel-presets">
+                <button class="date-preset-btn" @click="setDateRange('today')">今天</button>
+                <button class="date-preset-btn" @click="setDateRange('yesterday')">昨天</button>
+                <button class="date-preset-btn" @click="setDateRange('thisWeek')">本週</button>
+                <button class="date-preset-btn" @click="setDateRange('lastWeek')">上週</button>
+                <button class="date-preset-btn" @click="setDateRange('thisMonth')">本月</button>
+                <button class="date-preset-btn" @click="setDateRange('lastMonth')">上月</button>
+                <button class="date-preset-btn" @click="setDateRange('all')">全部</button>
+              </div>
+              <!-- 右側：手動日期輸入 -->
+              <div class="date-panel-inputs">
+                <label class="form-label small text-muted mb-1">開始日期</label>
+                <input type="date" class="form-control form-control-sm mb-3" v-model="tempDateFrom" />
+                <label class="form-label small text-muted mb-1">結束日期</label>
+                <input type="date" class="form-control form-control-sm" v-model="tempDateTo" />
+              </div>
             </div>
-            <!-- 右側：手動日期輸入 -->
-            <div class="date-panel-inputs">
-              <label class="form-label small text-muted mb-1">開始日期</label>
-              <input type="date" class="form-control form-control-sm mb-3" v-model="tempDateFrom" />
-              <label class="form-label small text-muted mb-1">結束日期</label>
-              <input type="date" class="form-control form-control-sm" v-model="tempDateTo" />
+            <!-- 底部按鈕 -->
+            <div class="d-flex justify-content-end gap-2 mt-3 pt-3 border-top">
+              <button class="btn btn-sm btn-outline-secondary" @click="cancelDatePanel">取消</button>
+              <button class="btn btn-sm btn-primary" @click="applyDateRange">套用</button>
             </div>
           </div>
-          <!-- 底部按鈕 -->
-          <div class="d-flex justify-content-end gap-2 mt-3 pt-3 border-top">
-            <button class="btn btn-sm btn-outline-secondary" @click="cancelDatePanel">取消</button>
-            <button class="btn btn-sm btn-primary" @click="applyDateRange">套用</button>
-          </div>
+          <!-- 遮罩層 -->
+          <div v-if="showDatePanel" class="date-panel-backdrop" @click="cancelDatePanel"></div>
         </div>
-        <!-- 遮罩層 -->
-        <div v-if="showDatePanel" class="date-panel-backdrop" @click="cancelDatePanel"></div>
+        
+        <!-- 🚻 性別條件篩選 -->
+        <select class="form-select form-select-sm" v-model="filterGender" style="width: 140px;">
+          <option value="all">全部 (不限)</option>
+          <option value="male">限男性</option>
+          <option value="female">限女性</option>
+        </select>
       </div>
 
       <!-- → 右側：排序 + 重新整理（操作區） -->
@@ -466,6 +524,7 @@ onMounted(() => {
             <th>時間</th>
             <th>人數</th>
             <th>程度</th>
+            <th>性別限制</th>
             <th>狀態</th>
             <th>操作</th>
           </tr>
@@ -524,6 +583,15 @@ onMounted(() => {
                 </span>
               </td>
               <td>
+                <span v-if="game.requiredGender === 'MALE'" class="badge bg-light text-secondary border border-secondary-subtle">
+                  限男
+                </span>
+                <span v-else-if="game.requiredGender === 'FEMALE'" class="badge bg-light text-secondary border border-secondary-subtle">
+                  限女
+                </span>
+                <span v-else class="text-muted small">不限</span>
+              </td>
+              <td>
                 <span
                   class="badge"
                   :class="{
@@ -566,6 +634,8 @@ onMounted(() => {
                     @click="openEditModal(game)"
                     data-bs-toggle="modal"
                     data-bs-target="#editGameModal"
+                    :disabled="game.status === 'CANCELLED' || getDisplayStatus(game) === 'CLOSED'"
+                    :title="game.status === 'CANCELLED' ? '已取消的揪團無法編輯' : (getDisplayStatus(game) === 'CLOSED' ? '已結束的揪團無法編輯' : '')"
                   >
                     <i class="bi bi-pencil-fill"></i>
                   </button>
@@ -574,6 +644,8 @@ onMounted(() => {
                   <button
                     class="btn btn-outline-danger btn-sm btn-action"
                     @click="cancelPickupGame(game)"
+                    :disabled="game.status === 'CANCELLED' || getDisplayStatus(game) === 'CLOSED'"
+                    :title="game.status === 'CANCELLED' ? '此揪團已取消' : (getDisplayStatus(game) === 'CLOSED' ? '已結束的揪團無法取消' : '')"
                   >
                     <i class="bi bi-x-circle-fill"></i>
                   </button>
@@ -613,6 +685,8 @@ onMounted(() => {
                           <button
                             class="btn btn-outline-danger btn-sm"
                             @click="removeSignup(s.signupId, game.gameId, s.member?.fullName)"
+                            :disabled="game.status === 'CANCELLED' || getDisplayStatus(game) === 'CLOSED'"
+                            :title="game.status === 'CANCELLED' ? '已取消的揪團無法移除成員' : (getDisplayStatus(game) === 'CLOSED' ? '已結束的揪團無法移除成員' : '')"
                           >
                             <i class="bi bi-person-dash-fill"></i>
                           </button>
@@ -634,6 +708,7 @@ onMounted(() => {
                         v-model="signupKeyword"
                         @input="searchSignupMembers"
                         placeholder="輸入姓名或手機搜尋會員"
+                        :disabled="game.status === 'CANCELLED' || getDisplayStatus(game) === 'CLOSED'"
                       />
                       <!-- 搜尋結果下拉 -->
                       <ul
@@ -652,7 +727,7 @@ onMounted(() => {
                         </li>
                       </ul>
                     </div>
-                    <button class="btn btn-success text-nowrap" @click="addSignup(game.gameId)">
+                    <button class="btn btn-success text-nowrap" @click="addSignup(game.gameId)" :disabled="game.status === 'CANCELLED' || getDisplayStatus(game) === 'CLOSED'">
                       <i class="bi bi-person-plus-fill me-1"></i> 新增報名
                     </button>
                   </div>
@@ -754,65 +829,47 @@ onMounted(() => {
                   ✅ 已選擇：{{ selectedMember.fullName }} (ID: {{ selectedMember.memberId }})
                 </small>
               </div>
-              <!-- 場地 -->
-              <div class="col-12">
+              <!-- 🌟 選擇該主揪的預約場地 (取代原本自由選場地/日期/時間) -->
+              <div class="col-12" v-if="selectedMember">
                 <div class="d-flex align-items-center mb-2">
                   <div class="icon-box me-2" style="background-color: rgba(25, 135, 84, 0.1)">
-                    <i class="bi bi-geo-alt-fill text-success"></i>
+                    <i class="bi bi-calendar-check-fill text-success"></i>
                   </div>
                   <label class="form-label fw-bold mb-0"
-                    >場地 <span class="text-danger">*</span></label
+                    >選擇預約場地 <span class="text-danger">*</span></label
                   >
                 </div>
-                <select class="form-select" v-model="newGame.court.courtId">
-                  <option :value="null" disabled>請選擇場地</option>
-                  <option v-for="c in courts" :key="c.courtId" :value="c.courtId">
-                    {{ c.venue?.venueName }} / {{ c.courtName }}
+                <select class="form-select" v-model="selectedBookingId" @change="selectAdminBooking(selectedBookingId)">
+                  <option :value="null" disabled>請選擇該會員的可用預約...</option>
+                  <option v-for="b in memberBookings" :key="b.bookingId" :value="b.bookingId">
+                    {{ b.bookingDate }} ({{ b.startTime }}-{{ b.endTime }}) | {{ b.venueName }} - {{ b.courtName }}
                   </option>
                 </select>
+                <small v-if="memberBookings.length === 0" class="text-warning d-block mt-1">
+                  ⚠️ 該會員目前沒有可用的預約紀錄
+                </small>
               </div>
-              <!-- 日期 -->
-              <div class="col-12">
-                <div class="d-flex align-items-center mb-2">
-                  <div class="icon-box me-2" style="background-color: rgba(255, 193, 7, 0.15)">
-                    <i class="bi bi-calendar-event-fill text-warning"></i>
+              <!-- 🌟 自動帶入的預約資訊 (唯讀顯示) -->
+              <div class="col-12" v-if="selectedBookingId">
+                <div class="card bg-light border-0 rounded-3 p-3">
+                  <div class="row text-secondary small fw-medium">
+                    <div class="col-12 mb-2">
+                      <i class="bi bi-geo-alt me-1 text-primary"></i>
+                      {{ newGame._venueName }} - {{ newGame._courtName }}
+                    </div>
+                    <div class="col-6">
+                      <i class="bi bi-calendar-event me-1 text-warning"></i>
+                      {{ newGame.gameDate }}
+                    </div>
+                    <div class="col-6">
+                      <i class="bi bi-clock me-1 text-info"></i>
+                      {{ newGame.startTime }} ~ {{ newGame.endTime }}
+                    </div>
                   </div>
-                  <label class="form-label fw-bold mb-0"
-                    >日期 <span class="text-danger">*</span></label
-                  >
                 </div>
-                <input type="date" class="form-control" v-model="newGame.gameDate" :min="today" />
               </div>
-              <!-- 開始時間 -->
-              <div class="col-md-6">
-                <div class="d-flex align-items-center mb-2">
-                  <div class="icon-box me-2" style="background-color: rgba(13, 202, 240, 0.15)">
-                    <i class="bi bi-clock-fill text-info"></i>
-                  </div>
-                  <label class="form-label fw-bold mb-0"
-                    >開始時間 <span class="text-danger">*</span></label
-                  >
-                </div>
-                <select class="form-select" v-model="newGame.startTime" :disabled="!newGame.gameDate || startTimeOptions.length === 0">
-                  <option value="" disabled>{{ startTimeOptions.length === 0 ? '今日已無時段' : '請選擇...' }}</option>
-                  <option v-for="t in startTimeOptions" :key="t" :value="t">{{ t }}</option>
-                </select>
-              </div>
-              <!-- 結束時間 -->
-              <div class="col-md-6">
-                <div class="d-flex align-items-center mb-2">
-                  <div class="icon-box me-2" style="background-color: rgba(13, 202, 240, 0.15)">
-                    <i class="bi bi-clock-history text-info"></i>
-                  </div>
-                  <label class="form-label fw-bold mb-0"
-                    >結束時間 <span class="text-danger">*</span></label
-                  >
-                </div>
-                <select class="form-select" v-model="newGame.endTime" :disabled="!newGame.startTime">
-                  <option value="" disabled>請先選擇開始時間</option>
-                  <option v-for="t in endTimeOptions" :key="t" :value="t">{{ t }}</option>
-                </select>
-              </div>
+              <!-- 以下欄位：選完預約後才顯示 -->
+              <template v-if="selectedBookingId">
               <!-- 最大人數 -->
               <div class="col-md-6">
                 <div class="d-flex align-items-center mb-2">
@@ -848,6 +905,25 @@ onMounted(() => {
                   <option value="ADVANCED">高級</option>
                 </select>
               </div>
+              <!-- 性別限制 -->
+              <div class="col-md-12">
+                <div class="d-flex align-items-center mb-2">
+                  <div class="icon-box me-2" style="background-color: rgba(236, 72, 153, 0.15)">
+                    <i class="bi bi-gender-ambiguous" style="color: #ec4899"></i>
+                  </div>
+                  <label class="form-label fw-bold mb-0">性別限制</label>
+                </div>
+                <select class="form-select" v-model="newGame.requiredGender">
+                  <option value="ALL">不限</option>
+                  <option value="MALE">限男性</option>
+                  <option value="FEMALE">限女性</option>
+                </select>
+                <div v-if="isNewGameGenderConflict" class="alert alert-warning d-flex align-items-start mt-2 py-2 px-3 mb-0" style="font-size: 0.82rem;">
+                  <i class="bi bi-exclamation-triangle-fill me-2 mt-1 flex-shrink-0"></i>
+                  <span>⚠️ 系統提示：您選擇的性別限制與主揪性別衝突。主揪預設會佔用一個名額，請確認此特例操作是否正確。</span>
+                </div>
+              </div>
+              </template>
             </form>
           </div>
           <div class="modal-footer">
@@ -859,6 +935,7 @@ onMounted(() => {
               class="btn btn-primary"
               @click="createPickupGame"
               data-bs-dismiss="modal"
+              :disabled="!selectedBookingId || !selectedMember"
             >
               <i class="bi bi-check-lg me-1"></i> 儲存
             </button>
