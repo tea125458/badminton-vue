@@ -5,9 +5,10 @@
  * - 上方：歡迎區 + 帳號 / 等級概覽
  * - 下方：個人資料表單（姓名、性別不可改）
  */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { memberApi } from '@/api/member'
+import { bookingApi } from '@/api/booking'
 
 const router = useRouter()
 
@@ -167,6 +168,84 @@ function getLevelBadge(level) {
     : { label: '一般會員', cls: 'badge-normal' }
 }
 
+// ========== 預約紀錄 ==========
+const bookings = ref([])
+const bookingFilter = ref('all') // 'all', 'upcoming', 'completed', 'cancelled'
+const bookingsLoading = ref(false)
+
+const filteredBookings = computed(() => {
+  const today = new Date().toISOString().split('T')[0] // yyyy-MM-dd
+  return bookings.value.filter(b => {
+    if (bookingFilter.value === 'upcoming') {
+      return b.bookingDate >= today && b.status === 'CONFIRMED'
+    }
+    if (bookingFilter.value === 'completed') {
+      return b.status === 'COMPLETED' || (b.status === 'CONFIRMED' && b.bookingDate < today)
+    }
+    if (bookingFilter.value === 'cancelled') {
+      return b.status === 'CANCELLED'
+    }
+    return true // 'all'
+  })
+})
+
+// 載入預約紀錄
+async function loadBookings() {
+  bookingsLoading.value = true
+  try {
+    const data = await bookingApi.getMyAllBookings()
+    console.log('預約紀錄 API 回傳:', data)
+    bookings.value = Array.isArray(data) ? data : []
+  } catch (err) {
+    console.error('載入預約紀錄失敗:', err)
+    console.error('錯誤回應:', err.response?.status, err.response?.data)
+  } finally {
+    bookingsLoading.value = false
+  }
+}
+
+// 切換到預約紀錄頁籤時載入
+function switchTab(tabId) {
+  activeTab.value = tabId
+  if (tabId === 'bookings') {
+    loadBookings()
+  }
+}
+
+// 狀態顯示輔助
+function getStatusInfo(booking) {
+  const today = new Date().toISOString().split('T')[0]
+  if (booking.status === 'CANCELLED') return { label: '已取消', cls: 'status-cancelled', icon: 'bi-x-circle' }
+  if (booking.status === 'COMPLETED' || (booking.status === 'CONFIRMED' && booking.bookingDate < today)) {
+    return { label: '已完成', cls: 'status-completed', icon: 'bi-check-circle' }
+  }
+  return { label: '即將到來', cls: 'status-upcoming', icon: 'bi-clock' }
+}
+
+// 取消預約
+async function cancelBooking(booking) {
+  if (!confirm(`確定要取消 ${booking.bookingDate} ${booking.startTime}~${booking.endTime} 的預約嗎？`)) return
+  try {
+    await bookingApi.cancelBooking(booking.bookingId)
+    alert('預約已取消！')
+    loadBookings() // 重新載入
+  } catch (err) {
+    alert('取消失敗：' + (err.response?.data || err.message))
+  }
+}
+
+// 再次預約
+function rebookVenue(booking) {
+  router.push('/booking')
+}
+
+// 場館圖片
+function getVenueImage(booking) {
+  const imageUrl = booking.court?.venue?.imageUrl
+  if (imageUrl) return 'http://localhost:8080' + imageUrl
+  return 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=400'
+}
+
 // 點擊頭像觸發檔案選擇
 function triggerAvatarUpload() {
   document.getElementById('avatarFileInput').click()
@@ -240,7 +319,7 @@ async function handleAvatarUpload(event) {
                   <button v-for="item in menuItems" :key="item.id"
                           class="list-group-item list-group-item-action sidebar-item mb-2"
                           :class="{ 'active': activeTab === item.id }"
-                          @click="activeTab = item.id">
+                          @click="switchTab(item.id)">
                     <i class="bi me-3" :class="item.icon"></i>
                     {{ item.label }}
                   </button>
@@ -368,14 +447,97 @@ async function handleAvatarUpload(event) {
                   </div>
                 </div>
 
-                <!-- 頁籤 2: 預約紀錄 (預留占位) -->
+                <!-- 頁籤 2: 預約紀錄 -->
                 <div v-if="activeTab === 'bookings'" class="tab-content-fade">
-                  <div class="profile-card-base shadow-sm border p-5 bg-white text-center">
-                    <div class="empty-state py-5">
-                      <i class="bi bi-calendar-x mb-3 d-block text-light" style="font-size: 4rem;"></i>
+                  <!-- 篩選 Tab -->
+                  <div class="d-flex gap-2 mb-4 flex-wrap">
+                    <button v-for="f in [
+                      { id: 'all', label: '全部' },
+                      { id: 'upcoming', label: '即將到來' },
+                      { id: 'completed', label: '已完成' },
+                      { id: 'cancelled', label: '已取消' }
+                    ]" :key="f.id"
+                      class="btn btn-sm rounded-pill px-3"
+                      :class="bookingFilter === f.id ? 'btn-brand' : 'btn-outline-secondary'"
+                      @click="bookingFilter = f.id"
+                      style="font-size: 0.95rem"
+                    >
+                      {{ f.label }}
+                    </button>
+                  </div>
+
+                  <!-- 載入中 -->
+                  <div v-if="bookingsLoading" class="text-center py-5">
+                    <div class="spinner-border text-info" role="status"></div>
+                    <p class="text-muted mt-2">載入預約紀錄中...</p>
+                  </div>
+
+                  <!-- 預約卡片列表 -->
+                  <template v-else-if="filteredBookings.length > 0">
+                    <div v-for="booking in filteredBookings" :key="booking.bookingId"
+                         class="booking-card mb-3"
+                         :class="getStatusInfo(booking).cls"
+                    >
+                      <div class="row g-0 align-items-center">
+                        <!-- 左側：場館圖片 -->
+                        <div class="col-auto d-none d-md-block">
+                          <div class="booking-img-wrap">
+                            <img :src="getVenueImage(booking)" :alt="booking.court?.venue?.venueName" />
+                          </div>
+                        </div>
+
+                        <!-- 中間：預約資訊 -->
+                        <div class="col">
+                          <div class="booking-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                              <div>
+                                <h6 class="fw-bold mb-1" style="font-size: 1.1rem">
+                                  {{ booking.court?.venue?.venueName || '場館' }}
+                                </h6>
+                                <span class="text-secondary" style="font-size: 0.9rem">
+                                  {{ booking.court?.courtName }}
+                                </span>
+                              </div>
+                              <span class="badge booking-status-badge" :class="getStatusInfo(booking).cls">
+                                <i class="bi me-1" :class="getStatusInfo(booking).icon"></i>
+                                {{ getStatusInfo(booking).label }}
+                              </span>
+                            </div>
+
+                            <div class="booking-meta d-flex flex-wrap gap-3 mb-2">
+                              <span><i class="bi bi-calendar3 me-1"></i>{{ booking.bookingDate }}</span>
+                              <span><i class="bi bi-clock me-1"></i>{{ booking.startTime }} ~ {{ booking.endTime }}</span>
+                              <span class="fw-semibold" style="color: var(--brand-teal-dark)">
+                                <i class="bi bi-cash-stack me-1"></i>NT$ {{ booking.totalAmount }}
+                              </span>
+                            </div>
+
+                            <!-- 操作按鈕 -->
+                            <div class="d-flex gap-2 mt-2">
+                              <button v-if="getStatusInfo(booking).label === '即將到來'"
+                                      class="btn btn-sm btn-outline-danger rounded-pill px-3"
+                                      @click="cancelBooking(booking)">
+                                <i class="bi bi-x-circle me-1"></i>取消預約
+                              </button>
+                              <button v-if="getStatusInfo(booking).label === '已完成'"
+                                      class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                                      @click="rebookVenue(booking)">
+                                <i class="bi bi-arrow-repeat me-1"></i>再次預約
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 空狀態 -->
+                  <div v-else class="profile-card-base shadow-sm border p-5 bg-white text-center">
+                    <div class="empty-state py-4">
+                      <i class="bi bi-calendar-x mb-3 d-block" style="font-size: 4rem; color: #e2e8f0;"></i>
                       <h5 class="fw-bold">尚無預約紀錄</h5>
                       <p class="text-muted">歡迎預約打羽球！</p>
-                      <RouterLink to="/" class="btn-save-styled d-inline-block mt-3" style="text-decoration: none;">
+                      <RouterLink to="/booking" class="btn-save-styled d-inline-block mt-3" style="text-decoration: none;">
                         前往預約
                       </RouterLink>
                     </div>
@@ -662,5 +824,77 @@ async function handleAvatarUpload(event) {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========== 預約紀錄卡片 ========== */
+.booking-card {
+  background: white;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #e2e8f0;
+  overflow: hidden;
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.booking-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+
+/* 狀態左邊線顏色 */
+.booking-card.status-upcoming { border-left-color: #10b981; }
+.booking-card.status-completed { border-left-color: #94a3b8; }
+.booking-card.status-cancelled { border-left-color: #ef4444; }
+
+/* 場館圖片 */
+.booking-img-wrap {
+  width: 140px;
+  height: 120px;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  margin: 1rem;
+}
+.booking-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+.booking-card:hover .booking-img-wrap img {
+  transform: scale(1.05);
+}
+
+/* 卡片內容 */
+.booking-body {
+  padding: 1rem 1.25rem;
+}
+
+/* 狀態 Badge */
+.booking-status-badge {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: 2rem;
+}
+.booking-status-badge.status-upcoming {
+  background-color: #ecfdf5;
+  color: #059669;
+}
+.booking-status-badge.status-completed {
+  background-color: #f1f5f9;
+  color: #64748b;
+}
+.booking-status-badge.status-cancelled {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+/* 預約資訊元數據 */
+.booking-meta {
+  font-size: 0.92rem;
+  color: #64748b;
+}
+.booking-meta i {
+  color: #94a3b8;
 }
 </style>

@@ -11,4 +11,7 @@ export const announcementApi = {
   update: (id, announcement) => api.put(`/announcements/${id}`, announcement),
   updateStatus: (id, status) => api.patch(`/announcements/${id}/status`, { status }),
   delete: (id) => api.delete(`/announcements/${id}`),
+
+  // PATCH /api/announcements/:id/view → 瀏覽次數 +1
+  incrementView: (id) => api.patch(`/announcements/${id}/view`),
 }

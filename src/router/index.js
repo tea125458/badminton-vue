@@ -68,6 +68,11 @@ const router = createRouter({
           name: 'myOrders',
           component: () => import('@/views/frontend/MyOrders.vue'),
         },
+        {
+          path: 'announcements',
+          name: 'announcements',
+          component: () => import('@/views/frontend/AnnouncementPage.vue'),
+        },
       ],
     },
 

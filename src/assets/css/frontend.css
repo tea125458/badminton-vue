@@ -195,16 +195,24 @@ body {
 }
 
 .front-navbar .nav-link {
-  color: #64748B !important;
+  color: #1e293b !important;
   font-weight: 600;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   padding: 0.5rem 1rem !important;
-  transition: color 0.2s ease;
+  border-radius: 0.75rem;
+  transition: all 0.25s ease;
 }
 
-.front-navbar .nav-link:hover,
-.front-navbar .nav-link.router-link-active {
-  color: var(--brand-dark) !important;
+.front-navbar .nav-link:hover {
+  color: var(--brand-teal-dark) !important;
+  background-color: #F0FDFA;
+}
+
+.front-navbar .nav-link.router-link-exact-active {
+  color: white !important;
+  font-weight: 700;
+  background: linear-gradient(135deg, #5EEAD4, #2DD4BF);
+  box-shadow: 0 2px 8px rgba(45, 212, 191, 0.3);
 }
 
 /* ----- Badge 狀態標籤 ----- */
