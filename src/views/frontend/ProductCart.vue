@@ -160,7 +160,7 @@ function grandTotal() {
               <span class="summary-total-price">${{ grandTotal().toLocaleString() }}</span>
             </div>
 
-            <button class="checkout-btn">
+            <button class="checkout-btn" @click="router.push('/checkout')">
               <i class="bi bi-credit-card me-2"></i>前往結帳
             </button>
 

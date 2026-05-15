@@ -59,6 +59,11 @@ const router = createRouter({
           component: () => import('@/views/frontend/Checkout.vue'),
         },
         {
+          path: 'payment/linepay/confirm',
+          name: 'linePayConfirm',
+          component: () => import('@/views/frontend/LinePayCallback.vue'),
+        },
+        {
           path: 'order-success',
           name: 'orderSuccess',
           component: () => import('@/views/frontend/OrderSuccess.vue'),

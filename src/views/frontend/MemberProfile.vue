@@ -9,6 +9,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { memberApi } from '@/api/member'
 import { bookingApi } from '@/api/booking'
+import { orderApi } from '@/api/order'
 
 const router = useRouter()
 
@@ -40,13 +41,110 @@ const pwdSuccessMsg = ref('')
 const pwdErrorMsg = ref('')
 const isChangingPwd = ref(false)
 
+// 訂單相關
+const orders = ref([])
+const loadingOrders = ref(false)
+
+// 狀態對照 (同步 MyOrders.vue)
+const statusMap = {
+  UNPAID: { label: '訂單成立', color: '#F59E0B', bg: '#FEF3C7', icon: 'bi-clipboard-check' },
+  PAID: { label: '備貨中', color: '#3B82F6', bg: '#DBEAFE', icon: 'bi-box-seam' },
+  SHIPPED: { label: '待取貨', color: '#8B5CF6', bg: '#EDE9FE', icon: 'bi-shop' },
+  COMPLETED: { label: '已取貨', color: '#10B981', bg: '#D1FAE5', icon: 'bi-check2-circle' },
+  CANCELLED: { label: '已取消', color: '#F43F5E', bg: '#FFE4E6', icon: 'bi-x-circle' },
+}
+const paymentMap = {
+  CASH: '現金', CREDIT_CARD: '信用卡', TRANSFER: '轉帳', LINE_PAY: 'LINE Pay',
+}
+
+// 展開與明細相關
+const expandedId = ref(null)
+const orderItems = ref({}) // { orderId: [items...] }
+const loadingItems = ref(null) // 正在載入明細的 orderId
+
+// 進度條邏輯
+const progressSteps = ['UNPAID', 'PAID', 'SHIPPED', 'COMPLETED']
+function isStepActive(currentStatus, step) {
+  if (currentStatus === 'CANCELLED') return false
+  return progressSteps.indexOf(step) <= progressSteps.indexOf(currentStatus)
+}
+function getProgressWidth(currentStatus) {
+  if (currentStatus === 'CANCELLED') return '0%'
+  const index = progressSteps.indexOf(currentStatus)
+  if (index === -1) return '0%'
+  return (index / (progressSteps.length - 1)) * 100 + '%'
+}
+const stepTimeFields = { UNPAID: 'createdAt', PAID: 'paidAt', SHIPPED: 'shippedAt', COMPLETED: 'completedAt' }
+function getStepTime(order, step) {
+  const field = stepTimeFields[step]
+  const val = order[field]
+  if (!val) return ''
+  const d = new Date(val)
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 // 頁籤切換
-const activeTab = ref('profile') // 'profile', 'bookings', 'orders'
+const activeTab = ref('profile')
 const menuItems = [
   { id: 'profile', label: '會員帳號資料', icon: 'bi-person-gear' },
   { id: 'bookings', label: '我的預約紀錄', icon: 'bi-calendar-check' },
   { id: 'orders', label: '歷史消費訂單', icon: 'bi-bag-check' },
 ]
+
+// 監聽頁籤切換，若是訂單頁且還沒抓過資料就抓一次
+watch(activeTab, (newTab) => {
+  if (newTab === 'orders' && orders.value.length === 0) {
+    fetchOrders()
+  }
+})
+
+async function fetchOrders() {
+  if (!member.value?.memberId) return
+  loadingOrders.value = true
+  try {
+    const data = await orderApi.findByMemberId(member.value.memberId)
+    orders.value = data.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate))
+    
+    // 為了顯示代表圖，預抓前 5 筆的明細
+    const prefetchCount = Math.min(orders.value.length, 5)
+    for (let i = 0; i < prefetchCount; i++) {
+      const oid = orders.value[i].orderId
+      if (!orderItems.value[oid]) {
+        orderApi.findItems(oid).then(items => {
+          orderItems.value[oid] = items
+        })
+      }
+    }
+  } catch (err) {
+    console.error('載入訂單失敗', err)
+  } finally {
+    loadingOrders.value = false
+  }
+}
+
+async function toggleExpand(orderId) {
+  if (expandedId.value === orderId) {
+    expandedId.value = null
+    return
+  }
+  expandedId.value = orderId
+  if (!orderItems.value[orderId]) {
+    loadingItems.value = orderId
+    try {
+      orderItems.value[orderId] = await orderApi.findItems(orderId)
+    } catch (e) {
+      orderItems.value[orderId] = []
+    } finally {
+      loadingItems.value = null
+    }
+  }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+}
 
 // 電話格式化
 function formatPhone() {
@@ -544,16 +642,112 @@ async function handleAvatarUpload(event) {
                   </div>
                 </div>
 
-                <!-- 頁籤 3: 訂單紀錄 (預留占位) -->
+                <!-- 頁籤 3: 訂單紀錄 -->
                 <div v-if="activeTab === 'orders'" class="tab-content-fade">
-                  <div class="profile-card-base shadow-sm border p-5 bg-white text-center">
-                    <div class="empty-state py-5">
+                  <div class="profile-card-base shadow-sm border bg-white p-4">
+                    <h6 class="section-title-bar mb-4">歷史消費訂單</h6>
+
+                    <div v-if="loadingOrders" class="text-center py-5">
+                      <div class="spinner-border text-info" role="status"></div>
+                      <p class="text-muted mt-2 small">訂單載入中...</p>
+                    </div>
+
+                    <div v-else-if="orders.length === 0" class="empty-state py-5 text-center">
                       <i class="bi bi-cart-x mb-3 d-block text-light" style="font-size: 4rem;"></i>
                       <h5 class="fw-bold">尚無訂單紀錄</h5>
-                      <p class="text-muted">尚無購買紀錄。</p>
-                      <RouterLink to="/" class="btn-save-styled d-inline-block mt-3" style="text-decoration: none;">
+                      <p class="text-muted">尚無購買紀錄，快去逛逛吧！</p>
+                      <RouterLink to="/products" class="btn-save-styled d-inline-block mt-3" style="text-decoration: none;">
                         前往商城
                       </RouterLink>
+                    </div>
+
+                    <div v-else class="order-list">
+                      <div v-for="order in orders" :key="order.orderId" 
+                           class="order-item-row p-3 mb-3 border rounded-3"
+                           :class="{ 'is-expanded': expandedId === order.orderId }">
+                        <div class="row align-items-center cursor-pointer" @click="toggleExpand(order.orderId)">
+                          <!-- 商品代表圖 -->
+                          <div class="col-auto">
+                            <div class="order-repr-img-wrap">
+                              <img v-if="orderItems[order.orderId] && orderItems[order.orderId][0]?.product?.imageUrl" 
+                                   :src="orderItems[order.orderId][0].product.imageUrl.startsWith('/') ? orderItems[order.orderId][0].product.imageUrl : '/' + orderItems[order.orderId][0].product.imageUrl" 
+                                   class="order-repr-img" />
+                              <div v-else-if="loadingItems === order.orderId" class="order-repr-placeholder">
+                                <div class="spinner-border spinner-border-sm text-light"></div>
+                              </div>
+                              <div v-else class="order-repr-placeholder">
+                                <i class="bi bi-box-seam"></i>
+                              </div>
+                            </div>
+                          </div>
+                          <!-- 訂單資訊 -->
+                          <div class="col">
+                            <div class="d-flex justify-content-between align-items-start">
+                              <div>
+                                <div class="order-id-text">訂單編號 #{{ order.orderId }}</div>
+                                <div class="order-date-text text-muted small">{{ formatDate(order.orderDate) }}</div>
+                              </div>
+                              <span class="badge" :style="{ backgroundColor: statusMap[order.status]?.bg, color: statusMap[order.status]?.color }">
+                                {{ statusMap[order.status]?.label }}
+                              </span>
+                            </div>
+                            <div class="mt-2 d-flex justify-content-between align-items-end">
+                              <div class="order-summary-text text-secondary small">
+                                共 {{ orderItems[order.orderId]?.length || '...' }} 項商品 · {{ paymentMap[order.paymentType] }}
+                              </div>
+                              <div class="order-amount-text fw-bold" style="color: var(--brand-dark);">
+                                NT$ {{ order.totalAmount.toLocaleString() }}
+                              </div>
+                            </div>
+                          </div>
+                          <!-- 展開箭頭 -->
+                          <div class="col-auto">
+                            <i class="bi fs-5 text-secondary" :class="expandedId === order.orderId ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                          </div>
+                        </div>
+
+                        <!-- 展開內容：明細與進度條 -->
+                        <div v-if="expandedId === order.orderId" class="order-expanded-content mt-3 pt-3 border-top">
+                          <!-- 進度條 (Mini 版) -->
+                          <div class="progress-tracker-mini mb-4">
+                            <div class="progress-lines-wrap">
+                              <div class="progress-line-bg"></div>
+                              <div class="progress-line-fill" :style="{ width: getProgressWidth(order.status), backgroundColor: 'var(--brand-sky)' }"></div>
+                            </div>
+                            <div v-for="step in progressSteps" :key="step" 
+                                 class="progress-step-mini" 
+                                 :class="{ 'active': isStepActive(order.status, step), 'current': order.status === step && step !== 'COMPLETED' }">
+                              <div class="step-dot" :style="isStepActive(order.status, step) ? { borderColor: 'var(--brand-sky)', backgroundColor: (order.status === step && step !== 'COMPLETED') ? 'white' : 'var(--brand-sky)' } : {}">
+                                <!-- 如果是當前狀態：秀出專屬圖示 -->
+                                <i v-if="order.status === step && step !== 'COMPLETED'"
+                                   :class="['bi', statusMap[step]?.icon]"
+                                   :style="{ color: 'var(--brand-sky)', fontSize: '0.85rem' }"></i>
+                                <!-- 如果是已完成狀態：秀出打勾 -->
+                                <i v-else-if="isStepActive(order.status, step)" class="bi bi-check-lg"
+                                   style="color: white; font-size: 1rem;"></i>
+                              </div>
+                              <div class="step-text">{{ statusMap[step].label }}</div>
+                              <div class="step-time">{{ getStepTime(order, step) }}</div>
+                            </div>
+                          </div>
+
+                          <!-- 商品明细 -->
+                          <div v-if="loadingItems === order.orderId" class="text-center py-3">
+                            <div class="spinner-border spinner-border-sm text-info"></div>
+                          </div>
+                          <div v-else class="expanded-items-list px-2">
+                            <div v-for="item in orderItems[order.orderId]" :key="item.itemId" class="d-flex align-items-center gap-3 mb-2 py-2 border-bottom-dashed">
+                              <img :src="item.product?.imageUrl?.startsWith('/') ? item.product.imageUrl : '/' + item.product.imageUrl" 
+                                   class="rounded-2" style="width: 54px; height: 54px; object-fit: scale-down; background: #fff; border: 1.5px solid #f1f5f9; box-shadow: 0 1px 4px rgba(0,0,0,0.05);" />
+                              <div class="flex-grow-1">
+                                <div class="fw-semibold" style="font-size: 0.88rem;">{{ item.product?.productName }}</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">NT$ {{ item.unitPrice.toLocaleString() }} x {{ item.quantity }}</div>
+                              </div>
+                              <div class="fw-bold" style="font-size: 0.88rem; color: var(--brand-dark);">NT$ {{ (item.unitPrice * item.quantity).toLocaleString() }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -817,13 +1011,14 @@ async function handleAvatarUpload(event) {
   color: #e9ecef;
 }
 
-/* 轉場動畫 */
-.tab-content-fade {
-  animation: fadeIn 0.3s ease-out;
+/* 訂單列表樣式 */
+.order-item-row {
+  transition: all 0.2s;
+  border-color: #f1f5f9 !important;
 }
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+.order-item-row:hover {
+  border-color: #1bb0c1 !important;
+  background-color: #fcfdfe;
 }
 
 /* ========== 預約紀錄卡片 ========== */
@@ -897,4 +1092,112 @@ async function handleAvatarUpload(event) {
 .booking-meta i {
   color: #94a3b8;
 }
+.order-repr-img-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1.5px solid #f1f5f9;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+.order-repr-img {
+  width: 100%;
+  height: 100%;
+  object-fit: scale-down;
+}
+.order-repr-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #cbd5e1;
+  font-size: 1.5rem;
+}
+.order-id-text {
+  font-weight: 700;
+  color: #334155;
+  font-size: 0.95rem;
+}
+.btn-outline-info {
+  border-color: #1bb0c1;
+  color: #1bb0c1;
+}
+.btn-outline-info:hover {
+  background-color: #1bb0c1;
+  color: white;
+}
+.cursor-pointer { cursor: pointer; }
+.border-bottom-dashed { border-bottom: 1px dashed #f1f5f9; }
+
+/* 進度條 (Mini 版) */
+.progress-tracker-mini {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+}
+.progress-lines-wrap {
+  position: absolute;
+  top: calc(0.5rem + 14px);
+  left: calc(1rem + 12.5%);
+  right: calc(1rem + 12.5%);
+  height: 3px;
+  z-index: 0;
+}
+.progress-line-bg {
+  width: 100%;
+  height: 100%;
+  background: #E2E8F0;
+  border-radius: 2px;
+}
+.progress-line-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  transition: width 0.4s ease;
+  border-radius: 2px;
+}
+.progress-step-mini {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 25%;
+}
+.step-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #E2E8F0;
+  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+.progress-step-mini.active .step-dot {
+  border-color: var(--brand-sky);
+  background: var(--brand-sky);
+}
+.progress-step-mini.current .step-dot {
+  border-color: var(--brand-sky);
+  background: white;
+}
+.step-text {
+  font-size: 0.8rem;
+  color: #94A3B8;
+  font-weight: 600;
+}
+.progress-step-mini.active .step-text { color: var(--brand-dark); }
+.step-time {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  margin-top: 0.1rem;
+}
+.progress-step-mini.active .step-time { color: var(--brand-dark); }
 </style>
