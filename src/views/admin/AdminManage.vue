@@ -89,7 +89,7 @@ function resetSearch() {
 function openCreateModal() {
   modalTitle.value = '新增職員'
   editId.value = null
-  form.value = { username: '', password: '', fullName: '', role: 'STAFF', gender: '男', birthday: '', phone: '', email: '' }
+  form.value = { username: '', password: '', fullName: '', role: 'STAFF', gender: '男', birthday: '2000-01-01', phone: '', email: '' }
   showModal.value = true
 }
 
@@ -124,6 +124,18 @@ async function saveAdmin() {
   if (!editId.value && !d.password) {
     alert('新增職員時請設定密碼！'); return
   }
+
+  // 電話驗證
+  const phoneDigits = d.phone.replace(/\D/g, '')
+  if (phoneDigits.length !== 10 || !phoneDigits.startsWith('09')) {
+    alert('電話格式錯誤！必須為 09 開頭的 10 位數字'); return
+  }
+
+  // Email 驗證
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) {
+    alert('Email 格式錯誤！'); return
+  }
+
   if (!d.password) delete d.password
 
   try {
@@ -134,9 +146,28 @@ async function saveAdmin() {
     }
     showModal.value = false
     loadData()
-    alert(editId.value ? '職員更新成功！' : '職員新增成功！')
+    
+    // 使用 SweetAlert2 顯示成功訊息
+    Swal.fire({
+      title: editId.value ? '更新成功！' : '新增成功！',
+      text: editId.value ? '職員資料已同步' : '新職員已加入系統',
+      icon: 'success',
+      iconColor: '#0ea5e9',
+      showConfirmButton: false,
+      timer: 1500,
+      borderRadius: '1.25rem',
+      width: '350px',
+      background: '#ffffff',
+      color: '#334155',
+    })
   } catch (e) {
-    alert('操作失敗：' + (e.response?.data || e.message))
+    Swal.fire({
+      title: '操作失敗',
+      text: e.response?.data || e.message,
+      icon: 'error',
+      borderRadius: '1.25rem',
+      confirmButtonColor: '#0ea5e9',
+    })
   }
 }
 
@@ -213,6 +244,17 @@ async function saveNote() {
   } catch (e) {
     alert('備註更新失敗')
   }
+}
+
+// ===== 電話自動格式化 =====
+function formatPhone() {
+  let v = form.value.phone.replace(/\D/g, '')
+  if (v.length > 10) v = v.substring(0, 10)
+  let f = ''
+  if (v.length > 0) f = v.substring(0, 4)
+  if (v.length > 4) f += '-' + v.substring(4, 7)
+  if (v.length > 7) f += '-' + v.substring(7, 10)
+  form.value.phone = f
 }
 
 // ===== Badge 工具 =====
@@ -353,28 +395,28 @@ function getRoleLabel(r) {
           <div class="modal-body">
             <div class="form-row">
               <div class="form-col">
-                <label>帳號 <span class="req">*</span></label>
+                <label>帳號</label>
                 <input v-model="form.username" type="text" placeholder="登入帳號" :disabled="!!editId" />
               </div>
               <div class="form-col">
-                <label>密碼 <span v-if="!editId" class="req">*</span></label>
+                <label>密碼</label>
                 <input v-model="form.password" type="password" :placeholder="editId ? '留空不修改' : '請設定密碼'" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-col">
-                <label>姓名 <span class="req">*</span></label>
+                <label>姓名</label>
                 <input v-model="form.fullName" type="text" placeholder="請輸入姓名" />
               </div>
               <div class="form-col-half">
-                <label>職位權限 <span class="req">*</span></label>
-                <select v-model="form.role">
+                <label>職位權限</label>
+                <select v-model="form.role" :disabled="isSelf(editId)">
                   <option value="STAFF">一般職員</option>
                   <option value="MANAGER">主管</option>
                 </select>
               </div>
               <div class="form-col-half">
-                <label>性別 <span class="req">*</span></label>
+                <label>性別</label>
                 <select v-model="form.gender">
                   <option value="男">男</option>
                   <option value="女">女</option>
@@ -383,15 +425,15 @@ function getRoleLabel(r) {
             </div>
             <div class="form-row">
               <div class="form-col-third">
-                <label>生日 <span class="req">*</span></label>
-                <input v-model="form.birthday" type="date" />
+                <label>生日</label>
+                <input v-model="form.birthday" type="date" @click="$event.target.showPicker()" />
               </div>
               <div class="form-col-third">
-                <label>電話 <span class="req">*</span></label>
-                <input v-model="form.phone" type="text" placeholder="09xx-xxx-xxx" maxlength="12" />
+                <label>電話</label>
+                <input v-model="form.phone" type="text" placeholder="0912-345-678" maxlength="12" @input="formatPhone" />
               </div>
               <div class="form-col-third">
-                <label>Email <span class="req">*</span></label>
+                <label>Email</label>
                 <input v-model="form.email" type="email" placeholder="abc@mail.com" />
               </div>
             </div>
@@ -478,7 +520,7 @@ function getRoleLabel(r) {
 .empty-state i { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
 
 .data-table { width: 100%; border-collapse: collapse; }
-.data-table thead { background: var(--brand-dark); color: white; }
+.data-table thead { background: #1b4767; color: white; }
 .data-table th {
   padding: 0.75rem 1rem; font-size: 0.8rem; font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;

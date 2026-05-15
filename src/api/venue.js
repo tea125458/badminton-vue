@@ -11,4 +11,16 @@ export const venueApi = {
   update: (id, venue) => api.put(`/venues/${id}`, venue),
   updateStatus: (id, status) => api.patch(`/venues/${id}/status`, { status }),
   delete: (id) => api.delete(`/venues/${id}`),
+
+  // POST /api/venues/upload — 上傳場館圖片（可帶 oldImageUrl 自動刪除舊圖）
+  uploadImage: (file, oldImageUrl) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    if (oldImageUrl) {
+      formData.append('oldImageUrl', oldImageUrl)
+    }
+    return api.post('/venues/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }

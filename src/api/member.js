@@ -30,7 +30,7 @@ export const memberApi = {
   changePassword: (oldPassword, newPassword) => api.put('/members/change-password', { oldPassword, newPassword }, { headers: authHeader() }),
 
   // POST /api/members/logout — 登出
-  logout: () => api.post('/members/logout'),
+  logout: () => api.post('/members/logout', null, { headers: authHeader() }),
 
   // POST /api/members/reset-password — 忘記密碼（重設密碼）
   resetPassword: (data) => api.post('/members/reset-password', data),

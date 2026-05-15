@@ -17,9 +17,14 @@ const errorMsg = ref('')
 const showPassword = ref(false)
 
 // 一鍵登入帶入測試帳號
-function quickFill() {
-  username.value = 'admin01'
-  password.value = 'admin123'
+function quickFill(role) {
+  if (role === 'manager') {
+    username.value = 'admin.lin'
+    password.value = 'admin123'
+  } else {
+    username.value = 'staff.chen'
+    password.value = 'staff123'
+  }
 }
 
 // 進入登入頁時清除舊的 Token（等同於登出）
@@ -120,9 +125,14 @@ async function handleLogin() {
         </button>
 
         <!-- 一鍵登入 -->
-        <button type="button" class="btn-demo" @click="quickFill">
-          <i class="bi bi-lightning-fill"></i> 測試帳號
-        </button>
+        <div class="demo-buttons">
+          <button type="button" class="btn-demo" @click="quickFill('manager')">
+            <i class="bi bi-lightning-fill text-warning"></i> 主管測試
+          </button>
+          <button type="button" class="btn-demo" @click="quickFill('staff')">
+            <i class="bi bi-lightning-fill text-info"></i> 職員測試
+          </button>
+        </div>
       </form>
 
       <!-- 底部連結 -->
@@ -323,18 +333,24 @@ async function handleLogin() {
 }
 
 /* ----- Demo 按鈕 ----- */
+.demo-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
 .btn-demo {
-  width: 100%;
-  padding: 0.6rem;
+  flex: 1;
+  padding: 0.6rem 0.4rem;
   border: 1.5px dashed #CBD5E1;
   border-radius: 0.65rem;
   background: transparent;
   color: #64748B;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  margin-top: 0.5rem;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .btn-demo:hover {
@@ -343,9 +359,8 @@ async function handleLogin() {
   border-color: #94A3B8;
 }
 
-.btn-demo i {
-  color: #FBBF24;
-}
+.text-warning { color: #FBBF24 !important; }
+.text-info { color: #0EA5E9 !important; }
 
 /* ----- Loading Spinner ----- */
 .spinner {
