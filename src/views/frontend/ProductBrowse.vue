@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { productApi } from '@/api/product'
 import { useCartStore } from '@/stores/cart'
@@ -35,7 +35,8 @@ onMounted(fetchProducts)
 
 // ===================== 常數 =====================
 const categoryMap = {
-  RACKET: '球拍', SHUTTLECOCK: '羽球', GRIP: '握把布',
+  RACKET: '球拍', SHUTTLECOCK: '羽球',
+  SHOES: '球鞋', GRIP: '握把布',
   STRING: '球線', ACCESSORY: '配件', OTHER: '其他',
 }
 
@@ -113,12 +114,7 @@ function modalDecreaseQty() {
   if (modal.value.qty > 1) modal.value.qty--
 }
 
-function confirmAdd() {
-  cart.add(modal.value.product, modal.value.qty)
-  closeModal()
-}
-
-function goToCart() {
+function addToCart() {
   cart.add(modal.value.product, modal.value.qty)
   closeModal()
 }
@@ -126,9 +122,35 @@ function goToCart() {
 function goToCheckout() {
   const el = document.getElementById('cartOffcanvas')
   if (el && window.bootstrap) {
-    window.bootstrap.Offcanvas.getOrCreateInstance(el).hide()
+    const offcanvas = window.bootstrap.Offcanvas.getOrCreateInstance(el)
+    el.addEventListener('hidden.bs.offcanvas', () => router.push('/cart'), { once: true })
+    offcanvas.hide()
+  } else {
+    router.push('/cart')
   }
-  router.push('/cart')
+}
+
+onUnmounted(() => {
+  // 元件卸載時確保 Bootstrap 殘留的 body scroll lock 被清除
+  document.body.style.overflow = ''
+  document.body.style.paddingRight = ''
+})
+
+// ===================== 商品詳情 Modal =====================
+const detailModal = ref({ show: false, product: null })
+
+function openDetailModal(product) {
+  detailModal.value = { show: true, product }
+}
+
+function closeDetailModal() {
+  detailModal.value.show = false
+}
+
+function openCartFromDetail() {
+  const p = detailModal.value.product
+  closeDetailModal()
+  openModal(p)
 }
 </script>
 
@@ -203,39 +225,45 @@ function goToCheckout() {
           :key="product.productId"
           class="col-6 col-md-4 col-lg-3"
         >
-          <div class="product-card card-rounded hover-lift">
+          <div class="product-card card-rounded hover-lift product-card--clickable" @click="openDetailModal(product)">
             <!-- 商品圖片 -->
             <div class="img-zoom product-img-wrap">
               <img
                 :src="product.imageUrl || defaultImage"
                 :alt="product.productName"
                 class="product-img"
+                :class="{ 'product-img--sold-out': product.stockQty === 0 }"
                 @error="onImageError"
               />
+              <div v-if="product.stockQty === 0" class="img-sold-out-overlay"></div>
+
+              <!-- 左上角類別標籤 -->
+              <span class="badge-teal img-category-badge">{{ categoryMap[product.category] || product.category }}</span>
+              <!-- 行銷標籤 -->
+              <span v-if="product.marketingTag" class="marketing-tag-badge">{{ product.marketingTag }}</span>
 
               <!-- 右上角庫存 badge -->
               <span v-if="product.stockQty === 0" class="stock-badge stock-badge--empty">缺貨中</span>
               <span v-else-if="product.stockQty < 5" class="stock-badge stock-badge--low">少量庫存</span>
-            </div>
 
-            <!-- 下方橫幅 -->
-            <div v-if="product.stockQty === 0" class="stock-banner stock-banner--empty">
-              <i class="bi bi-clock-history me-1"></i>熱銷完售，補貨中
-            </div>
-            <div v-else-if="product.stockQty < 5" class="stock-banner stock-banner--low">
-              <i class="bi bi-fire me-1"></i>熱銷中
+              <!-- 圖片底部橫幅（半透明疊層） -->
+              <div v-if="product.stockQty === 0" class="img-stock-banner img-stock-banner--empty">
+                <i class="bi bi-clock-history me-1"></i>熱銷完售，補貨中
+              </div>
+              <div v-else-if="product.stockQty < 15" class="img-stock-banner img-stock-banner--low">
+                <i class="bi bi-fire me-1"></i>熱銷中
+              </div>
             </div>
 
             <!-- 商品資訊 -->
             <div class="product-body">
-              <span class="badge-teal tracking-wide mb-2">{{ categoryMap[product.category] || product.category }}</span>
               <p class="product-brand">{{ product.brand }}</p>
               <h6 class="product-name line-clamp-2">{{ product.productName }}</h6>
               <div class="product-footer">
                 <span class="product-price">${{ Number(product.price).toLocaleString() }}</span>
                 <button
                   class="add-btn-sm"
-                  @click="openModal(product)"
+                  @click.stop="openModal(product)"
                   :disabled="product.stockQty === 0"
                 >
                   <i class="bi bi-cart-plus me-1"></i>加入
@@ -312,6 +340,82 @@ function goToCheckout() {
       </div>
     </div>
 
+    <!-- ====== 商品詳情 Modal ====== -->
+    <Transition name="modal">
+      <div v-if="detailModal.show" class="modal-overlay" @click.self="closeDetailModal">
+        <div class="detail-modal">
+
+          <!-- 標題 + 關閉 -->
+          <div class="detail-modal-header">
+            <h5 class="detail-modal-title">商品詳情</h5>
+            <button class="cart-modal-close" @click="closeDetailModal">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <hr class="cart-modal-divider" />
+
+          <!-- 內容區：左圖 + 右資訊 -->
+          <div class="detail-modal-body">
+            <!-- 左：商品圖片 -->
+            <div class="detail-modal-img-wrap">
+              <img
+                :src="detailModal.product?.imageUrl || defaultImage"
+                :alt="detailModal.product?.productName"
+                class="detail-modal-img"
+                @error="onImageError"
+              />
+              <!-- 庫存 badge -->
+              <span v-if="detailModal.product?.stockQty === 0" class="stock-badge stock-badge--empty detail-img-badge">缺貨中</span>
+              <span v-else-if="detailModal.product?.stockQty < 5" class="stock-badge stock-badge--low detail-img-badge">少量庫存</span>
+            </div>
+
+            <!-- 右：商品資訊 -->
+            <div class="detail-modal-info">
+              <span class="badge-teal detail-category-badge tracking-wide mb-2 d-inline-block">
+                {{ categoryMap[detailModal.product?.category] || detailModal.product?.category }}
+              </span>
+              <p class="detail-modal-brand">{{ detailModal.product?.brand }}</p>
+              <h4 class="detail-modal-name">{{ detailModal.product?.productName }}</h4>
+              <p class="detail-modal-price">${{ Number(detailModal.product?.price).toLocaleString() }}</p>
+
+              <!-- 規格 -->
+              <div v-if="detailModal.product?.spec" class="detail-modal-desc-wrap">
+                <p class="detail-modal-desc-label">規格</p>
+                <p class="detail-modal-desc">{{ detailModal.product?.spec }}</p>
+              </div>
+
+              <!-- 商品描述 -->
+              <div v-if="detailModal.product?.description" class="detail-modal-desc-wrap">
+                <p class="detail-modal-desc-label">商品描述</p>
+                <p class="detail-modal-desc">{{ detailModal.product?.description }}</p>
+              </div>
+
+              <!-- 庫存狀態 -->
+              <div class="detail-modal-stock">
+                <i
+                  :class="detailModal.product?.stockQty === 0 ? 'bi bi-x-circle text-danger' : 'bi bi-check-circle text-success'"
+                  class="me-1"
+                ></i>
+                <span v-if="detailModal.product?.stockQty === 0" class="text-danger">無庫存 補貨中</span>
+                <span v-else-if="detailModal.product?.stockQty <= 10" class="stock-low-text">僅剩 {{ detailModal.product?.stockQty }} 件</span>
+                <span v-else class="text-success">現貨充足</span>
+              </div>
+
+              <!-- 加入購物車按鈕 -->
+              <button
+                class="detail-modal-cart-btn btn-brand"
+                :disabled="detailModal.product?.stockQty === 0"
+                @click="openCartFromDetail"
+              >
+                <i class="bi bi-cart-plus me-2"></i>加入購物車
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </Transition>
+
     <!-- ====== 加入購物車確認 Modal ====== -->
     <Transition name="modal">
       <div v-if="modal.show" class="modal-overlay" @click.self="closeModal">
@@ -334,6 +438,10 @@ function goToCheckout() {
             <div class="cart-modal-info">
               <p class="cart-modal-name">{{ modal.product?.productName }}</p>
               <p class="cart-modal-brand">{{ categoryMap[modal.product?.category] || modal.product?.category }}</p>
+              <div v-if="modal.product?.spec" class="modal-spec">
+                <span class="modal-spec-label">規格</span>
+                <span class="modal-spec-text">{{ modal.product?.spec }}</span>
+              </div>
             </div>
             <div class="cart-modal-qty-wrap">
               <span class="cart-modal-qty-label">數量</span>
@@ -348,8 +456,8 @@ function goToCheckout() {
 
           <!-- 操作按鈕 -->
           <div class="cart-modal-actions">
-            <button class="cart-modal-continue" @click="confirmAdd">繼續購物</button>
-            <button class="btn-brand cart-modal-go" @click="goToCart">加入購物車</button>
+            <button class="cart-modal-continue" @click="closeModal">繼續購物</button>
+            <button class="btn-brand cart-modal-go" @click="addToCart">加入購物車</button>
           </div>
 
           <!-- 推薦商品 -->
@@ -524,36 +632,88 @@ function goToCheckout() {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
-  font-size: 0.62rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  padding: 0.2rem 0.55rem;
+  padding: 0.35rem 0.65rem;
   border-radius: 9999px;
   z-index: 1;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
 }
 .stock-badge--empty {
-  background: rgba(241, 245, 249, 0.92);
-  color: #94A3B8;
+  background: rgba(254, 226, 226, 0.92);
+  color: #DC3545;
 }
 .stock-badge--low {
   background: rgba(254, 243, 199, 0.95);
   color: #D97706;
 }
 
-/* 下方橫幅 */
-.stock-banner {
+/* 行銷標籤（圖片左下角） */
+.marketing-tag-badge {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  z-index: 2;
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  background: #EA580C;
+  color: white;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+/* 左上角類別標籤（圖片疊層） */
+.img-category-badge {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 1;
+  font-size: 0.78rem;
+  border-radius: 9999px;
+  padding: 0.35rem 0.65rem;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+}
+
+/* 圖片底部橫幅（半透明疊層） */
+.img-stock-banner {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
   text-align: center;
-  padding: 0.3rem 1rem;
+  padding: 0.35rem 1rem;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 1;
 }
-.stock-banner--empty {
-  background: #F1F5F9;
-  color: #94A3B8;
+.img-sold-out-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.15);
+  z-index: 0;
 }
-.stock-banner--low {
-  background: #FEF3C7;
+.product-img--sold-out {
+  filter: grayscale(10%);
+}
+.img-stock-banner--empty {
+  background: linear-gradient(90deg, #D4845A, #C46262);
+  color: white;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+}
+.img-stock-banner--low {
+  background: linear-gradient(90deg, rgba(254, 243, 199, 0.9), rgba(252, 211, 77, 0.9));
   color: #B45309;
+  font-weight: 700;
+  letter-spacing: 0.05em;
 }
 .product-img {
   width: 100%;
@@ -800,6 +960,160 @@ function goToCheckout() {
 .checkout-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ===== 商品卡片可點擊樣式 ===== */
+.product-card--clickable {
+  cursor: pointer;
+}
+
+.detail-category-badge {
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+/* ===== 商品詳情 Modal ===== */
+.detail-modal {
+  background: white;
+  border-radius: var(--brand-card-radius);
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 2rem 2rem 2rem;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+}
+.detail-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.detail-modal-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--brand-dark);
+  margin: 0;
+}
+.detail-modal-body {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+.detail-modal-img-wrap {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  flex-shrink: 0;
+  border-radius: 0.75rem;
+  background: var(--brand-bg);
+  border: 1px solid #E2E8F0;
+  overflow: hidden;
+}
+.detail-modal-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 0.75rem;
+}
+.detail-img-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+.detail-modal-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.detail-modal-brand {
+  font-size: 0.8rem;
+  color: #94A3B8;
+  font-weight: 600;
+  margin: 0.5rem 0 0.35rem;
+}
+.detail-modal-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--brand-dark);
+  line-height: 1.4;
+  margin-bottom: 0.75rem;
+}
+.detail-modal-price {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--brand-teal-dark);
+  margin-bottom: 1rem;
+}
+.detail-modal-desc-wrap {
+  background: #F8FAFC;
+  border-left: 3px solid var(--brand-teal);
+  border-radius: 0 0.4rem 0.4rem 0;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+.detail-modal-desc-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--brand-teal-dark);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+.detail-modal-desc {
+  font-size: 0.88rem;
+  color: #475569;
+  line-height: 1.65;
+  margin: 0;
+  white-space: pre-line;
+}
+.detail-modal-stock {
+  font-size: 0.88rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+}
+.stock-low-text {
+  color: #D97706;
+  font-size: 0.88rem;
+  font-weight: 400;
+}
+.detail-modal-cart-btn {
+  width: 100%;
+  border-radius: 0.75rem !important;
+  padding: 0.85rem !important;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.detail-modal-cart-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 575.98px) {
+  .detail-modal { padding: 1.5rem 1.25rem; }
+  .detail-modal-body { flex-direction: column; gap: 1.25rem; }
+  .detail-modal-img-wrap { width: 100%; height: 220px; }
+}
+
+/* ===== 規格（純文字顯示） ===== */
+.modal-spec {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.modal-spec-label {
+  font-size: 0.72rem;
+  color: #94A3B8;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.modal-spec-text {
+  font-size: 0.82rem;
+  color: #475569;
+  white-space: pre-line;
 }
 
 /* ===== 加入購物車確認 Modal ===== */

@@ -33,7 +33,7 @@ const paymentOptions = [
 ]
 
 onMounted(() => {
-  if (cart.isEmpty) {
+  if (cart.items.length === 0) {
     alert('購物車是空的，請先加入商品！')
     router.push('/products')
   }
@@ -42,7 +42,7 @@ onMounted(() => {
 // 送出訂單
 async function handleSubmit() {
   if (isSubmitting.value) return
-  if (cart.isEmpty) return
+  if (cart.items.length === 0) return
 
   // TODO: 登入機制完成後，改為從 authStore 取得 memberId
   // 目前先用 memberId = 1（王小明）做 Demo
@@ -53,7 +53,7 @@ async function handleSubmit() {
     // Step 1: 建立訂單主檔
     const newOrder = await orderApi.create({
       member: { memberId: memberId },
-      totalAmount: cart.cartTotal,
+      totalAmount: cart.total,
       paymentType: paymentType.value,
       note: note.value || null,
     })
@@ -61,14 +61,14 @@ async function handleSubmit() {
     // Step 2: 逐筆建立訂單明細（後端會自動扣庫存 + 計算 subtotal）
     for (const item of cart.items) {
       await orderApi.createItem(newOrder.orderId, {
-        product: { productId: item.productId },
-        quantity: item.quantity,
+        product: { productId: item.id },
+        quantity: item.qty,
         unitPrice: item.price,
       })
     }
 
     // Step 3: 清空購物車 → 跳轉成功頁
-    cart.clearCart()
+    cart.clear()
     router.push({
       path: '/order-success',
       query: { orderId: newOrder.orderId }
@@ -172,19 +172,19 @@ async function handleSubmit() {
             <div class="order-detail-header">
               <h3 class="order-detail-title">
                 您的訂單詳情
-                <span class="item-count">({{ cart.cartCount }}樣商品)</span>
+                <span class="item-count">({{ cart.count }}樣商品)</span>
               </h3>
               <router-link to="/cart" class="edit-cart-link">編輯購物車</router-link>
             </div>
 
             <!-- 商品列表 -->
             <div class="order-products">
-              <div v-for="item in cart.items" :key="item.productId" class="order-product-item">
+              <div v-for="item in cart.items" :key="item.id" class="order-product-item">
                 <div class="product-img-wrap">
                   <img
                     v-if="item.imageUrl"
                     :src="item.imageUrl.startsWith('/') || item.imageUrl.startsWith('http') ? item.imageUrl : '/' + item.imageUrl"
-                    :alt="item.productName"
+                    :alt="item.name"
                     class="product-img"
                   />
                   <div v-else class="product-img-placeholder">
@@ -192,12 +192,12 @@ async function handleSubmit() {
                   </div>
                 </div>
                 <div class="product-details">
-                  <div class="product-name">{{ item.productName }}</div>
+                  <div class="product-name">{{ item.name }}</div>
                   <div class="product-brand" v-if="item.brand">{{ item.brand }}</div>
-                  <div class="product-qty">數量：{{ item.quantity }}</div>
+                  <div class="product-qty">數量：{{ item.qty }}</div>
                 </div>
                 <div class="product-price">
-                  NT${{ (item.price * item.quantity).toLocaleString() }}
+                  NT${{ (item.price * item.qty).toLocaleString() }}
                 </div>
               </div>
             </div>
@@ -206,7 +206,7 @@ async function handleSubmit() {
             <div class="order-summary">
               <div class="summary-row">
                 <span>小計</span>
-                <span>NT${{ cart.cartTotal.toLocaleString() }}</span>
+                <span>NT${{ cart.total.toLocaleString() }}</span>
               </div>
               <div class="summary-row">
                 <span>
@@ -217,7 +217,7 @@ async function handleSubmit() {
               </div>
               <div class="summary-row total-row">
                 <span>總計</span>
-                <span class="total-price">NT${{ cart.cartTotal.toLocaleString() }}</span>
+                <span class="total-price">NT${{ cart.total.toLocaleString() }}</span>
               </div>
             </div>
 
@@ -226,7 +226,7 @@ async function handleSubmit() {
               <button
                 @click="handleSubmit"
                 class="submit-btn"
-                :disabled="isSubmitting || cart.isEmpty"
+                :disabled="isSubmitting || cart.items.length === 0"
               >
                 <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
                 {{ isSubmitting ? '訂單處理中...' : '確認下單' }}

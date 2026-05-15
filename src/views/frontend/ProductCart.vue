@@ -160,7 +160,7 @@ function grandTotal() {
               <span class="summary-total-price">${{ grandTotal().toLocaleString() }}</span>
             </div>
 
-            <button class="checkout-btn">
+            <button class="checkout-btn" @click="router.push('/checkout')">
               <i class="bi bi-credit-card me-2"></i>前往結帳
             </button>
 
@@ -170,6 +170,25 @@ function grandTotal() {
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- ====== 信任卡片 ====== -->
+    <div class="trust-bar">
+      <div class="trust-card">
+        <i class="bi bi-shop-window trust-icon"></i>
+        <p class="trust-title">球館自取</p>
+        <p class="trust-desc">打球順便取貨</p>
+      </div>
+      <div class="trust-card">
+        <i class="bi bi-shield-check trust-icon"></i>
+        <p class="trust-title">品質保證</p>
+        <p class="trust-desc">原廠授權商品</p>
+      </div>
+      <div class="trust-card">
+        <i class="bi bi-arrow-repeat trust-icon"></i>
+        <p class="trust-title">七天鑑賞</p>
+        <p class="trust-desc">不滿意七天內隨時退換</p>
       </div>
     </div>
 
@@ -522,6 +541,51 @@ function grandTotal() {
 .continue-btn:hover {
   border-color: var(--brand-dark);
   color: var(--brand-dark);
+}
+
+/* ===== 信任卡片 ===== */
+.trust-bar {
+  max-width: 1200px;
+  margin: 0 auto 3rem;
+  padding: 0 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.trust-card {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 1.5rem 1rem;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.trust-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+.trust-icon {
+  font-size: 1.8rem;
+  background: linear-gradient(135deg, var(--brand-sky), var(--brand-teal));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: block;
+  margin-bottom: 0.6rem;
+}
+.trust-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+  margin: 0 0 0.25rem;
+}
+.trust-desc {
+  font-size: 0.78rem;
+  color: #94A3B8;
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .trust-bar { grid-template-columns: 1fr; }
 }
 
 /* ===== 手機版 ===== */

@@ -2,7 +2,7 @@
 /**
  * 商品管理 — 列表式 CRUD + 圖片上傳 + 分頁 + 搜尋篩選
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { productApi } from '@/api/product'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 
@@ -12,6 +12,7 @@ const loading = ref(true)
 const keyword = ref('')
 const filterCategory = ref('')
 const filterStatus = ref('')
+const filterTag = ref('')
 
 // ===================== 分頁 =====================
 const currentPage = ref(1)
@@ -29,9 +30,18 @@ const formData = ref(createEmptyForm())
 const showConfirm = ref(false)
 const deleteTarget = ref(null)
 
+// ===================== 商品詳情 =====================
+const showDetail = ref(false)
+const detailProduct = ref(null)
+
+function openDetail(product) {
+  detailProduct.value = product
+  showDetail.value = true
+}
+
 // ===================== 常數 =====================
 const categoryMap = {
-  RACKET: '球拍', SHUTTLECOCK: '羽球', GRIP: '握把布',
+  RACKET: '球拍', SHUTTLECOCK: '羽球', SHOES: '球鞋', GRIP: '握把布',
   STRING: '球線', ACCESSORY: '配件', OTHER: '其他',
 }
 const categoryOptions = Object.entries(categoryMap)
@@ -51,11 +61,17 @@ const filteredProducts = computed(() => {
       p.brand?.toLowerCase().includes(keyword.value.toLowerCase())
     const matchCategory = !filterCategory.value || p.category === filterCategory.value
     const matchStatus = !filterStatus.value || p.status === filterStatus.value
-    return matchKeyword && matchCategory && matchStatus
+    const matchTag = !filterTag.value || p.marketingTag === filterTag.value
+    return matchKeyword && matchCategory && matchStatus && matchTag
   })
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredProducts.value.length / pageSize)))
+
+// 筆數變少（刪除/改狀態被篩掉）導致目前頁碼超出總頁數時，夾回最後一頁，避免卡在空白頁且分頁列隱藏
+watch(totalPages, (tp) => {
+  if (currentPage.value > tp) currentPage.value = tp
+})
 
 const pagedProducts = computed(() => {
   const start = (currentPage.value - 1) * pageSize
@@ -70,7 +86,7 @@ function createEmptyForm() {
   return {
     productId: null, productName: '', category: 'RACKET',
     brand: '', price: '', stockQty: '', description: '',
-    imageUrl: '', status: 'ACTIVE',
+    imageUrl: '', status: 'ACTIVE', spec: '', marketingTag: '',
   }
 }
 
@@ -117,6 +133,10 @@ async function handleSave() {
   if (!formData.value.productName || !formData.value.price) {
     alert('請填寫商品名稱和價格')
     return
+  }
+  // 庫存留空時預設為 0，避免後端存成 null（0 是合法庫存，不強制必填）
+  if (formData.value.stockQty === '' || formData.value.stockQty == null) {
+    formData.value.stockQty = 0
   }
   saving.value = true
   try {
@@ -183,6 +203,11 @@ function formatPrice(val) {
 }
 
 onMounted(loadProducts)
+
+const defaultImage = 'http://localhost:8080/images/products/default.png'
+function onImageError(e) {
+  e.target.src = defaultImage
+}
 </script>
 
 <template>
@@ -203,7 +228,7 @@ onMounted(loadProducts)
       <div class="card-body p-3">
         <div class="row g-3 align-items-end">
           <!-- 搜尋 -->
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label small fw-semibold text-secondary">搜尋商品</label>
             <div class="input-group">
               <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-secondary"></i></span>
@@ -234,9 +259,19 @@ onMounted(loadProducts)
               <option value="PREPARING">備貨中</option>
             </select>
           </div>
+          <!-- 標籤篩選 -->
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold text-secondary">標籤</label>
+            <select v-model="filterTag" class="form-select" @change="onFilterChange">
+              <option value="">全部標籤</option>
+              <option value="促銷">促銷</option>
+              <option value="精選">精選</option>
+              <option value="熱銷">熱銷</option>
+            </select>
+          </div>
           <!-- 新增按鈕 -->
-          <div class="col-md-4 text-end">
-            <button class="btn btn-brand" @click="openCreate">
+          <div class="col-md-3 text-end">
+            <button class="btn btn-brand btn-brand-admin" @click="openCreate">
               <i class="bi bi-plus-lg me-1"></i>新增商品
             </button>
           </div>
@@ -266,8 +301,8 @@ onMounted(loadProducts)
             <th>ID</th>
             <th>商品圖片</th>
             <th>商品名稱</th>
-            <th>分類</th>
-            <th>品牌</th>
+            <th>標籤</th>
+            <th>品類</th>
             <th>價格</th>
             <th>庫存</th>
             <th>狀態</th>
@@ -275,23 +310,30 @@ onMounted(loadProducts)
           </tr>
         </thead>
         <tbody>
-          <tr v-for="product in pagedProducts" :key="product.productId">
+          <tr v-for="product in pagedProducts" :key="product.productId" class="row-clickable" @click="openDetail(product)">
             <td class="text-secondary fw-semibold">{{ product.productId }}</td>
             <td>
               <img
-                v-if="product.imageUrl"
-                :src="product.imageUrl.startsWith('/') || product.imageUrl.startsWith('http') ? product.imageUrl : '/' + product.imageUrl"
+                :src="product.imageUrl ? (product.imageUrl.startsWith('/') || product.imageUrl.startsWith('http') ? product.imageUrl : '/' + product.imageUrl) : defaultImage"
                 :alt="product.productName"
                 class="product-list-img"
+                @error="onImageError"
               />
-              <div v-else class="product-list-img-placeholder">
-                <i class="bi bi-image" style="color: #CBD5E1"></i>
+            </td>
+            <td class="fw-bold product-name-cell">{{ product.productName }}</td>
+            <td>
+              <div class="d-flex flex-column gap-1">
+                <span v-if="product.marketingTag" class="marketing-badge">{{ product.marketingTag }}</span>
+                <span v-else class="no-tag-badge">無</span>
               </div>
             </td>
-            <td class="fw-bold">{{ product.productName }}</td>
-            <td class="text-secondary">{{ categoryMap[product.category] || product.category }}</td>
-            <td class="text-secondary">{{ product.brand || '—' }}</td>
-            <td class="fw-semibold" style="color: var(--brand-teal)">${{ Number(product.price).toLocaleString() }}</td>
+            <td>
+              <div class="d-flex flex-column gap-1">
+                <span class="text-secondary">{{ categoryMap[product.category] || product.category }}</span>
+                <span class="text-secondary" style="font-size:0.78rem; color:#94A3B8 !important">{{ product.brand || '—' }}</span>
+              </div>
+            </td>
+            <td class="fw-semibold text-price">${{ Number(product.price).toLocaleString() }}</td>
             <td :class="product.stockQty <= 5 ? 'text-danger fw-semibold' : 'text-secondary'">
               {{ product.stockQty ?? 0 }}
             </td>
@@ -303,7 +345,7 @@ onMounted(loadProducts)
                 {{ statusMap[product.status]?.label || product.status }}
               </span>
             </td>
-            <td>
+            <td @click.stop>
               <div class="d-flex gap-1">
                 <button class="btn btn-sm btn-outline-primary" title="編輯" @click="openEdit(product)">
                   <i class="bi bi-pencil"></i>
@@ -420,6 +462,21 @@ onMounted(loadProducts)
                 <option value="PREPARING">備貨中</option>
               </select>
             </div>
+            <!-- 規格 -->
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">規格</label>
+              <input v-model="formData.spec" type="text" class="form-control" placeholder="例：4U、鵝毛" maxlength="10" />
+            </div>
+            <!-- 行銷標籤 -->
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">行銷標籤</label>
+              <select v-model="formData.marketingTag" class="form-select">
+                <option value="">無</option>
+                <option value="促銷">促銷</option>
+                <option value="精選">精選</option>
+                <option value="熱銷">熱銷</option>
+              </select>
+            </div>
             <!-- 說明 -->
             <div class="col-md-8">
               <label class="form-label small fw-semibold">商品描述</label>
@@ -458,13 +515,102 @@ onMounted(loadProducts)
       @confirm="handleDelete"
       @cancel="showConfirm = false"
     />
+
+    <!-- ====== 商品詳情 Modal ====== -->
+    <div v-if="showDetail && detailProduct" class="modal-overlay" @click.self="showDetail = false">
+      <div class="modal-container detail-modal">
+        <div class="modal-header-custom">
+          <h5 class="fw-bold mb-0">
+            <i class="bi bi-info-circle me-2" style="color: var(--brand-sky)"></i>商品詳情
+          </h5>
+          <button class="btn-close" @click="showDetail = false"></button>
+        </div>
+        <div class="modal-body-custom">
+          <div class="row g-0">
+            <!-- 左側：圖片 -->
+            <div class="col-md-5 d-flex align-items-center justify-content-center detail-img-col">
+              <img
+                :src="detailProduct.imageUrl ? (detailProduct.imageUrl.startsWith('/') || detailProduct.imageUrl.startsWith('http') ? detailProduct.imageUrl : '/' + detailProduct.imageUrl) : defaultImage"
+                :alt="detailProduct.productName"
+                class="detail-img"
+                @error="onImageError"
+              />
+            </div>
+            <!-- 右側：資訊 -->
+            <div class="col-md-7 detail-info-col">
+              <!-- 標題區 -->
+              <div class="mb-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <span
+                    class="list-status-badge"
+                    :style="{ backgroundColor: statusMap[detailProduct.status]?.bg, color: statusMap[detailProduct.status]?.color }"
+                  >{{ statusMap[detailProduct.status]?.label || detailProduct.status }}</span>
+                  <span v-if="detailProduct.marketingTag" class="marketing-badge">{{ detailProduct.marketingTag }}</span>
+                </div>
+                <h4 class="fw-bold mb-1">{{ detailProduct.productName }}</h4>
+                <p class="text-secondary mb-0" style="font-size:0.85rem">ID：{{ detailProduct.productId }}</p>
+              </div>
+              <!-- 價格 -->
+              <div class="detail-price mb-3">${{ Number(detailProduct.price).toLocaleString() }}</div>
+              <!-- 基本資訊 -->
+              <div class="detail-grid mb-3">
+                <div class="detail-item">
+                  <span class="detail-label">分類</span>
+                  <span class="detail-value">{{ categoryMap[detailProduct.category] || detailProduct.category }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">品牌</span>
+                  <span class="detail-value">{{ detailProduct.brand || '—' }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">庫存</span>
+                  <span class="detail-value" :style="{ color: detailProduct.stockQty <= 5 ? '#EF4444' : 'inherit', fontWeight: detailProduct.stockQty <= 5 ? 700 : 400 }">
+                    {{ detailProduct.stockQty ?? 0 }} 件
+                  </span>
+                </div>
+              </div>
+              <!-- 商品描述 -->
+              <div v-if="detailProduct.description">
+                <p class="detail-label mb-1">商品描述</p>
+                <p class="text-secondary mb-0" style="font-size:0.875rem; line-height:1.6">{{ detailProduct.description }}</p>
+              </div>
+              <!-- 規格 -->
+              <div v-if="detailProduct.spec" class="mt-3">
+                <p class="detail-label mb-1">規格</p>
+                <p class="text-secondary mb-0" style="font-size:0.875rem; line-height:1.6; white-space:pre-line">{{ detailProduct.spec }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer-custom" style="justify-content: space-between">
+          <button class="btn btn-outline-danger" @click="showDetail = false; confirmDelete(detailProduct)">
+            <i class="bi bi-trash3 me-1"></i>刪除商品
+          </button>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" @click="showDetail = false">關閉</button>
+            <button class="btn btn-brand" @click="showDetail = false; openEdit(detailProduct)">
+              <i class="bi bi-pencil me-1"></i>編輯商品
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+/* ===== 頁面級：覆寫圓角變數 ===== */
+.product-manage {
+  --brand-card-radius: 0.5rem;
+  --brand-card-radius-lg: 0.75rem;
+}
+.btn-brand-admin {
+  border-radius: 0.5rem;
+}
+
 /* ===== 列表表格 ===== */
 .product-table thead tr {
-  background: #1E293B;
+  background: var(--brand-dark);
   color: white;
 }
 .product-table thead th {
@@ -507,6 +653,28 @@ onMounted(loadProducts)
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
+}
+
+/* ===== 商品名稱截斷 ===== */
+.product-name-cell {
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== 價格文字 ===== */
+.text-price { color: var(--brand-teal); }
+
+/* ===== 行銷標籤 ===== */
+.marketing-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  background: #FFF7ED;
+  color: #EA580C;
+  white-space: nowrap;
 }
 
 /* ===== 狀態標籤 ===== */
@@ -556,11 +724,13 @@ onMounted(loadProducts)
 }
 .modal-container {
   background: white;
-  border-radius: 1.25rem;
+  border-radius: 0.5rem;
   width: 95%;
-  max-width: 720px;
+  max-width: 900px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
   animation: slideUp 0.3s ease;
 }
@@ -570,9 +740,12 @@ onMounted(loadProducts)
   justify-content: space-between;
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #F1F5F9;
+  flex-shrink: 0;
 }
 .modal-body-custom {
   padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
 }
 .modal-footer-custom {
   display: flex;
@@ -580,12 +753,16 @@ onMounted(loadProducts)
   gap: 0.75rem;
   padding: 1rem 1.5rem;
   border-top: 1px solid #F1F5F9;
+  flex-shrink: 0;
+}
+.modal-footer-custom .btn {
+  border-radius: 0.5rem;
 }
 
 /* ===== 圖片上傳區 ===== */
 .upload-area {
   border: 2px dashed #E2E8F0;
-  border-radius: 1rem;
+  border-radius: 0.5rem;
   padding: 1.5rem;
   text-align: center;
   cursor: pointer;
@@ -604,6 +781,69 @@ onMounted(loadProducts)
   max-width: 100%;
   object-fit: contain;
   border-radius: 0.5rem;
+}
+
+/* ===== 列表行點擊 ===== */
+.row-clickable {
+  cursor: pointer;
+}
+
+/* ===== 詳情 Modal ===== */
+.detail-modal {
+  max-width: 960px;
+}
+.detail-img-col {
+  background: #F8FAFC;
+  border-right: 1px solid #F1F5F9;
+  border-radius: 0.5rem 0 0 0.5rem;
+  padding: 2rem;
+  min-height: 280px;
+}
+.detail-img {
+  max-width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 0.375rem;
+}
+.detail-info-col {
+  padding: 1.75rem;
+}
+.detail-price {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--brand-teal);
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem 1.25rem;
+}
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.detail-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.detail-value {
+  font-size: 1rem;
+  color: #1E293B;
+  font-weight: 500;
+}
+.no-tag-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  background: #F1F5F9;
+  color: #94A3B8;
+  white-space: nowrap;
 }
 
 /* ===== 動畫 ===== */
