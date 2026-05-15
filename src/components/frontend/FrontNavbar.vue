@@ -9,6 +9,7 @@
  */
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
+import { memberApi } from '@/api/member'
 
 const router = useRouter()
 const route = useRoute()
@@ -55,7 +56,14 @@ watch(() => route.path, () => {
   showDropdown.value = false  // 換頁時關閉選單
 })
 
-function handleLogout() {
+async function handleLogout() {
+  try {
+    // 呼叫登出 API 以記錄日誌
+    await memberApi.logout()
+  } catch (e) {
+    console.error('Logout API failed:', e)
+  }
+  
   localStorage.removeItem('memberToken')
   localStorage.removeItem('memberInfo')
   isLoggedIn.value = false

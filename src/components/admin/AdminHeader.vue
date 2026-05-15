@@ -6,13 +6,10 @@
  */
 import { useRouter, useRoute } from 'vue-router'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { useNotificationStore } from '../../stores/notificationStore'
+import { adminApi } from '../../api/admin'
 
 const router = useRouter()
 const route = useRoute()
-const notificationStore = useNotificationStore()
-
-// 頁面標題映射
 const pageTitles = {
   '/admin/dashboard': '數據儀表板',
   '/admin/members': '會員管理',
@@ -24,6 +21,7 @@ const pageTitles = {
   '/admin/products': '商品管理',
   '/admin/orders': '訂單管理',
   '/admin/announcements': '公告管理',
+  '/admin/logs': '操作日誌',
 }
 
 const currentTitle = computed(() => pageTitles[route.path] || '管理後台')
@@ -39,18 +37,16 @@ onMounted(() => {
   } catch (e) {
     console.error('Failed to parse adminInfo from localStorage', e)
   }
-
-  // 啟動 WebSocket 連線
-  notificationStore.connect()
 })
 
-onUnmounted(() => {
-  // 元件銷毀時斷開連線
-  notificationStore.disconnect()
-})
-
-function handleLogout() {
-  // TODO: 呼叫登出 API，清除登入狀態
+async function handleLogout() {
+  try {
+    // 呼叫登出 API 以記錄日誌
+    await adminApi.logout()
+  } catch (e) {
+    console.error('Logout API failed:', e)
+  }
+  
   localStorage.removeItem('adminToken')
   localStorage.removeItem('adminInfo')
   router.push('/admin/login')
@@ -64,38 +60,6 @@ function handleLogout() {
     </div>
 
     <div class="d-flex align-items-center gap-3">
-      <!-- 通知 -->
-      <div class="dropdown">
-        <button class="btn btn-icon" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
-          <i class="bi bi-bell"></i>
-          <span v-if="notificationStore.unreadCount > 0" class="notification-dot"></span>
-        </button>
-        
-        <ul class="dropdown-menu dropdown-menu-end shadow-sm notification-menu">
-          <li><h6 class="dropdown-header">系統通知 ({{ notificationStore.unreadCount }})</h6></li>
-          
-          <li v-if="notificationStore.unreadCount === 0">
-            <span class="dropdown-item text-muted text-center py-3">目前沒有新通知</span>
-          </li>
-          
-          <div class="notification-list">
-            <li v-for="n in notificationStore.notifications" :key="n.id">
-              <div class="dropdown-item notification-item">
-                <strong class="d-block text-truncate">{{ n.title }}</strong>
-                <p class="mb-1 text-muted small text-wrap">{{ n.content }}</p>
-                <small class="text-secondary">{{ new Date(n.time).toLocaleString() }}</small>
-              </div>
-            </li>
-          </div>
-          
-          <li><hr class="dropdown-divider"></li>
-          <li>
-            <button class="dropdown-item text-center text-primary py-2 fw-bold" @click="notificationStore.clearAll()">
-              全部標示為已讀
-            </button>
-          </li>
-        </ul>
-      </div>
 
       <!-- 管理員資訊 (點擊前往個人中心) -->
       <RouterLink to="/admin/profile" class="admin-info text-decoration-none">
@@ -135,7 +99,6 @@ function handleLogout() {
 }
 
 .btn-icon {
-  position: relative;
   width: 38px;
   height: 38px;
   border: none;
@@ -146,26 +109,6 @@ function handleLogout() {
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-}
-
-.btn-icon:hover {
-  background-color: #F0F9FF;
-  color: var(--brand-sky);
-}
-
-.btn-icon i {
-  font-size: 1.1rem;
-}
-
-.notification-dot {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 8px;
-  height: 8px;
-  background-color: #EF4444;
-  border-radius: 50%;
-  border: 2px solid white;
 }
 
 .admin-info {
@@ -220,32 +163,4 @@ function handleLogout() {
   border-color: #EF4444;
 }
 
-/* 通知選單樣式 */
-.notification-menu {
-  width: 320px;
-  padding: 0;
-  border: none;
-  border-radius: 0.75rem;
-}
-
-.notification-list {
-  max-height: 350px;
-  overflow-y: auto;
-}
-
-.notification-item {
-  white-space: normal;
-  border-bottom: 1px solid #f1f5f9;
-  padding: 0.75rem 1rem;
-  cursor: default;
-}
-
-.notification-item:last-child {
-  border-bottom: none;
-}
-
-.notification-item:active {
-  background-color: transparent;
-  color: inherit;
-}
 </style>

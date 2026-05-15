@@ -30,6 +30,7 @@ export const adminApi = {
   // ===== 管理員管理會員 =====
   getAllMembers: () => api.get('/admins/member', { headers: authHeader() }),
   searchMembers: (keyword) => api.get('/admins/member/search', { params: { keyword }, headers: authHeader() }),
+  addMember: (member) => api.post('/admins/member', member, { headers: authHeader() }),
   getMemberById: (id) => api.get(`/admins/member/${id}`, { headers: authHeader() }),
   updateMember: (id, member) => api.put(`/admins/member/${id}`, member, { headers: authHeader() }),
   deleteMember: (id) => api.delete(`/admins/member/${id}`, { headers: authHeader() }),

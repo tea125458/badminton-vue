@@ -263,31 +263,20 @@ async function handleAvatarUpload(event) {
                     <h6 class="section-title-bar mb-4">基本資料</h6>
                     <div class="row g-3 mb-4">
                       <div class="col-md-6">
-                        <label class="form-label-gray">帳號</label>
-                        <input :value="member.username" type="text" class="form-control-styled" disabled />
-                      </div>
-                      <div class="col-md-6">
                         <label class="form-label-gray">姓名</label>
                         <input v-model="form.fullName" type="text" class="form-control-styled" disabled />
                       </div>
-                    </div>
-
-                    <div class="row g-3 mb-4">
                       <div class="col-md-6">
-                        <label class="form-label-gray">手機號碼 <span class="text-danger">*</span></label>
-                        <input v-model="form.phone" type="text" class="form-control-styled"
-                               placeholder="09xx-xxx-xxx" maxlength="12" @input="formatPhone" />
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label-gray">電子信箱 <span class="text-danger">*</span></label>
-                        <input v-model="form.email" type="email" class="form-control-styled" />
+                        <label class="form-label-gray">帳號</label>
+                        <input :value="member.username" type="text" class="form-control-styled" disabled />
                       </div>
                     </div>
 
+                    <!-- 第二排：生日與性別 (皆設為反灰) -->
                     <div class="row g-3 mb-4">
                       <div class="col-md-6">
                         <label class="form-label-gray">生日</label>
-                        <input v-model="form.birthday" type="date" class="form-control-styled" @click="$event.target.showPicker()" />
+                        <input v-model="form.birthday" type="date" class="form-control-styled" disabled />
                       </div>
                       <div class="col-md-6">
                         <label class="form-label-gray">性別</label>
@@ -299,6 +288,19 @@ async function handleAvatarUpload(event) {
                             <input v-model="form.gender" type="radio" value="女" disabled /> 女
                           </label>
                         </div>
+                      </div>
+                    </div>
+
+                    <!-- 第三排：手機與信箱 (可修改) -->
+                    <div class="row g-3 mb-4">
+                      <div class="col-md-6">
+                        <label class="form-label-gray">手機號碼</label>
+                        <input v-model="form.phone" type="text" class="form-control-styled"
+                                placeholder="09xx-xxx-xxx" maxlength="12" @input="formatPhone" />
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label-gray">電子信箱</label>
+                        <input v-model="form.email" type="email" class="form-control-styled" />
                       </div>
                     </div>
 
@@ -319,7 +321,7 @@ async function handleAvatarUpload(event) {
 
                   <!-- 2. 安全設定卡片 -->
                   <div class="profile-card-base shadow-sm border p-4 bg-white mt-4">
-                    <h6 class="section-title-bar mb-4">帳號安全</h6>
+                    <h6 class="section-title-bar mb-4">修改密碼</h6>
                     <div class="row g-3 mb-3">
                       <div class="col-md-12">
                         <label class="form-label-gray">目前密碼</label>
@@ -360,7 +362,7 @@ async function handleAvatarUpload(event) {
                     <div class="d-flex justify-content-end mt-4 pt-3 border-top">
                       <button type="button" class="btn-pwd-save" @click="handleChangePassword" :disabled="isChangingPwd">
                         <span v-if="isChangingPwd" class="spinner-border spinner-border-sm me-2"></span>
-                        變更密碼
+                        確認變更
                       </button>
                     </div>
                   </div>
