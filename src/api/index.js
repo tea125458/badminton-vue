@@ -39,10 +39,13 @@ api.interceptors.request.use(
     // ✅ 成功的情況：請求正常送出前
 
     // 自動附加 JWT Token（根據路徑判斷用管理員或會員 Token）
-    const isAdminApi = config.url?.startsWith('/admins')
+    const url = config.url || ''
+    const isAdminApi = url.startsWith('/admins') || url.includes('/api/admins')
+    
     const token = isAdminApi
       ? localStorage.getItem('adminToken')
       : (localStorage.getItem('memberToken') || localStorage.getItem('adminToken'))
+      
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }

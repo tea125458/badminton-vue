@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePickupGameApi } from '@/composables/usePickupGameApi'
 import SignupPanel from '@/components/frontend/SignupPanel.vue'
+import GoogleMap from '@/components/common/GoogleMap.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,12 +21,7 @@ const skillMap = {
   ADVANCED: '高級',
 }
 
-// 真實地圖網址計算邏輯
-const googleMapUrl = computed(() => {
-  if (!game.value || !game.value.court) return ''
-  const searchQuery = '聖德基督學院'
-  return `https://maps.google.com/maps?q=${encodeURIComponent(searchQuery)}&t=&z=15&ie=UTF8&iwloc=&output=embed`
-})
+
 
 onMounted(async () => {
   await Promise.all([
@@ -82,13 +78,13 @@ const displaySignups = computed(() => {
   return signups.value.map((signup) => {
     const mId = signup.member?.memberId
     const isHost = (String(mId) === String(game.value.host?.memberId))
-    
+
     if (!memberCounts[mId]) {
       memberCounts[mId] = 1
     } else {
       memberCounts[mId]++
     }
-    
+
     const count = memberCounts[mId]
     let tag = ''
 
@@ -104,6 +100,31 @@ const displaySignups = computed(() => {
 
 const onJoinGame = async (payload) => {
   if (isButtonDisabled.value) return
+
+  // 🌟 前台詳情頁性別防呆檢查
+  const memberInfo = JSON.parse(localStorage.getItem('memberInfo')) || {}
+  const reqGender = game.value?.requiredGender || game.value?.genderLimit
+  
+  if (reqGender === 'FEMALE' && memberInfo.gender !== 'FEMALE' && memberInfo.gender !== '女') {
+    Swal.fire({ 
+      icon: 'error', 
+      title: '資格不符', 
+      text: '不好意思，本場次為主揪設定之女性專屬場次喔！', 
+      confirmButtonColor: '#ec4899',
+      confirmButtonText: '我知道了'
+    })
+    return
+  }
+  if (reqGender === 'MALE' && memberInfo.gender !== 'MALE' && memberInfo.gender !== '男') {
+    Swal.fire({ 
+      icon: 'error', 
+      title: '資格不符', 
+      text: '不好意思，本場次為主揪設定之男性專屬場次喔！', 
+      confirmButtonColor: '#0ea5e9',
+      confirmButtonText: '我知道了'
+    })
+    return
+  }
 
   isJoining.value = true
   await joinPickupGame(gameId, currentMemberId)
@@ -127,29 +148,29 @@ const handleKick = async (signupId, memberName) => {
 
 <template>
   <div class="page-bg">
-    
+
     <!-- 讀取中 -->
     <div v-if="!isLoaded" class="vh-100 d-flex align-items-center justify-content-center">
       <div class="spinner-border text-sky-blue" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
     </div>
-    
+
     <!-- 找不到資料 -->
     <div v-else-if="!game" class="vh-100 d-flex flex-column align-items-center justify-content-center">
       <i class="bi bi-emoji-frown fs-1 text-secondary mb-3"></i>
       <h4 class="text-secondary mb-4">找不到該筆揪團紀錄</h4>
       <button class="btn btn-outline-secondary rounded-pill px-4" @click="router.push('/pickup')">回揪團列表</button>
     </div>
-    
+
     <!-- 內容區 -->
     <div v-else class="content-wrapper pb-5">
-      
+
       <!-- 1. Hero Banner (全寬頂部視覺) -->
       <div class="hero-banner position-relative" style="background-image: url('/banner_c.jpg'); background-size: cover; background-position: center; height: 350px;">
         <!-- 漸層遮罩：左深右淺 -->
         <div class="position-absolute w-100 h-100 top-0 start-0" style="background: linear-gradient(to right, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 70%);"></div>
-        
+
         <div class="container position-relative h-100 d-flex align-items-center">
           <div class="w-100 text-white z-3">
             <!-- Tags (毛玻璃效果) -->
@@ -176,10 +197,10 @@ const handleKick = async (signupId, memberName) => {
       <!-- 2. 下半部內容 (重疊在 Banner 上方) -->
       <div class="container main-content position-relative z-3">
         <div class="row g-4 g-lg-5">
-          
+
           <!-- 左側資訊區 -->
           <div class="col-lg-8">
-            
+
             <!-- 🌟 主揪推薦區塊 (移至上方，增加人情味) -->
             <div class="card border-0 shadow-sm rounded-4 mb-4">
               <div class="card-body p-4 p-md-5 d-flex align-items-start position-relative overflow-hidden">
@@ -206,15 +227,15 @@ const handleKick = async (signupId, memberName) => {
                   <h4 class="fw-bold mb-0"><i class="bi bi-people-fill text-sky-blue me-2"></i>已報名隊友</h4>
                   <span class="badge bg-light text-secondary border fs-6 rounded-pill px-3 py-2">{{ game.currentPlayers }} / {{ game.maxPlayers }} 人</span>
                 </div>
-                
+
                 <div class="d-flex flex-wrap gap-4 pt-2">
                   <!-- 已經報名的人 -->
                   <div v-for="s in displaySignups" :key="s.signupId" class="text-center position-relative player-avatar-wrapper" style="width: 80px;">
                     <!-- 踢出按鈕 -->
-                    <button 
-                      v-if="isCurrentUserHost && s.displayTag !== '主揪'" 
+                    <button
+                      v-if="isCurrentUserHost && s.displayTag !== '主揪' && game.status !== 'CANCELLED' && new Date(`${game.gameDate}T${game.endTime}`) >= new Date()"
                       @click="handleKick(s.signupId, s.member?.fullName)"
-                      class="btn btn-danger btn-sm rounded-circle position-absolute shadow kick-btn" 
+                      class="btn btn-danger btn-sm rounded-circle position-absolute shadow kick-btn"
                       title="踢除此成員"
                     >
                       <i class="bi bi-x"></i>
@@ -225,10 +246,10 @@ const handleKick = async (signupId, memberName) => {
                       {{ s.member?.fullName?.charAt(0) || '無' }}
                       <span class="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white rounded-circle" style="margin-bottom: 2px; margin-right: 2px;"></span>
                     </div>
-                    
+
                     <div class="small fw-bold text-truncate w-100 text-dark">{{ s.member?.fullName }}</div>
                     <div v-if="s.displayTag" class="small text-sky-blue fw-medium" style="font-size: 0.75rem;">{{ s.displayTag }}</div>
-                    
+
                     <!-- 聯絡方式 -->
                     <div v-if="isCurrentUserHost" class="text-secondary mt-1 px-1 rounded bg-light border" style="font-size: 0.65rem;">
                       {{ s.member?.phone || '無電話' }}
@@ -286,21 +307,7 @@ const handleKick = async (signupId, memberName) => {
             <div class="card border-0 shadow-sm rounded-4 mb-5">
               <div class="card-body p-4 p-md-5">
                 <h4 class="fw-bold mb-4 pb-2 border-bottom"><i class="bi bi-geo-alt-fill text-sky-blue me-2"></i>場館位置</h4>
-                <div class="rounded-4 overflow-hidden position-relative map-container shadow-sm border mt-3" style="height: 350px; background-color: #f8f9fa;">
-                  <div v-if="!googleMapUrl" class="position-absolute top-50 start-50 translate-middle text-center">
-                    <div class="spinner-border text-sky-blue mb-2" role="status"></div>
-                    <div class="fw-bold text-secondary">載入地圖中...</div>
-                  </div>
-                  <iframe 
-                    v-else
-                    width="100%" 
-                    height="100%" 
-                    style="border:0; position: absolute; top: 0; left: 0;" 
-                    loading="lazy" 
-                    allowfullscreen 
-                    :src="googleMapUrl">
-                  </iframe>
-                </div>
+                <GoogleMap address="聖德基督學院" height="350px" />
               </div>
             </div>
 
@@ -310,7 +317,7 @@ const handleKick = async (signupId, memberName) => {
           <div class="col-lg-4">
             <!-- 確保 SignupPanel 是 sticky-top -->
             <div class="sticky-panel">
-              <SignupPanel 
+              <SignupPanel
                 :game="game"
                 :is-joining="isJoining"
                 :button-text="signupButtonText"

@@ -13,12 +13,120 @@ import { orderApi } from '@/api/order'
 import { memberApi } from '@/api/member'
 import { productApi } from '@/api/product'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import { useExport } from '@/composables/useExport'
 
 // ===================== 資料狀態 =====================
 const orders = ref([])
 const loading = ref(true)
 const keyword = ref('')
+
+// ===================== 匯出功能 =====================
+const { exportData } = useExport()
+const showExportMenu = ref(false)
+
+function getExportData() {
+  return filteredOrders.value.map(o => ({
+    '訂單編號': o.orderId,
+    '會員': o.member?.fullName || '未知',
+    '電話': o.member?.phone || '',
+    '訂購日期': o.orderDate,
+    '金額': o.totalAmount,
+    '狀態': statusMap[o.status]?.label || o.status,
+    '付款方式': paymentMap[o.paymentType] || o.paymentType || '',
+    '備註': o.note || '',
+  }))
+}
+
+function handleExport(format) {
+  showExportMenu.value = false
+  exportData(getExportData(), format)
+}
 const filterStatus = ref('')
+
+// ===================== 勾選（批次處理） =====================
+const selectedIds = ref(new Set())
+
+const isAllSelected = computed(() => {
+  return pagedOrders.value.length > 0 && pagedOrders.value.every(o => selectedIds.value.has(o.orderId))
+})
+
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    pagedOrders.value.forEach(o => selectedIds.value.delete(o.orderId))
+  } else {
+    pagedOrders.value.forEach(o => selectedIds.value.add(o.orderId))
+  }
+}
+
+function toggleSelect(orderId) {
+  if (selectedIds.value.has(orderId)) {
+    selectedIds.value.delete(orderId)
+  } else {
+    selectedIds.value.add(orderId)
+  }
+}
+
+function clearSelection() {
+  selectedIds.value = new Set()
+}
+
+// 批次變更狀態
+const showBatchStatusMenu = ref(false)
+async function batchChangeStatus(newStatus) {
+  showBatchStatusMenu.value = false
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  const label = statusMap[newStatus]?.label || newStatus
+  if (!confirm(`確定要將 ${ids.length} 筆訂單批次變更為「${label}」嗎？`)) return
+  try {
+    for (const id of ids) {
+      await orderApi.updateStatus(id, newStatus)
+    }
+    clearSelection()
+    await loadOrders()
+    alert(`已成功將 ${ids.length} 筆訂單變更為「${label}」`)
+  } catch (e) {
+    console.error('批次狀態更新失敗', e)
+    alert('部分訂單狀態更新失敗，請重新整理頁面確認')
+    await loadOrders()
+  }
+}
+
+// 批次刪除
+const showBatchDeleteConfirm = ref(false)
+async function handleBatchDelete() {
+  const ids = [...selectedIds.value]
+  showBatchDeleteConfirm.value = false
+  try {
+    for (const id of ids) {
+      await orderApi.delete(id)
+    }
+    clearSelection()
+    await loadOrders()
+    alert(`已成功刪除 ${ids.length} 筆訂單`)
+  } catch (e) {
+    console.error('批次刪除失敗', e)
+    alert('部分訂單刪除失敗，請重新整理頁面確認')
+    await loadOrders()
+  }
+}
+
+// 批次匯出（只匯出勾選的）
+function batchExport(format) {
+  const ids = [...selectedIds.value]
+  const selected = orders.value.filter(o => ids.includes(o.orderId))
+  const data = selected.map(o => ({
+    '訂單編號': o.orderId,
+    '會員': o.member?.fullName || '未知',
+    '電話': o.member?.phone || '',
+    '訂購日期': o.orderDate,
+    '金額': o.totalAmount,
+    '狀態': statusMap[o.status]?.label || o.status,
+    '付款方式': paymentMap[o.paymentType] || o.paymentType || '',
+    '備註': o.note || '',
+  }))
+  exportData(data, format)
+}
 
 // ===================== 分頁 =====================
 const currentPage = ref(1)
@@ -227,9 +335,9 @@ async function handleCreateOrder() {
 
 // ===================== 常數 =====================
 const statusMap = {
-  UNPAID:    { label: '訂單成立', color: '#F59E0B', bg: '#FEF3C7', icon: 'bi-clipboard-check' },
-  PAID:      { label: '備貨中', color: '#3B82F6', bg: '#DBEAFE', icon: 'bi-box-seam' },
-  SHIPPED:   { label: '待取貨', color: '#8B5CF6', bg: '#EDE9FE', icon: 'bi-shop' },
+  UNPAID: { label: '訂單成立', color: '#F59E0B', bg: '#FEF3C7', icon: 'bi-clipboard-check' },
+  PAID: { label: '備貨中', color: '#3B82F6', bg: '#DBEAFE', icon: 'bi-box-seam' },
+  SHIPPED: { label: '待取貨', color: '#8B5CF6', bg: '#EDE9FE', icon: 'bi-shop' },
   COMPLETED: { label: '已取貨', color: '#10B981', bg: '#D1FAE5', icon: 'bi-check2-circle' },
   CANCELLED: { label: '已取消', color: '#F43F5E', bg: '#FFE4E6', icon: 'bi-x-circle' },
 }
@@ -241,9 +349,9 @@ const paymentMap = {
 
 // 狀態流程：定義每個狀態「可以」轉到哪些狀態
 const statusFlow = {
-  UNPAID:    ['PAID', 'CANCELLED'],
-  PAID:      ['SHIPPED', 'CANCELLED'],
-  SHIPPED:   ['COMPLETED'],
+  UNPAID: ['PAID', 'CANCELLED'],
+  PAID: ['SHIPPED', 'CANCELLED'],
+  SHIPPED: ['COMPLETED'],
   COMPLETED: [],
   CANCELLED: [],
 }
@@ -261,12 +369,27 @@ const statusTabs = [
 // ===================== 計算屬性 =====================
 const filteredOrders = computed(() => {
   return orders.value.filter((o) => {
-    const matchKeyword =
-      !keyword.value ||
-      String(o.orderId).includes(keyword.value) ||
-      o.member?.fullName?.toLowerCase().includes(keyword.value.toLowerCase()) ||
-      o.member?.phone?.includes(keyword.value)
     const matchStatus = !filterStatus.value || o.status === filterStatus.value
+    if (!keyword.value) return matchStatus
+    const kw = keyword.value.trim().toLowerCase()
+
+    // #開頭 → 精確比對訂單編號
+    if (kw.startsWith('#')) {
+      const id = kw.slice(1)
+      return matchStatus && id !== '' && String(o.orderId) === id
+    }
+
+    // 一般模糊搜尋（所有欄位）
+    const matchKeyword =
+      String(o.orderId).includes(kw) ||
+      (o.member?.fullName?.toLowerCase().includes(kw)) ||
+      (o.member?.phone?.includes(kw)) ||
+      (o.member?.email?.toLowerCase().includes(kw)) ||
+      (statusMap[o.status]?.label?.includes(kw)) ||
+      (paymentMap[o.paymentType]?.includes(kw)) ||
+      String(o.totalAmount).includes(kw) ||
+      (o.orderDate?.includes(kw.replace(/\//g, '-'))) ||
+      (o.note?.toLowerCase().includes(kw))
     return matchKeyword && matchStatus
   })
 })
@@ -301,7 +424,7 @@ const dashboardStats = computed(() => {
     if (['UNPAID', 'PAID'].includes(o.status)) {
       pendingCount++
     }
-    
+
     // 今日訂單數 (不論狀態都算)
     if (o.orderDate && o.orderDate.startsWith(todayStr)) {
       todayCount++
@@ -339,6 +462,26 @@ function getProgressWidth(currentStatus) {
   const index = progressSteps.indexOf(currentStatus)
   if (index === -1) return '0%'
   return (index / (progressSteps.length - 1)) * 100 + '%'
+}
+
+// 取得各進度節點的時間
+const stepTimeFields = {
+  UNPAID: 'createdAt',
+  PAID: 'paidAt',
+  SHIPPED: 'shippedAt',
+  COMPLETED: 'completedAt',
+}
+function getStepTime(order, step) {
+  if (!order) return ''
+  const field = stepTimeFields[step]
+  const val = order[field]
+  if (!val) return ''
+  const d = new Date(val)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${mm}/${dd} ${hh}:${min}`
 }
 
 // ===================== 方法 =====================
@@ -420,6 +563,11 @@ function onFilterChange(status) {
   currentPage.value = 1
 }
 
+// 搜尋時自動跳回第 1 頁
+watch(keyword, () => {
+  currentPage.value = 1
+})
+
 function goToPage(page) {
   if (page >= 1 && page <= totalPages.value) currentPage.value = page
 }
@@ -434,10 +582,16 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('zh-TW') + ' ' + d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
 }
 
-// 點擊外部關閉狀態下拉選單
+// 點擊外部關閉狀態下拉選單 & 匯出選單 & 批次狀態選單
 function handleClickOutside(e) {
   if (!e.target.closest('.status-dropdown-wrap')) {
     closeStatusDropdown()
+  }
+  if (!e.target.closest('.export-dropdown-wrap')) {
+    showExportMenu.value = false
+  }
+  if (!e.target.closest('.batch-status-wrap')) {
+    showBatchStatusMenu.value = false
   }
 }
 
@@ -481,7 +635,29 @@ onUnmounted(() => {
           <i class="bi bi-receipt me-2" style="color: var(--brand-sky)"></i>訂單管理
         </h2>
       </div>
-      <button class="btn btn-brand" @click="openCreateOrder"><i class="bi bi-plus-lg me-1"></i>新增訂單</button>
+      <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-brand" @click="openCreateOrder"><i class="bi bi-plus-lg me-1"></i>新增訂單</button>
+        <!-- 匯出下拉選單 -->
+        <div class="export-dropdown-wrap" style="position: relative;">
+          <button class="btn btn-outline-brand" @click="showExportMenu = !showExportMenu">
+            <i class="bi bi-download me-1"></i>
+            <i class="bi bi-caret-down-fill" style="font-size: 0.6rem;"></i>
+          </button>
+          <transition name="fade">
+            <div v-if="showExportMenu" class="export-dropdown-menu">
+              <button class="export-menu-item" @click="handleExport('EXCEL')">
+                <i class="bi bi-file-earmark-excel me-2" style="color: #10B981;"></i>匯出 Excel (.xlsx)
+              </button>
+              <button class="export-menu-item" @click="handleExport('PDF')">
+                <i class="bi bi-file-earmark-pdf me-2" style="color: #EF4444;"></i>匯出 PDF (.pdf)
+              </button>
+              <button class="export-menu-item" @click="handleExport('JSON')">
+                <i class="bi bi-filetype-json me-2" style="color: #3B82F6;"></i>匯出 JSON (.json)
+              </button>
+            </div>
+          </transition>
+        </div>
+      </div>
     </div>
     <!-- ====== 工具列 (狀態比例圖 + 搜尋框) ====== -->
     <div class="card card-rounded shadow-sm border-0 mb-3">
@@ -491,37 +667,38 @@ onUnmounted(() => {
           <div class="d-flex justify-content-between align-items-end mb-2" style="color: #64748B;">
             <span class="fw-bold" style="font-size: 0.85rem;"><i class="bi bi-funnel me-1"></i>訂單狀態分佈 (點擊篩選)</span>
             <div class="d-flex align-items-center" style="font-size: 0.95rem;">
-              <span v-if="filterStatus" class="badge bg-secondary me-3 px-3 py-2 shadow-sm" style="cursor:pointer; font-size: 0.85rem;" @click="onFilterChange('')"><i class="bi bi-x-circle me-1"></i>清除篩選</span>
-              <span class="fw-bold text-dark" style="letter-spacing: 0.5px;">總計 {{ Number(statusCounts[''] || 0).toLocaleString() }} 筆</span>
+              <span v-if="filterStatus" class="badge bg-secondary me-3 px-3 py-2 shadow-sm"
+                style="cursor:pointer; font-size: 0.85rem;" @click="onFilterChange('')"><i
+                  class="bi bi-x-circle me-1"></i>清除篩選</span>
+              <span class="fw-bold text-dark" style="letter-spacing: 0.5px;">總計 {{ Number(statusCounts[''] ||
+                0).toLocaleString() }} 筆</span>
             </div>
           </div>
           <div class="status-stacked-bar">
             <!-- 我們只顯示有數量的狀態 -->
             <template v-for="tab in statusTabs.slice(1)" :key="tab.key">
-              <div v-if="statusCounts[tab.key] > 0" 
-                   class="stacked-segment"
-                   :class="{ 'is-dimmed': filterStatus && filterStatus !== tab.key, 'is-active': filterStatus === tab.key }"
-                   :style="{ 
-                     width: (statusCounts[tab.key] / statusCounts[''] * 100) + '%', 
-                     backgroundColor: statusMap[tab.key]?.color,
-                     color: 'white'
-                   }"
-                   @click="onFilterChange(tab.key)"
-                   :title="tab.label + ': ' + statusCounts[tab.key] + '筆'">
+              <div v-if="statusCounts[tab.key] > 0" class="stacked-segment"
+                :class="{ 'is-dimmed': filterStatus && filterStatus !== tab.key, 'is-active': filterStatus === tab.key }"
+                :style="{
+                  width: (statusCounts[tab.key] / statusCounts[''] * 100) + '%',
+                  backgroundColor: statusMap[tab.key]?.color,
+                  color: 'white'
+                }" @click="onFilterChange(tab.key)" :title="tab.label + ': ' + statusCounts[tab.key] + '筆'">
                 <span class="segment-label" v-if="(statusCounts[tab.key] / statusCounts[''] * 100) > 8">
                   {{ tab.label }} {{ statusCounts[tab.key] }}
                 </span>
               </div>
             </template>
             <!-- 若完全沒訂單的佔位 -->
-            <div v-if="statusCounts[''] === 0" class="stacked-segment" style="width: 100%; background-color: #E2E8F0; color: #94A3B8;">無資料</div>
+            <div v-if="statusCounts[''] === 0" class="stacked-segment"
+              style="width: 100%; background-color: #E2E8F0; color: #94A3B8;">無資料</div>
           </div>
         </div>
 
         <!-- 搜尋框 -->
         <div class="input-group" style="width: 100%; max-width: 320px; flex-shrink: 0;">
           <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-secondary"></i></span>
-          <input v-model="keyword" type="text" class="form-control border-start-0" placeholder="搜尋訂單編號、會員名稱..." />
+          <input v-model="keyword" type="text" class="form-control border-start-0" placeholder="搜尋訂單 (#編號可精確查詢)" />
         </div>
       </div>
     </div>
@@ -538,44 +715,111 @@ onUnmounted(() => {
           <p class="text-secondary mt-2">{{ orders.length === 0 ? '尚無任何訂單' : '沒有符合條件的訂單' }}</p>
         </div>
         <div v-else class="card card-rounded shadow-sm border-0">
+          <!-- 批次操作工具列 -->
+          <transition name="batch-bar">
+            <div v-if="selectedIds.size > 0" class="batch-toolbar">
+              <div class="batch-toolbar-left">
+                <span class="batch-count"><i class="bi bi-check2-square me-1"></i>已選取 <strong>{{ selectedIds.size
+                    }}</strong> 筆訂單</span>
+              </div>
+              <div class="batch-toolbar-actions">
+                <div class="batch-status-wrap" style="position: relative;">
+                  <button class="batch-btn batch-btn-status" @click.stop="showBatchStatusMenu = !showBatchStatusMenu">
+                    <i class="bi bi-arrow-repeat me-1"></i>批次變更狀態 <i class="bi bi-caret-down-fill"
+                      style="font-size: 0.55rem; margin-left: 2px;"></i>
+                  </button>
+                  <div v-if="showBatchStatusMenu" class="batch-status-menu">
+                    <button v-for="s in ['UNPAID', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED']" :key="s"
+                      class="batch-status-item" @click="batchChangeStatus(s)">
+                      <i :class="['bi', statusMap[s]?.icon]" class="me-1" :style="{ color: statusMap[s]?.color }"></i>{{
+                      statusMap[s]?.label }}
+                    </button>
+                  </div>
+                </div>
+                <button class="batch-btn batch-btn-export" @click="batchExport('EXCEL')">
+                  <i class="bi bi-file-earmark-excel me-1"></i>匯出勾選
+                </button>
+                <button class="batch-btn batch-btn-delete" @click="showBatchDeleteConfirm = true">
+                  <i class="bi bi-trash3 me-1"></i>批次刪除
+                </button>
+                <button class="batch-btn batch-btn-clear" @click="clearSelection">
+                  <i class="bi bi-x-lg me-1"></i>取消全選
+                </button>
+              </div>
+            </div>
+          </transition>
           <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-              <thead><tr style="background: #F8FAFC">
-                <th style="width: 8%">編號</th><th style="width: 18%">會員</th><th style="width: 20%">訂購日期</th>
-                <th style="width: 14%" class="text-end">金額</th><th style="width: 14%" class="text-center">狀態</th><th style="width: 26%" class="text-center">操作</th>
-              </tr></thead>
+              <thead>
+                <tr style="background: #F8FAFC">
+                  <th style="width: 4%; text-align: center; padding-left: 0.75rem;"><input type="checkbox"
+                      class="form-check-input table-check" :checked="isAllSelected" @change="toggleSelectAll"
+                      @click.stop />
+                  </th>
+                  <th style="width: 9%">訂單編號</th>
+                  <th style="width: 20%">會員</th>
+                  <th style="width: 21%">訂購日期</th>
+                  <th style="width: 14%" class="text-end">金額</th>
+                  <th style="width: 16%" class="text-center">狀態</th>
+                  <th style="width: 16%" class="text-center">操作</th>
+                </tr>
+              </thead>
               <tbody>
                 <tr v-for="order in pagedOrders" :key="order.orderId" class="c-order-row"
-                  :class="{ 'c-selected': selectedOrder?.orderId === order.orderId }"
-                  @click="selectOrder(order)" style="cursor: pointer">
+                  :class="{ 'c-selected': selectedOrder?.orderId === order.orderId }" @click="selectOrder(order)"
+                  style="cursor: pointer">
+                  <td style="text-align: center; padding-left: 0.75rem;" @click.stop><input type="checkbox"
+                      class="form-check-input table-check" :checked="selectedIds.has(order.orderId)"
+                      @change="toggleSelect(order.orderId)" /></td>
                   <td><span class="fw-bold" style="color: var(--brand-dark)">#{{ order.orderId }}</span></td>
-                  <td><div class="fw-semibold" style="font-size: 0.85rem">{{ order.member?.fullName || '未知' }}</div><div class="text-secondary" style="font-size: 0.72rem">{{ order.member?.phone || '' }}</div></td>
+                  <td>
+                    <div class="fw-semibold" style="font-size: 0.85rem">{{ order.member?.fullName || '未知' }}</div>
+                    <div class="text-secondary" style="font-size: 0.72rem">{{ order.member?.phone || '' }}</div>
+                  </td>
                   <td style="font-size: 0.82rem">{{ formatDate(order.orderDate) }}</td>
-                  <td class="text-end"><span class="fw-bold" style="color: var(--brand-teal)">{{ formatPrice(order.totalAmount) }}</span></td>
-                  <td class="text-center"><span class="order-status-badge" :style="{ backgroundColor: statusMap[order.status]?.bg, color: statusMap[order.status]?.color }"><i :class="['bi', statusMap[order.status]?.icon]" class="me-1"></i>{{ statusMap[order.status]?.label }}</span></td>
+                  <td class="text-end"><span class="fw-bold" style="color: var(--brand-teal)">{{
+                    formatPrice(order.totalAmount) }}</span></td>
+                  <td class="text-center"><span class="order-status-badge"
+                      :style="{ backgroundColor: statusMap[order.status]?.bg, color: statusMap[order.status]?.color }"><i
+                        :class="['bi', statusMap[order.status]?.icon]" class="me-1"></i>{{
+                          statusMap[order.status]?.label
+                      }}</span></td>
                   <td class="text-center" @click.stop>
                     <div class="d-flex gap-1 justify-content-center">
-                      <div class="status-dropdown-wrap">
-                        <button class="btn btn-sm action-btn action-btn-status" :disabled="statusFlow[order.status]?.length === 0" @click="toggleStatusDropdown(order.orderId)"><i class="bi bi-arrow-repeat"></i></button>
-                        <div v-if="statusDropdownId === order.orderId && statusFlow[order.status]?.length > 0" class="status-dropdown-menu">
-                          <button v-for="next in statusFlow[order.status]" :key="next" class="status-dropdown-item" :style="{ color: statusMap[next]?.color }" @click="changeStatus(order, next); closeStatusDropdown()"><i :class="['bi', statusMap[next]?.icon]" class="me-1"></i>{{ statusMap[next]?.label }}</button>
-                        </div>
-                      </div>
-                      <button class="btn btn-sm action-btn action-btn-edit" @click="openEdit(order)"><i class="bi bi-pencil"></i></button>
-                      <button class="btn btn-sm action-btn action-btn-delete" @click="confirmDelete(order)"><i class="bi bi-trash3"></i></button>
+                      <button class="btn btn-sm action-btn action-btn-edit" @click="openEdit(order)"><i
+                          class="bi bi-pencil"></i></button>
+                      <button class="btn btn-sm action-btn action-btn-delete" @click="confirmDelete(order)"><i
+                          class="bi bi-trash3"></i></button>
                     </div>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <nav v-if="totalPages > 1" class="d-flex justify-content-center py-3">
-            <ul class="pagination pagination-custom mb-0">
-              <li class="page-item" :class="{ disabled: currentPage === 1 }"><button class="page-link" @click="goToPage(currentPage - 1)"><i class="bi bi-chevron-left"></i></button></li>
-              <li v-for="page in totalPages" :key="page" class="page-item" :class="{ active: currentPage === page }"><button class="page-link" @click="goToPage(page)">{{ page }}</button></li>
-              <li class="page-item" :class="{ disabled: currentPage === totalPages }"><button class="page-link" @click="goToPage(currentPage + 1)"><i class="bi bi-chevron-right"></i></button></li>
-            </ul>
-          </nav>
+          <!-- 頁面資訊 + 分頁 -->
+          <div class="table-footer">
+            <div class="table-footer-left">
+              <span v-if="selectedIds.size > 0" class="selected-count"><i class="bi bi-check2-square me-1"></i>已選 {{
+                selectedIds.size }} 筆</span>
+              <span>共 <strong>{{ filteredOrders.length }}</strong> 筆訂單</span>
+            </div>
+            <nav v-if="totalPages > 1" class="table-footer-center">
+              <ul class="pagination pagination-custom mb-0">
+                <li class="page-item" :class="{ disabled: currentPage === 1 }"><button class="page-link"
+                    @click="goToPage(currentPage - 1)"><i class="bi bi-chevron-left"></i></button></li>
+                <li v-for="page in totalPages" :key="page" class="page-item" :class="{ active: currentPage === page }">
+                  <button class="page-link" @click="goToPage(page)">{{ page }}</button>
+                </li>
+                <li class="page-item" :class="{ disabled: currentPage === totalPages }"><button class="page-link"
+                    @click="goToPage(currentPage + 1)"><i class="bi bi-chevron-right"></i></button></li>
+              </ul>
+            </nav>
+            <div class="table-footer-right">
+              顯示第 <strong>{{ (currentPage - 1) * pageSize + 1 }}</strong>–<strong>{{ Math.min(currentPage * pageSize,
+                filteredOrders.length) }}</strong> 筆，第 <strong>{{ currentPage }}</strong> / <strong>{{ totalPages
+                }}</strong> 頁
+            </div>
+          </div>
         </div>
       </div>
       <!-- 右：詳情側邊面板 -->
@@ -584,17 +828,29 @@ onUnmounted(() => {
           <div class="c-detail-inner">
             <div class="c-detail-header d-flex align-items-center">
               <div class="flex-grow-1">
-                <h5 class="fw-bold mb-1" style="color: var(--brand-dark); font-size: 1.1rem"><i class="bi bi-receipt me-2" style="color: var(--brand-sky)"></i>#{{ selectedOrder.orderId }}</h5>
-                <span class="order-status-badge" :style="{ backgroundColor: statusMap[selectedOrder.status]?.bg, color: statusMap[selectedOrder.status]?.color }"><i :class="['bi', statusMap[selectedOrder.status]?.icon]" class="me-1"></i>{{ statusMap[selectedOrder.status]?.label }}</span>
+                <h5 class="fw-bold mb-1" style="color: var(--brand-dark); font-size: 1.1rem"><i
+                    class="bi bi-receipt me-2" style="color: var(--brand-sky)"></i>#{{ selectedOrder.orderId }}</h5>
+                <span class="order-status-badge"
+                  :style="{ backgroundColor: statusMap[selectedOrder.status]?.bg, color: statusMap[selectedOrder.status]?.color }"><i
+                    :class="['bi', statusMap[selectedOrder.status]?.icon]" class="me-1"></i>{{
+                      statusMap[selectedOrder.status]?.label }}</span>
               </div>
               <div class="text-end me-3">
-                <div class="text-secondary mb-1" style="font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px;">訂單總額</div>
-                <div class="fw-bold" style="color: var(--brand-teal); font-size: 1.25rem; line-height: 1;">{{ formatPrice(selectedOrder.totalAmount) }}</div>
+                <div class="text-secondary mb-1" style="font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px;">
+                  訂單總額
+                </div>
+                <div class="fw-bold" style="color: var(--brand-teal); font-size: 1.25rem; line-height: 1;">{{
+                  formatPrice(selectedOrder.totalAmount) }}</div>
               </div>
-              <button class="btn btn-sm btn-outline-secondary" @click="closeDetail" style="border-radius: 50%; width: 30px; height: 30px; padding: 0"><i class="bi bi-x-lg" style="font-size: 0.7rem"></i></button>
+              <button class="btn btn-sm btn-outline-secondary" @click="closeDetail"
+                style="border-radius: 50%; width: 30px; height: 30px; padding: 0"><i class="bi bi-x-lg"
+                  style="font-size: 0.7rem"></i></button>
             </div>
             <div class="c-detail-tabs">
-              <button v-for="t in [{key:'info',icon:'bi-info-circle',label:'資訊'},{key:'items',icon:'bi-box-seam',label:'明細'},{key:'notes',icon:'bi-sticky',label:'備註'}]" :key="t.key" class="c-tab-btn" :class="{ active: activeTab === t.key }" @click="activeTab = t.key"><i :class="['bi', t.icon]" class="me-1"></i>{{ t.label }}</button>
+              <button
+                v-for="t in [{ key: 'info', icon: 'bi-info-circle', label: '資訊' }, { key: 'items', icon: 'bi-box-seam', label: '明細' }, { key: 'notes', icon: 'bi-sticky', label: '備註' }]"
+                :key="t.key" class="c-tab-btn" :class="{ active: activeTab === t.key }" @click="activeTab = t.key"><i
+                  :class="['bi', t.icon]" class="me-1"></i>{{ t.label }}</button>
             </div>
             <div class="c-detail-body">
               <div v-if="activeTab === 'info'" class="c-tab-content">
@@ -603,19 +859,24 @@ onUnmounted(() => {
                     <div class="col-12 border-bottom pb-2">
                       <div class="info-label"><i class="bi bi-person me-1"></i>訂購會員</div>
                       <div class="d-flex align-items-center gap-2 mb-1">
-                        <span class="fw-bold" style="font-size: 0.95rem; color: var(--brand-dark);">{{ selectedOrder.member?.fullName || '未知' }}</span>
-                        <span class="badge bg-light text-secondary border">{{ selectedOrder.member?.phone || '-' }}</span>
+                        <span class="fw-bold" style="font-size: 0.95rem; color: var(--brand-dark);">{{
+                          selectedOrder.member?.fullName || '未知' }}</span>
+                        <span class="badge bg-light text-secondary border">{{ selectedOrder.member?.phone || '-'
+                          }}</span>
                       </div>
-                      <div class="info-sub text-muted" style="font-size: 0.75rem;"><i class="bi bi-envelope me-1"></i>{{ selectedOrder.member?.email || '-' }}</div>
+                      <div class="info-sub text-muted" style="font-size: 0.75rem;"><i class="bi bi-envelope me-1"></i>{{
+                        selectedOrder.member?.email || '-' }}</div>
                     </div>
                     <div class="col-6">
                       <div class="info-label"><i class="bi bi-calendar3 me-1"></i>訂購日期</div>
-                      <div class="info-value" style="font-size: 0.85rem;">{{ formatDate(selectedOrder.orderDate) }}</div>
+                      <div class="info-value" style="font-size: 0.85rem;">{{ formatDate(selectedOrder.orderDate) }}
+                      </div>
                     </div>
                     <div class="col-6">
                       <div class="info-label"><i class="bi bi-credit-card me-1"></i>付款方式</div>
                       <div class="info-value" style="font-size: 0.85rem;">
-                        <span class="badge" style="background: #F1F5F9; color: #475569;">{{ paymentMap[selectedOrder.paymentType] || '未設定' }}</span>
+                        <span class="badge" style="background: #F1F5F9; color: #475569;">{{
+                          paymentMap[selectedOrder.paymentType] || '未設定' }}</span>
                       </div>
                     </div>
                   </div>
@@ -626,31 +887,42 @@ onUnmounted(() => {
                   <div class="progress-tracker">
                     <div class="progress-lines-wrap">
                       <div class="progress-line"></div>
-                      <div class="progress-line-fill" 
-                           :style="{ width: getProgressWidth(selectedOrder.status), backgroundColor: 'var(--brand-sky)' }"></div>
-                    </div>
-                    
-                    <div v-for="(step, index) in ['UNPAID', 'PAID', 'SHIPPED', 'COMPLETED']" :key="step" 
-                         class="progress-step" :class="{ 'active': isStepActive(selectedOrder.status, step), 'current': selectedOrder.status === step }">
-                      <div class="step-circle" 
-                           :style="isStepActive(selectedOrder.status, step) ? { borderColor: 'var(--brand-sky)', backgroundColor: selectedOrder.status === step ? 'white' : 'var(--brand-sky)' } : {}">
-                        <i v-if="selectedOrder.status === step" :class="['bi', statusMap[step]?.icon]" :style="{ color: 'var(--brand-sky)', fontSize: '0.95rem' }"></i>
-                        <i v-else-if="isStepActive(selectedOrder.status, step)" class="bi bi-check" style="color: white; font-size: 1.2rem;"></i>
+                      <div class="progress-line-fill"
+                        :style="{ width: getProgressWidth(selectedOrder.status), backgroundColor: 'var(--brand-sky)' }">
                       </div>
-                      <div class="step-label" :style="selectedOrder.status === step ? { color: 'var(--brand-sky)', fontWeight: '700' } : {}">
+                    </div>
+
+                    <div v-for="(step, index) in ['UNPAID', 'PAID', 'SHIPPED', 'COMPLETED']" :key="step"
+                      class="progress-step"
+                      :class="{ 'active': isStepActive(selectedOrder.status, step), 'current': selectedOrder.status === step && step !== 'COMPLETED' }">
+                      <div class="step-circle"
+                        :style="isStepActive(selectedOrder.status, step) ? { borderColor: 'var(--brand-sky)', backgroundColor: (selectedOrder.status === step && step !== 'COMPLETED') ? 'white' : 'var(--brand-sky)' } : {}">
+                        <i v-if="selectedOrder.status === step && step !== 'COMPLETED'"
+                          :class="['bi', statusMap[step]?.icon]"
+                          :style="{ color: 'var(--brand-sky)', fontSize: '0.95rem' }"></i>
+                        <i v-else-if="isStepActive(selectedOrder.status, step)" class="bi bi-check"
+                          style="color: white; font-size: 1.2rem;"></i>
+                      </div>
+                      <div class="step-label"
+                        :style="(selectedOrder.status === step && step !== 'COMPLETED') ? { color: 'var(--brand-sky)', fontWeight: '700' } : {}">
                         {{ statusMap[step]?.label }}
+                      </div>
+                      <div class="step-time"
+                        v-if="isStepActive(selectedOrder.status, step) && getStepTime(selectedOrder, step)"
+                        :style="(selectedOrder.status === step && step !== 'COMPLETED') ? { color: 'var(--brand-sky)', fontWeight: '700' } : {}">
+                        {{ getStepTime(selectedOrder, step) }}
                       </div>
                     </div>
                   </div>
-                  
+
                   <!-- 若有可變更的下一步，顯示按鈕 -->
-                  <div v-if="statusFlow[selectedOrder.status]?.length > 0" class="d-flex justify-content-center gap-2 mt-4 pt-3" style="border-top: 1px dashed #E2E8F0;">
+                  <div v-if="statusFlow[selectedOrder.status]?.length > 0"
+                    class="d-flex justify-content-center gap-2 mt-4 pt-3" style="border-top: 1px dashed #E2E8F0;">
                     <span class="text-secondary" style="font-size: 0.8rem; line-height: 30px;">手動更新進度：</span>
-                    <button v-for="next in statusFlow[selectedOrder.status]" :key="next" class="btn btn-sm fw-bold" 
-                      style="font-size: 0.85rem; padding: 0.35rem 1rem; border-radius: 8px; transition: all 0.2s;" 
-                      :style="next === 'CANCELLED' ? { color: statusMap[next]?.color, border: '1px solid ' + statusMap[next]?.color, background: 'white' } : { color: 'white', background: statusMap[next]?.color, border: '1px solid ' + statusMap[next]?.color, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }" 
-                      @click="changeStatus(selectedOrder, next)"
-                      onmouseover="this.style.opacity='0.85'"
+                    <button v-for="next in statusFlow[selectedOrder.status]" :key="next" class="btn btn-sm fw-bold"
+                      style="font-size: 0.85rem; padding: 0.35rem 1rem; border-radius: 8px; transition: all 0.2s;"
+                      :style="next === 'CANCELLED' ? { color: statusMap[next]?.color, border: '1px solid ' + statusMap[next]?.color, background: 'white' } : { color: 'white', background: statusMap[next]?.color, border: '1px solid ' + statusMap[next]?.color, boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }"
+                      @click="changeStatus(selectedOrder, next)" onmouseover="this.style.opacity='0.85'"
                       onmouseout="this.style.opacity='1'">
                       <i v-if="next !== 'CANCELLED'" :class="['bi', statusMap[next]?.icon]" class="me-1"></i>
                       <i v-else class="bi bi-x-lg me-1"></i>
@@ -658,30 +930,48 @@ onUnmounted(() => {
                     </button>
                   </div>
                   <!-- 訂單取消提示 -->
-                  <div v-if="selectedOrder.status === 'CANCELLED'" class="text-center mt-3 text-danger fw-bold" style="font-size: 0.9rem;">
+                  <div v-if="selectedOrder.status === 'CANCELLED'" class="text-center mt-3 text-danger fw-bold"
+                    style="font-size: 0.9rem;">
                     <i class="bi bi-x-circle me-1"></i>此訂單已取消
                   </div>
                 </div>
               </div>
               <div v-if="activeTab === 'items'" class="c-tab-content">
-                <div v-if="loadingItems" class="text-center py-4"><div class="spinner-border spinner-border-sm" style="color: var(--brand-sky)"></div></div>
-                <div v-else-if="orderItems.length === 0" class="text-center py-4 text-secondary" style="font-size: 0.85rem">尚無明細</div>
+                <div v-if="loadingItems" class="text-center py-4">
+                  <div class="spinner-border spinner-border-sm" style="color: var(--brand-sky)"></div>
+                </div>
+                <div v-else-if="orderItems.length === 0" class="text-center py-4 text-secondary"
+                  style="font-size: 0.85rem">
+                  尚無明細</div>
                 <div v-else>
                   <div v-for="item in orderItems" :key="item.itemId" class="c-item-row">
                     <div class="d-flex align-items-center gap-3">
-                      <img v-if="item.product?.imageUrl" :src="item.product.imageUrl.startsWith('/') || item.product.imageUrl.startsWith('http') ? item.product.imageUrl : '/' + item.product.imageUrl" class="rounded-3" style="width: 72px; height: 72px; object-fit: cover; border: 1px solid #E2E8F0; flex-shrink: 0;" />
-                      <div v-else class="rounded-3 d-flex align-items-center justify-content-center" style="width: 72px; height: 72px; background: #F1F5F9; flex-shrink: 0;"><i class="bi bi-box-seam" style="color: #CBD5E1; font-size: 1.5rem"></i></div>
+                      <img v-if="item.product?.imageUrl"
+                        :src="item.product.imageUrl.startsWith('/') || item.product.imageUrl.startsWith('http') ? item.product.imageUrl : '/' + item.product.imageUrl"
+                        class="rounded-3"
+                        style="width: 80px; height: 80px; object-fit: scale-down; background: #fff; border: 1.5px solid #E2E8F0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex-shrink: 0;" />
+                      <div v-else class="rounded-3 d-flex align-items-center justify-content-center"
+                        style="width: 80px; height: 80px; background: #F1F5F9; border: 1.5px solid #E2E8F0; flex-shrink: 0;"><i
+                          class="bi bi-box-seam" style="color: #CBD5E1; font-size: 1.6rem"></i></div>
                       <div class="flex-grow-1">
-                        <div class="fw-semibold" style="font-size: 0.9rem; color: var(--brand-dark); line-height: 1.4;">{{ item.product?.productName || '未知商品' }}</div>
-                        <div class="text-secondary mt-1" style="font-size: 0.78rem">單價 {{ formatPrice(item.unitPrice) }} × {{ item.quantity }} 件</div>
+                        <div class="fw-semibold" style="font-size: 0.9rem; color: var(--brand-dark); line-height: 1.4;">
+                          {{
+                            item.product?.productName || '未知商品' }}</div>
+                        <div class="text-secondary mt-1" style="font-size: 0.78rem">單價 {{ formatPrice(item.unitPrice) }}
+                          ×
+                          {{ item.quantity }} 件</div>
                       </div>
-                      <div class="fw-bold text-end" style="color: var(--brand-teal); font-size: 1rem; white-space: nowrap;">{{ formatPrice(item.subtotal) }}</div>
+                      <div class="fw-bold text-end"
+                        style="color: var(--brand-teal); font-size: 1rem; white-space: nowrap;">
+                        {{ formatPrice(item.subtotal) }}</div>
                     </div>
                   </div>
                 </div>
               </div>
               <div v-if="activeTab === 'notes'" class="c-tab-content">
-                <div v-if="selectedOrder.note" class="p-3 rounded-3" style="background: #FFFBEB; font-size: 0.85rem; line-height: 1.8"><i class="bi bi-sticky me-1" style="color: #F59E0B"></i>{{ selectedOrder.note }}</div>
+                <div v-if="selectedOrder.note" class="p-3 rounded-3"
+                  style="background: #FFFBEB; font-size: 0.85rem; line-height: 1.8"><i class="bi bi-sticky me-1"
+                    style="color: #F59E0B"></i>{{ selectedOrder.note }}</div>
                 <div v-else class="text-center text-secondary py-4" style="font-size: 0.85rem">此訂單無備註</div>
               </div>
             </div>
@@ -735,13 +1025,13 @@ onUnmounted(() => {
     </div>
 
     <!-- ====== 刪除確認 ====== -->
-    <ConfirmDialog
-      :visible="showConfirm"
-      title="確認刪除"
-      :message="`確定要刪除訂單 #${deleteTarget?.orderId} 嗎？訂單明細也會一併刪除，此操作無法復原。`"
-      @confirm="handleDelete"
-      @cancel="showConfirm = false"
-    />
+    <ConfirmDialog :visible="showConfirm" title="確認刪除"
+      :message="`確定要刪除訂單 #${deleteTarget?.orderId} 嗎？訂單明細也會一併刪除，此操作無法復原。`" @confirm="handleDelete"
+      @cancel="showConfirm = false" />
+    <!-- ====== 批次刪除確認 ====== -->
+    <ConfirmDialog :visible="showBatchDeleteConfirm" title="批次刪除確認"
+      :message="`確定要刪除已勾選的 ${selectedIds.size} 筆訂單嗎？訂單明細也會一併刪除，此操作無法復原。`" @confirm="handleBatchDelete"
+      @cancel="showBatchDeleteConfirm = false" />
 
     <!-- ====== 新增訂單 Modal ====== -->
     <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
@@ -762,7 +1052,8 @@ onUnmounted(() => {
                 <i class="bi bi-person-check-fill" style="color: var(--brand-teal); font-size: 1.2rem"></i>
                 <div>
                   <div class="fw-semibold">{{ selectedMember.fullName || selectedMember.username }}</div>
-                  <div class="text-secondary" style="font-size: 0.75rem">{{ selectedMember.phone || '' }} · ID: {{ selectedMember.memberId }}</div>
+                  <div class="text-secondary" style="font-size: 0.75rem">{{ selectedMember.phone || '' }} · ID: {{
+                    selectedMember.memberId }}</div>
                 </div>
               </div>
               <button class="btn btn-sm btn-outline-secondary" @click="clearMember">
@@ -772,33 +1063,24 @@ onUnmounted(() => {
             <div v-else class="position-relative">
               <div class="input-group">
                 <span class="input-group-text bg-white"><i class="bi bi-search text-secondary"></i></span>
-                <input
-                  v-model="memberKeyword"
-                  type="text"
-                  class="form-control"
-                  placeholder="輸入姓名或手機搜尋會員..."
-                  @input="onMemberInput"
-                  @focus="memberKeyword.length > 0 && (showMemberDropdown = true)"
-                  autocomplete="off"
-                />
+                <input v-model="memberKeyword" type="text" class="form-control" placeholder="輸入姓名或手機搜尋會員..."
+                  @input="onMemberInput" @focus="memberKeyword.length > 0 && (showMemberDropdown = true)"
+                  autocomplete="off" />
                 <span v-if="searchingMember" class="input-group-text bg-white">
                   <div class="spinner-border spinner-border-sm text-secondary"></div>
                 </span>
               </div>
               <!-- 搜尋結果下拉 -->
               <div v-if="showMemberDropdown && memberResults.length > 0" class="member-dropdown">
-                <button
-                  v-for="m in memberResults"
-                  :key="m.memberId"
-                  class="member-dropdown-item"
-                  @click="pickMember(m)"
-                >
+                <button v-for="m in memberResults" :key="m.memberId" class="member-dropdown-item"
+                  @click="pickMember(m)">
                   <i class="bi bi-person me-2" style="color: var(--brand-sky)"></i>
                   <span class="fw-semibold">{{ m.fullName || m.username }}</span>
                   <span class="text-secondary ms-2" style="font-size: 0.75rem">{{ m.phone || '' }}</span>
                 </button>
               </div>
-              <div v-else-if="showMemberDropdown && memberKeyword.length > 0 && !searchingMember" class="member-dropdown">
+              <div v-else-if="showMemberDropdown && memberKeyword.length > 0 && !searchingMember"
+                class="member-dropdown">
                 <div class="text-center text-secondary py-2" style="font-size: 0.85rem">找不到符合的會員</div>
               </div>
             </div>
@@ -831,15 +1113,14 @@ onUnmounted(() => {
             <div class="col">
               <select v-model="selectedProductId" class="form-select form-select-sm">
                 <option value="">請選擇商品</option>
-                <option
-                  v-for="p in products"
-                  :key="p.productId"
-                  :value="p.productId"
-                >{{ p.productName }} ({{ p.brand }}) - NT${{ p.price.toLocaleString() }} [庫存:{{ p.stockQty }}]</option>
+                <option v-for="p in products" :key="p.productId" :value="p.productId">{{ p.productName }} ({{ p.brand
+                  }}) -
+                  NT${{ p.price.toLocaleString() }} [庫存:{{ p.stockQty }}]</option>
               </select>
             </div>
             <div class="col-auto" style="width: 80px">
-              <input v-model.number="selectQty" type="number" class="form-control form-control-sm" min="1" placeholder="數量" />
+              <input v-model.number="selectQty" type="number" class="form-control form-control-sm" min="1"
+                placeholder="數量" />
             </div>
             <div class="col-auto">
               <button class="btn btn-sm btn-success" @click="addToCart">
@@ -869,24 +1150,24 @@ onUnmounted(() => {
                 <tr v-for="(item, idx) in cart" :key="item.productId">
                   <td>
                     <div class="d-flex align-items-center gap-2">
-                      <img
-                        v-if="item.imageUrl"
+                      <img v-if="item.imageUrl"
                         :src="item.imageUrl.startsWith('/') || item.imageUrl.startsWith('http') ? item.imageUrl : '/' + item.imageUrl"
-                        class="rounded"
-                        style="width: 32px; height: 32px; object-fit: cover"
-                      />
+                        class="rounded" style="width: 32px; height: 32px; object-fit: cover" />
                       <span class="fw-semibold" style="font-size: 0.85rem">{{ item.name }}</span>
                     </div>
                   </td>
                   <td class="text-center" style="font-size: 0.85rem">NT$ {{ item.price.toLocaleString() }}</td>
                   <td class="text-center">
                     <div class="d-flex align-items-center justify-content-center gap-1">
-                      <button class="btn btn-sm btn-outline-secondary" style="padding: 0 6px; font-size: 0.75rem" @click="updateCartQty(idx, -1)">−</button>
+                      <button class="btn btn-sm btn-outline-secondary" style="padding: 0 6px; font-size: 0.75rem"
+                        @click="updateCartQty(idx, -1)">−</button>
                       <span class="fw-bold" style="min-width: 24px; text-align: center">{{ item.quantity }}</span>
-                      <button class="btn btn-sm btn-outline-secondary" style="padding: 0 6px; font-size: 0.75rem" @click="updateCartQty(idx, 1)">+</button>
+                      <button class="btn btn-sm btn-outline-secondary" style="padding: 0 6px; font-size: 0.75rem"
+                        @click="updateCartQty(idx, 1)">+</button>
                     </div>
                   </td>
-                  <td class="text-end fw-bold" style="font-size: 0.85rem; color: var(--brand-teal)">NT$ {{ (item.price * item.quantity).toLocaleString() }}</td>
+                  <td class="text-end fw-bold" style="font-size: 0.85rem; color: var(--brand-teal)">NT$ {{ (item.price *
+                    item.quantity).toLocaleString() }}</td>
                   <td class="text-center">
                     <button class="btn btn-sm text-danger" style="padding: 0 4px" @click="removeFromCart(idx)">
                       <i class="bi bi-x-lg" style="font-size: 0.7rem"></i>
@@ -897,7 +1178,8 @@ onUnmounted(() => {
               <tfoot v-if="cart.length > 0">
                 <tr style="border-top: 2px solid #E2E8F0">
                   <td colspan="3" class="text-end fw-bold" style="font-size: 0.9rem">訂單合計</td>
-                  <td class="text-end fw-bold" style="font-size: 1.1rem; color: var(--brand-teal)">NT$ {{ cartTotal.toLocaleString() }}</td>
+                  <td class="text-end fw-bold" style="font-size: 1.1rem; color: var(--brand-teal)">NT$ {{
+                    cartTotal.toLocaleString() }}</td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -906,7 +1188,8 @@ onUnmounted(() => {
         </div>
         <div class="modal-footer-custom">
           <button class="btn btn-outline-secondary" @click="showCreateModal = false">取消</button>
-          <button class="btn btn-brand" :disabled="creating || !selectedMember || cart.length === 0" @click="handleCreateOrder">
+          <button class="btn btn-brand" :disabled="creating || !selectedMember || cart.length === 0"
+            @click="handleCreateOrder">
             <span v-if="creating" class="spinner-border spinner-border-sm me-1"></span>
             {{ creating ? '建立中...' : '送出訂單' }}
           </button>
@@ -927,6 +1210,7 @@ table th {
   padding: 0.75rem 1rem;
   border-bottom: 2px solid #F1F5F9;
 }
+
 table td {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid #F1F5F9;
@@ -936,17 +1220,21 @@ table td {
 .order-row {
   transition: background 0.2s ease;
 }
+
 .order-row:hover {
   background: #F8FAFC !important;
 }
+
 .order-row.expanded {
   background: #F0F9FF !important;
 }
+
 .expand-icon {
   font-size: 0.75rem;
   color: #94A3B8;
   transition: transform 0.2s ease;
 }
+
 .order-row.expanded .expand-icon {
   color: var(--brand-sky);
 }
@@ -982,15 +1270,18 @@ table td {
   color: #64748B;
   transition: all 0.2s ease;
 }
+
 .status-tab:hover {
   border-color: var(--brand-sky);
   color: var(--brand-sky);
 }
+
 .status-tab.active {
   background: var(--brand-sky);
   border-color: var(--brand-sky);
   color: white;
 }
+
 .tab-count {
   display: inline-block;
   font-size: 0.7rem;
@@ -1000,6 +1291,7 @@ table td {
   border-radius: 9999px;
   margin-left: 0.3rem;
 }
+
 .status-tab.active .tab-count {
   background: rgba(255, 255, 255, 0.25);
 }
@@ -1008,6 +1300,7 @@ table td {
 .detail-row td {
   background: #FAFBFC;
 }
+
 .detail-panel {
   padding: 1rem 1.5rem 1rem 3rem;
   animation: slideDown 0.25s ease;
@@ -1024,15 +1317,18 @@ table td {
   margin: 0 2px;
   transition: all 0.2s ease;
 }
+
 .pagination-custom .page-link:hover {
   background: #F0F9FF;
   color: var(--brand-sky);
 }
+
 .pagination-custom .active .page-link {
   background: var(--brand-sky);
   color: white;
   box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
 }
+
 .pagination-custom .disabled .page-link {
   color: #CBD5E1;
 }
@@ -1049,6 +1345,7 @@ table td {
   z-index: 1050;
   animation: fadeIn 0.2s ease;
 }
+
 .modal-container {
   background: white;
   border-radius: 1.25rem;
@@ -1059,6 +1356,7 @@ table td {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
   animation: slideUp 0.3s ease;
 }
+
 .modal-header-custom {
   display: flex;
   align-items: center;
@@ -1066,9 +1364,11 @@ table td {
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #F1F5F9;
 }
+
 .modal-body-custom {
   padding: 1.5rem;
 }
+
 .modal-footer-custom {
   display: flex;
   justify-content: flex-end;
@@ -1079,16 +1379,37 @@ table td {
 
 /* ===== 動畫 ===== */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
+
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 @keyframes slideDown {
-  from { opacity: 0; max-height: 0; }
-  to { opacity: 1; max-height: 500px; }
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
 }
 
 /* ===== 操作按鈕 ===== */
@@ -1100,16 +1421,19 @@ table td {
   transition: all 0.2s ease;
   white-space: nowrap;
 }
+
 .action-btn-status {
   background: #F0F9FF;
   color: var(--brand-sky, #0EA5E9);
   border: 1px solid #BAE6FD;
 }
+
 .action-btn-status:hover:not(:disabled) {
   background: var(--brand-sky, #0EA5E9);
   color: white;
   border-color: var(--brand-sky, #0EA5E9);
 }
+
 .action-btn-status:disabled {
   background: #F1F5F9;
   color: #CBD5E1;
@@ -1117,21 +1441,25 @@ table td {
   cursor: not-allowed;
   opacity: 0.6;
 }
+
 .action-btn-edit {
   background: #EEF2FF;
   color: #6366F1;
   border: 1px solid #C7D2FE;
 }
+
 .action-btn-edit:hover {
   background: #6366F1;
   color: white;
   border-color: #6366F1;
 }
+
 .action-btn-delete {
   background: #FEF2F2;
   color: #EF4444;
   border: 1px solid #FECACA;
 }
+
 .action-btn-delete:hover {
   background: #EF4444;
   color: white;
@@ -1142,6 +1470,7 @@ table td {
 .status-dropdown-wrap {
   position: relative;
 }
+
 .status-dropdown-menu {
   position: absolute;
   top: 100%;
@@ -1157,6 +1486,7 @@ table td {
   min-width: 120px;
   animation: fadeIn 0.15s ease;
 }
+
 .status-dropdown-item {
   display: flex;
   align-items: center;
@@ -1170,6 +1500,7 @@ table td {
   cursor: pointer;
   transition: background 0.15s ease;
 }
+
 .status-dropdown-item:hover {
   background: #F8FAFC;
 }
@@ -1184,6 +1515,7 @@ table td {
   border: 1px solid #A7F3D0;
   border-radius: 0.75rem;
 }
+
 .member-dropdown {
   position: absolute;
   top: 100%;
@@ -1199,6 +1531,7 @@ table td {
   z-index: 1060;
   animation: fadeIn 0.15s ease;
 }
+
 .member-dropdown-item {
   display: flex;
   align-items: center;
@@ -1210,6 +1543,7 @@ table td {
   cursor: pointer;
   transition: background 0.15s ease;
 }
+
 .member-dropdown-item:hover {
   background: #F0F9FF;
 }
@@ -1220,47 +1554,177 @@ table td {
   border-radius: 0.75rem;
   overflow: hidden;
 }
+
 /* ===== C 版面：左右分割 ===== */
-.c-layout { display: flex; gap: 1rem; transition: all 0.35s cubic-bezier(0.4,0,0.2,1); }
-.c-master { flex: 1; min-width: 0; transition: all 0.35s cubic-bezier(0.4,0,0.2,1); }
-.c-layout.has-detail .c-master { flex: 0 0 58%; }
-.c-detail { flex: 0 0 40%; min-width: 0; }
-.c-detail-inner {
-  background: white; border-radius: 1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-  border: 1px solid #F1F5F9; overflow: hidden; position: sticky; top: 1rem;
-  max-height: calc(100vh - 120px); display: flex; flex-direction: column;
+.c-layout {
+  display: flex;
+  gap: 1rem;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.c-order-row { transition: background 0.15s ease; }
-.c-order-row:hover { background: #F0F9FF !important; }
-.c-order-row.c-selected { background: #E0F2FE !important; border-left: 3px solid var(--brand-sky); }
+
+.c-master {
+  flex: 1;
+  min-width: 0;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.c-layout.has-detail .c-master {
+  flex: 0 0 58%;
+}
+
+.c-detail {
+  flex: 0 0 40%;
+  min-width: 0;
+}
+
+.c-detail-inner {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #F1F5F9;
+  overflow: hidden;
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+}
+
+.c-order-row {
+  transition: background 0.15s ease;
+}
+
+.c-order-row:hover {
+  background: #F0F9FF !important;
+}
+
+.c-order-row.c-selected {
+  background: #E0F2FE !important;
+  border-left: 3px solid var(--brand-sky);
+}
+
 .c-detail-header {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  padding: 1rem 1.25rem; border-bottom: 1px solid #F1F5F9;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #F1F5F9;
   background: linear-gradient(135deg, #FAFBFC 0%, #F0F9FF 100%);
 }
-.c-detail-tabs { display: flex; gap: 0; border-bottom: 1px solid #F1F5F9; background: #FAFBFC; }
-.c-tab-btn {
-  flex: 1; padding: 0.55rem 0.25rem; border: none; background: none;
-  color: #64748B; font-size: 0.75rem; font-weight: 600; cursor: pointer;
-  border-bottom: 2px solid transparent; transition: all 0.2s ease;
+
+.c-detail-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #F1F5F9;
+  background: #FAFBFC;
 }
-.c-tab-btn:hover { color: var(--brand-sky); }
-.c-tab-btn.active { color: var(--brand-sky); border-bottom-color: var(--brand-sky); background: white; }
-.c-detail-body { flex: 1; overflow-y: auto; padding: 1rem 1.25rem; }
-.c-tab-content { animation: fadeIn 0.2s ease; }
-.c-item-row { padding: 0.5rem 0; border-bottom: 1px solid #F1F5F9; }
-.c-item-row:last-child { border-bottom: none; }
-.info-card { padding: 0.65rem 0.85rem; background: #FAFBFC; border-radius: 0.65rem; border: 1px solid #F1F5F9; }
-.info-label { font-size: 0.68rem; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.2rem; }
-.info-value { font-size: 0.95rem; font-weight: 700; color: var(--brand-dark); }
-.info-sub { font-size: 0.72rem; color: #94A3B8; margin-top: 0.1rem; }
-.stat-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+.c-tab-btn {
+  flex: 1;
+  padding: 0.55rem 0.25rem;
+  border: none;
+  background: none;
+  color: #64748B;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.c-tab-btn:hover {
+  color: var(--brand-sky);
+}
+
+.c-tab-btn.active {
+  color: var(--brand-sky);
+  border-bottom-color: var(--brand-sky);
+  background: white;
+}
+
+.c-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem;
+}
+
+.c-tab-content {
+  animation: fadeIn 0.2s ease;
+}
+
+.c-item-row {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.c-item-row:last-child {
+  border-bottom: none;
+}
+
+.info-card {
+  padding: 0.65rem 0.85rem;
+  background: #FAFBFC;
+  border-radius: 0.65rem;
+  border: 1px solid #F1F5F9;
+}
+
+.info-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.2rem;
+}
+
+.info-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+}
+
+.info-sub {
+  font-size: 0.72rem;
+  color: #94A3B8;
+  margin-top: 0.1rem;
+}
+
+.stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
 /* 側邊面板滑入動畫 */
-.slide-panel-enter-active { transition: all 0.35s cubic-bezier(0.4,0,0.2,1); }
-.slide-panel-leave-active { transition: all 0.25s cubic-bezier(0.4,0,0.2,1); }
-.slide-panel-enter-from { opacity: 0; transform: translateX(30px); }
-.slide-panel-leave-to { opacity: 0; transform: translateX(30px); }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.slide-panel-enter-active {
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-panel-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-panel-enter-from {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+.slide-panel-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 /* 儀表板 Banner */
 .dashboard-banner {
   background: white;
@@ -1268,25 +1732,30 @@ table td {
   overflow: hidden;
   border: 1px solid #E2E8F0;
 }
+
 .stat-block {
   padding: 1.2rem 1rem;
   border-right: 1px solid #F1F5F9;
   transition: background 0.2s ease;
 }
+
 .stat-block:hover {
   background: #F8FAFC;
 }
+
 .stat-label {
   font-size: 0.85rem;
   font-weight: 600;
   color: #64748B;
   margin-bottom: 0.5rem;
 }
+
 .stat-value {
   font-size: 1.5rem;
   font-weight: 700;
   color: #1E293B;
 }
+
 .text-brand {
   color: var(--brand-teal);
 }
@@ -1298,6 +1767,7 @@ table td {
   justify-content: space-between;
   margin-bottom: 1rem;
 }
+
 .progress-lines-wrap {
   position: absolute;
   top: 10px;
@@ -1306,12 +1776,14 @@ table td {
   height: 4px;
   z-index: 1;
 }
+
 .progress-line {
   width: 100%;
   height: 100%;
   background: #E2E8F0;
   border-radius: 2px;
 }
+
 .progress-line-fill {
   position: absolute;
   top: 0;
@@ -1322,6 +1794,7 @@ table td {
   transition: width 0.4s ease;
   border-radius: 2px;
 }
+
 .progress-step {
   position: relative;
   z-index: 3;
@@ -1330,6 +1803,7 @@ table td {
   align-items: center;
   width: 25%;
 }
+
 .step-circle {
   width: 24px;
   height: 24px;
@@ -1344,15 +1818,18 @@ table td {
   color: white;
   font-size: 0.8rem;
 }
+
 .progress-step.active .step-circle {
   border-color: var(--brand-sky);
   background: var(--brand-sky);
 }
+
 .progress-step.current .step-circle {
   border-color: var(--brand-sky);
   background: white;
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
 }
+
 .progress-step.current .step-circle::after {
   content: '';
   width: 8px;
@@ -1360,14 +1837,28 @@ table td {
   border-radius: 50%;
   background: var(--brand-sky);
 }
+
 .step-label {
   font-size: 0.75rem;
   color: #94A3B8;
   font-weight: 600;
   transition: color 0.3s ease;
 }
+
 .progress-step.active .step-label {
   color: var(--brand-dark);
+}
+
+.progress-step.active .step-time {
+  color: var(--brand-dark);
+}
+
+.step-time {
+  font-size: 0.7rem;
+  color: #94A3B8;
+  margin-top: 0.15rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 /* 堆疊長條比例圖 */
@@ -1376,10 +1867,11 @@ table td {
   height: 24px;
   border-radius: 6px;
   overflow: hidden;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   background-color: #F8FAFC;
 }
+
 .stacked-segment {
   display: flex;
   align-items: center;
@@ -1390,25 +1882,283 @@ table td {
   transition: opacity 0.3s ease, filter 0.3s ease;
   white-space: nowrap;
   overflow: hidden;
-  border-right: 1px solid rgba(255,255,255,0.3);
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
 }
+
 .stacked-segment:last-child {
   border-right: none;
 }
+
 .stacked-segment:hover {
   filter: brightness(0.9);
 }
+
 .stacked-segment.is-dimmed {
   opacity: 0.3;
   filter: grayscale(0.6);
 }
+
 .stacked-segment.is-active {
   opacity: 1;
   filter: brightness(1);
 }
+
 .segment-label {
   padding: 0 4px;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
+/* ===== 匯出下拉選單 ===== */
+.btn-outline-brand {
+  background: white;
+  border: 1.5px solid var(--brand-sky);
+  color: var(--brand-sky);
+  border-radius: 0.6rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  transition: all 0.2s;
+}
+
+.btn-outline-brand:hover {
+  background: var(--brand-sky);
+  color: white;
+}
+
+.export-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid #E2E8F0;
+  padding: 0.4rem 0;
+  min-width: 200px;
+  z-index: 999;
+}
+
+.export-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: none;
+  background: transparent;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.export-menu-item:hover {
+  background: #F1F5F9;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* ===== 表格底部資訊列 ===== */
+.table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #F1F5F9;
+  background: #FAFBFC;
+  border-radius: 0 0 0.75rem 0.75rem;
+}
+
+.table-footer-left {
+  font-size: 0.8rem;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.table-footer-left strong {
+  color: var(--brand-dark);
+}
+
+.table-footer-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.table-footer-right {
+  font-size: 0.8rem;
+  color: #64748B;
+  flex: 1;
+  text-align: right;
+}
+
+.table-footer-right strong {
+  color: var(--brand-dark);
+}
+
+.selected-count {
+  color: var(--brand-sky);
+  font-weight: 700;
+  background: rgba(14, 165, 233, 0.08);
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+/* ===== Checkbox ===== */
+.table-check {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  border: 1.5px solid #CBD5E1;
+  transition: all 0.15s;
+}
+
+.table-check:checked {
+  background-color: var(--brand-sky);
+  border-color: var(--brand-sky);
+}
+
+/* ===== 批次操作工具列 ===== */
+.batch-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1.25rem;
+  background: linear-gradient(135deg, #1E293B, #334155);
+  border-radius: 0.75rem 0.75rem 0 0;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.batch-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.batch-count {
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.batch-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.batch-btn {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.batch-btn-status {
+  background: rgba(14, 165, 233, 0.15);
+  color: #7DD3FC;
+}
+
+.batch-btn-status:hover {
+  background: rgba(14, 165, 233, 0.3);
+}
+
+.batch-btn-export {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6EE7B7;
+}
+
+.batch-btn-export:hover {
+  background: rgba(16, 185, 129, 0.3);
+}
+
+.batch-btn-delete {
+  background: rgba(239, 68, 68, 0.15);
+  color: #FCA5A5;
+}
+
+.batch-btn-delete:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.batch-btn-clear {
+  background: rgba(255, 255, 255, 0.1);
+  color: #94A3B8;
+}
+
+.batch-btn-clear:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* 批次狀態下拉 */
+.batch-status-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: white;
+  border-radius: 0.6rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid #E2E8F0;
+  padding: 0.3rem 0;
+  min-width: 160px;
+  z-index: 999;
+}
+
+.batch-status-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.5rem 0.85rem;
+  border: none;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.batch-status-item:hover {
+  background: #F1F5F9;
+}
+
+/* 動畫 */
+.batch-bar-enter-active {
+  transition: all 0.25s ease;
+}
+
+.batch-bar-leave-active {
+  transition: all 0.15s ease;
+}
+
+.batch-bar-enter-from {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.batch-bar-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
 </style>

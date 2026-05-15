@@ -2,8 +2,10 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Modal } from 'bootstrap'
+import Swal from 'sweetalert2'
 import PickupGameRow from '@/components/frontend/PickupGameRow.vue'
 import CreateGameModal from '@/components/frontend/CreateGameModal.vue'
+import ManageMatchModal from '@/components/frontend/ManageMatchModal.vue'
 import { usePickupGameApi } from '@/composables/usePickupGameApi'
 
 const router = useRouter()
@@ -13,19 +15,23 @@ const { pickupGames, fetchGames, joinPickupGame } = usePickupGameApi()
 const searchQuery = ref('')
 const selectedDateFilter = ref('全部') // 記錄目前點了哪個日期，可能是 '全部', '今天', '明天', '本週末', 或是自訂的 'YYYY-MM-DD'
 const createModalRef = ref(null)
+const manageModalRef = ref(null)
+const managedGame = ref(null)
 
 // 進階篩選變數
 const advancedFilters = ref({
   levels: [], // 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'
   hasAvailableSlotsOnly: false,
-  timeOfDay: '' // 'morning', 'afternoon', 'evening', ''
+  timeOfDay: '', // 'morning', 'afternoon', 'evening', ''
+  requiredGender: '' // 'FEMALE', 'MALE', ''
 })
 
 // Offcanvas 專用的暫存篩選狀態 (按下套用後才正式生效)
 const tempFilters = ref({
   levels: [],
   hasAvailableSlotsOnly: false,
-  timeOfDay: ''
+  timeOfDay: '',
+  requiredGender: ''
 })
 
 const applyAdvancedFilters = () => {
@@ -36,8 +42,8 @@ const applyAdvancedFilters = () => {
 }
 
 const clearAdvancedFilters = () => {
-  tempFilters.value = { levels: [], hasAvailableSlotsOnly: false, timeOfDay: '' }
-  advancedFilters.value = { levels: [], hasAvailableSlotsOnly: false, timeOfDay: '' }
+  tempFilters.value = { levels: [], hasAvailableSlotsOnly: false, timeOfDay: '', requiredGender: '' }
+  advancedFilters.value = { levels: [], hasAvailableSlotsOnly: false, timeOfDay: '', requiredGender: '' }
   changePage(1)
 }
 // --- 日期計算小幫手 ---
@@ -58,12 +64,20 @@ const isWeekend = (dateStr) => {
 const availableGames = computed(() => {
   const todayStr = getTodayStr()
   
-  // 🌟 基本過濾：過濾掉已取消、已結束，且【只顯示今天或未來的場次】
-  let result = pickupGames.value.filter(game => 
-    game.status !== 'CANCELLED' && 
-    game.status !== 'CLOSED' && 
-    game.gameDate >= todayStr
-  )
+  // 🌟 基本過濾：過濾掉已取消、已結束，且【只顯示今天或未來且尚未結束的場次】
+  const now = new Date()
+  let result = pickupGames.value.filter(game => {
+    // 資料庫狀態已標記為取消或結束 → 直接排除
+    if (game.status === 'CANCELLED' || game.status === 'CLOSED') return false
+    // 日期已過 → 排除
+    if (game.gameDate < todayStr) return false
+    // 🌟 關鍵修正：即使是「今天」的場次，如果結束時間已過也要排除
+    if (game.gameDate === todayStr && game.endTime) {
+      const endDateTime = new Date(`${game.gameDate}T${game.endTime}`)
+      if (endDateTime < now) return false
+    }
+    return true
+  })
 
   // 🌟 1. 快速日期篩選
   if (selectedDateFilter.value === '今天') {
@@ -102,6 +116,9 @@ const availableGames = computed(() => {
       if (advancedFilters.value.timeOfDay === 'evening') return startHour >= 18 && startHour <= 22
       return true
     })
+  }
+  if (advancedFilters.value.requiredGender) {
+    result = result.filter(g => (g.requiredGender || g.genderLimit) === advancedFilters.value.requiredGender)
   }
 
   return result
@@ -194,7 +211,32 @@ const confirmSignup = async () => {
     return
   }
   
-  const currentMemberId = 1 // 假資料：目前登入的會員 ID
+  // 🌟 性別防呆檢查
+  const memberInfo = JSON.parse(localStorage.getItem('memberInfo')) || {}
+  const reqGender = quickViewGame.value.requiredGender || quickViewGame.value.genderLimit
+  
+  if (reqGender === 'FEMALE' && memberInfo.gender !== 'FEMALE' && memberInfo.gender !== '女') {
+    Swal.fire({ 
+      icon: 'error', 
+      title: '資格不符', 
+      text: '不好意思，本場次為主揪設定之女性專屬場次喔！', 
+      confirmButtonColor: '#ec4899', // 使用粉色符合女團氛圍
+      confirmButtonText: '我知道了'
+    })
+    return
+  }
+  if (reqGender === 'MALE' && memberInfo.gender !== 'MALE' && memberInfo.gender !== '男') {
+    Swal.fire({ 
+      icon: 'error', 
+      title: '資格不符', 
+      text: '不好意思，本場次為主揪設定之男性專屬場次喔！', 
+      confirmButtonColor: '#0ea5e9',
+      confirmButtonText: '我知道了'
+    })
+    return
+  }
+
+  const currentMemberId = memberInfo.memberId || 1 // 假資料：目前登入的會員 ID
   await joinPickupGame(quickViewGame.value.gameId, currentMemberId)
   
   if (quickViewModalInstance) {
@@ -206,6 +248,14 @@ const confirmSignup = async () => {
 onMounted(() => {
   fetchGames()
 })
+
+// 🌟 管理揪團 Modal
+const handleManageGame = (game) => {
+  managedGame.value = game
+  if (manageModalRef.value) {
+    manageModalRef.value.showModal()
+  }
+}
 </script>
 <template>
   <div class="container py-5 mt-5">
@@ -303,6 +353,7 @@ onMounted(() => {
         :game="game"
         @open-quick-view="handleOpenQuickView"
         @view-details="handleViewDetails"
+        @manage-game="handleManageGame"
       />
       <!-- 如果沒有場次的時候顯示 -->
       <div v-if="availableGames.length === 0" class="text-center py-5 text-secondary">
@@ -434,6 +485,24 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- 性別限制 -->
+        <div class="mb-4">
+          <label class="fw-bold mb-2">性別限制</label>
+          <div class="d-flex flex-column gap-2">
+            <div class="form-check">
+              <input class="form-check-input cursor-pointer" type="radio" name="tempGender" id="genderAll" value="" v-model="tempFilters.requiredGender">
+              <label class="form-check-label cursor-pointer text-secondary" for="genderAll">全部 (不限)</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input cursor-pointer" type="radio" name="tempGender" id="genderFemale" value="FEMALE" v-model="tempFilters.requiredGender">
+              <label class="form-check-label cursor-pointer text-secondary" for="genderFemale">限女性</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input cursor-pointer" type="radio" name="tempGender" id="genderMale" value="MALE" v-model="tempFilters.requiredGender">
+              <label class="form-check-label cursor-pointer text-secondary" for="genderMale">限男性</label>
+            </div>
+          </div>
+        </div>
       </div>
       
       <!-- 底部按鈕 -->
@@ -501,6 +570,9 @@ onMounted(() => {
       </div>
     </div>
   </div>
+
+  <!-- 🌟 管理揪團 Modal -->
+  <ManageMatchModal ref="manageModalRef" :game="managedGame" @refresh-list="fetchGames" />
 </template>
 <style scoped>
 /* 日期選擇器觸發範圍放大 */

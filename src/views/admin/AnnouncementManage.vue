@@ -331,7 +331,7 @@ async function saveAnnouncement() {
   <nav v-if="totalPages > 1" class="mt-3">
     <ul class="pagination justify-content-center mb-0">
       <li class="page-item" :class="{ disabled: currentPage === 1 }">
-        <a class="page-link" href="#" @click.prevent="goToPage(currentPage - 1)">上一頁</a>
+        <a class="page-link" href="#" @click.prevent="goToPage(currentPage - 1)">‹</a>
       </li>
       <li
         v-for="page in totalPages"
@@ -342,7 +342,7 @@ async function saveAnnouncement() {
         <a class="page-link" href="#" @click.prevent="goToPage(page)">{{ page }}</a>
       </li>
       <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-        <a class="page-link" href="#" @click.prevent="goToPage(currentPage + 1)">下一頁</a>
+        <a class="page-link" href="#" @click.prevent="goToPage(currentPage + 1)">›</a>
       </li>
     </ul>
   </nav>

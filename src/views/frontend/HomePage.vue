@@ -25,8 +25,9 @@ import HomeCta from '@/components/frontend/HomeCta.vue'
 
 <template>
   <div class="home-page">
+    <!-- Hero 滿版：不受 container 限制 -->
+    <HomeHero />
     <div class="container py-4">
-      <HomeHero />
       <HomeNewsVideo />
       <HomePickupGames />
       <HomeVenues />

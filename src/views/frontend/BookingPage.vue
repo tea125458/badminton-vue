@@ -17,17 +17,11 @@ const steps = [
 const venues = ref([])
 const selectedVenue = ref(null)
 
-// 場館圖片（後端沒有圖片欄位，先 hardcode）
-const venueImages = {
-  1: 'https://images.unsplash.com/photo-1626224580194-ff9601fe0674?w=600',
-  2: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=600',
-  3: 'https://images.unsplash.com/photo-1613918431703-aa50889e3be2?w=600',
-}
+// 場館圖片（從 DB 的 image_url 欄位讀取）
+const defaultVenueImage = 'https://images.unsplash.com/photo-1626224580194-ff9601fe0674?w=600'
 
-function getVenueImage(venueId) {
-  return (
-    venueImages[venueId] || 'https://images.unsplash.com/photo-1626224580194-ff9601fe0674?w=600'
-  )
+function getVenueImage(venue) {
+  return venue.imageUrl || defaultVenueImage
 }
 
 // 選擇場館 → 前進到 Step 2
@@ -46,7 +40,7 @@ const selectedSlots = ref([]) // 使用者選中的時段
 // 今天日期（限制日期選擇器不能選過去）
 const today = computed(() => new Date().toISOString().slice(0, 10))
 
-// 所有可選時段（10:00 ~ 21:00，每格代表 1 小時）
+// 所有可選時段（10:00 ~ 22:00，每格代表 1 小時）
 const timeSlots = [
   '10:00',
   '11:00',
@@ -60,8 +54,13 @@ const timeSlots = [
   '19:00',
   '20:00',
   '21:00',
-  '22:00',
 ]
+
+// 取得時段的結束時間（+1 小時）
+function slotEndTime(slot) {
+  const h = parseInt(slot) + 1
+  return h.toString().padStart(2, '0') + ':00'
+}
 
 // 篩選出「選中場館」底下的 ACTIVE 球場
 const filteredCourts = computed(() => {
@@ -112,6 +111,13 @@ function toggleSlot(slot) {
 function selectCourt(court) {
   selectedCourt.value = court
   loadBookedSlots()
+}
+
+// 日期變更 → 重置球場與時段（強制按順序操作）
+function onDateChange() {
+  selectedCourt.value = null
+  selectedSlots.value = []
+  bookedSlots.value = []
 }
 
 // Step 2 → Step 3：驗證後才前進
@@ -217,9 +223,9 @@ async function submitBooking() {
         <div v-for="venue in venues" :key="venue.venueId" class="col-md-6 col-lg-4">
           <div class="card card-rounded shadow-sm border-0 h-100 hover-lift overflow-hidden">
             <!-- 場館圖片 -->
-            <div class="img-zoom" style="height: 200px">
+            <div class="img-zoom" style="height: 280px">
               <img
-                :src="getVenueImage(venue.venueId)"
+                :src="getVenueImage(venue)"
                 :alt="venue.venueName"
                 class="card-img-top w-100 h-100"
                 style="object-fit: cover"
@@ -227,15 +233,15 @@ async function submitBooking() {
             </div>
             <div class="card-body p-4">
               <!-- 場館名稱 -->
-              <h5 class="card-title fw-bold mb-2">{{ venue.venueName }}</h5>
+              <h4 class="card-title fw-bold mb-2" style="font-size: 1.35rem">{{ venue.venueName }}</h4>
 
               <!-- 地址 -->
-              <p class="text-secondary mb-3" style="font-size: 0.85rem">
+              <p class="text-secondary mb-4" style="font-size: 1.05rem">
                 <i class="bi bi-geo-alt me-1"></i>{{ venue.address }}
               </p>
 
               <!-- 選擇按鈕 -->
-              <button class="btn btn-brand w-100" @click="selectVenue(venue)">選擇此場館</button>
+              <button class="btn btn-brand w-100" style="font-size: 1.1rem; padding: 0.65rem 1rem" @click="selectVenue(venue)">選擇此場館</button>
             </div>
           </div>
         </div>
@@ -246,49 +252,107 @@ async function submitBooking() {
     <div v-else-if="currentStep === 2">
       <div class="card card-rounded shadow-sm border-0 p-4">
         <!-- 目前選的場館名稱 -->
-        <h5 class="fw-bold mb-4">
+        <h4 class="fw-bold mb-4" style="font-size: 1.4rem">
           <i class="bi bi-building me-2" style="color: var(--brand-sky)"></i>
           {{ selectedVenue?.venueName }}
-        </h5>
+        </h4>
 
-        <!-- 球場選擇 -->
-        <div class="mb-4">
-          <label class="form-label fw-bold">選擇球場</label>
-          <div class="d-flex flex-wrap gap-2">
-            <button
-              v-for="court in filteredCourts"
-              :key="court.courtId"
-              class="btn"
-              :class="
-                selectedCourt?.courtId === court.courtId ? 'btn-brand' : 'btn-outline-secondary'
-              "
-              @click="selectCourt(court)"
-            >
-              {{ court.courtName }}
-            </button>
+        <!-- 上方兩欄：左邊控制項 / 右邊場館預覽 -->
+        <div class="row g-4 mb-4">
+          <!-- 左欄：日期 → 球場 -->
+          <div class="col-lg-7">
+            <!-- ① 日期選擇（第一步） -->
+            <div class="mb-4">
+              <label class="form-label fw-bold" style="font-size: 1.05rem">
+                <span class="badge rounded-pill me-1" style="background: var(--brand-teal); font-size: 0.85rem; padding: 0.35rem 0.65rem">1</span>
+                選擇日期
+              </label>
+              <input
+                type="date"
+                class="form-control"
+                style="max-width: 280px; font-size: 1rem"
+                v-model="selectedDate"
+                :min="today"
+                @change="onDateChange"
+              />
+            </div>
+
+            <!-- ② 球場選擇（需先選日期） -->
+            <div class="mb-4">
+              <label class="form-label fw-bold" style="font-size: 1.05rem">
+                <span class="badge rounded-pill me-1" :style="{ background: selectedDate ? 'var(--brand-teal)' : '#cbd5e1', fontSize: '0.85rem', padding: '0.35rem 0.65rem' }">2</span>
+                選擇球場
+                <span v-if="!selectedDate" class="text-muted fw-normal ms-2" style="font-size: 0.92rem;">
+                  <i class="bi bi-lock me-1"></i>請先選擇日期
+                </span>
+              </label>
+              <div class="d-flex flex-wrap gap-2">
+                <button
+                  v-for="court in filteredCourts"
+                  :key="court.courtId"
+                  class="btn"
+                  :class="
+                    selectedCourt?.courtId === court.courtId ? 'btn-brand' : 'btn-outline-secondary'
+                  "
+                  :disabled="!selectedDate"
+                  style="font-size: 1rem; padding: 0.5rem 1.2rem"
+                  @click="selectCourt(court)"
+                >
+                  {{ court.courtName }}
+                </button>
+              </div>
+            </div>
+
+            <!-- 場館備註 -->
+            <div class="p-3 rounded-3" style="background-color: #F0F9FF;">
+              <p class="fw-bold mb-2" style="font-size: 1.05rem; color: var(--brand-sky);">
+                <i class="bi bi-info-circle me-1"></i>場館資訊
+              </p>
+              <ul class="mb-0 text-secondary" style="font-size: 1rem; padding-left: 1.2rem; line-height: 1.8;">
+                <li>營業時間：10:00 ~ 22:00</li>
+                <li>每小時場地費 NT$300</li>
+                <li>提供球拍租借服務（另計費用）</li>
+                <li>
+                  <i class="bi bi-geo-alt me-1"></i>{{ selectedVenue?.address }}
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 右欄：場館預覽圖片 -->
+          <div class="col-lg-5">
+            <div class="card card-rounded border-0 shadow-sm overflow-hidden h-100">
+              <div class="img-zoom" style="height: 240px;">
+                <img
+                  :src="getVenueImage(selectedVenue)"
+                  :alt="selectedVenue?.venueName"
+                  class="w-100 h-100"
+                  style="object-fit: cover;"
+                />
+              </div>
+              <div class="card-body p-3 text-center">
+                <h5 class="fw-bold mb-1" style="font-size: 1.2rem">{{ selectedVenue?.venueName }}</h5>
+                <p class="text-secondary mb-0" style="font-size: 0.95rem;">
+                  <i class="bi bi-geo-alt me-1"></i>{{ selectedVenue?.address }}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- 日期選擇 -->
-        <div class="mb-4">
-          <label class="form-label fw-bold">選擇日期</label>
-          <input
-            type="date"
-            class="form-control"
-            style="max-width: 250px"
-            v-model="selectedDate"
-            :min="today"
-            @change="loadBookedSlots"
-          />
-        </div>
-
-        <!-- 時段格子 -->
+        <!-- ③ 時段格子（需先選日期 + 球場） -->
         <div class="mb-3">
-          <label class="form-label fw-bold">選擇時段</label>
-          <p class="text-secondary" style="font-size: 0.8rem">
+          <label class="form-label fw-bold" style="font-size: 1.05rem">
+            <span class="badge rounded-pill me-1" :style="{ background: selectedDate && selectedCourt ? 'var(--brand-teal)' : '#cbd5e1', fontSize: '0.85rem', padding: '0.35rem 0.65rem' }">3</span>
+            選擇時段
+            <span v-if="!selectedDate || !selectedCourt" class="text-muted fw-normal ms-2" style="font-size: 0.92rem;">
+              <i class="bi bi-lock me-1"></i>{{ !selectedDate ? '請先選擇日期' : '請先選擇球場' }}
+            </span>
+          </label>
+          <p v-if="selectedDate && selectedCourt" class="text-secondary" style="font-size: 0.95rem">
             🟢 可選 / ⬜ 已預約 / 🔵 已選取 ・每小時 NT$300
           </p>
-          <div class="d-flex flex-wrap gap-2">
+          <div v-if="selectedDate && selectedCourt" class="d-flex flex-wrap gap-2">
             <button
               v-for="slot in timeSlots"
               :key="slot"
@@ -301,8 +365,15 @@ async function submitBooking() {
               :disabled="bookedSlots.includes(slot)"
               @click="toggleSlot(slot)"
             >
-              {{ slot }}
+              {{ slot }}~{{ slotEndTime(slot) }}
             </button>
+          </div>
+          <!-- 尚未解鎖的提示 -->
+          <div v-else class="text-center py-4 rounded-3" style="background: #F8FAFC; border: 2px dashed #E2E8F0;">
+            <i class="bi bi-calendar2-check" style="font-size: 2rem; color: #CBD5E1;"></i>
+            <p class="text-muted mt-2 mb-0" style="font-size: 0.95rem;">
+              {{ !selectedDate ? '請先選擇日期，再選擇球場與時段' : '請先選擇球場，即可查看可用時段' }}
+            </p>
           </div>
         </div>
         <!-- 已選時段摘要 -->
@@ -312,8 +383,8 @@ async function submitBooking() {
         </div>
         <!-- Step 2 導航按鈕 -->
         <div class="d-flex gap-3 mt-4">
-          <button class="btn btn-outline-secondary" @click="currentStep = 1">← 上一步</button>
-          <button class="btn btn-brand" @click="goToConfirm">下一步 →</button>
+          <button class="btn btn-outline-secondary" style="font-size: 1.05rem; padding: 0.55rem 1.5rem" @click="currentStep = 1">← 上一步</button>
+          <button class="btn btn-brand" style="font-size: 1.05rem; padding: 0.55rem 1.5rem" @click="goToConfirm">下一步 →</button>
         </div>
       </div>
     </div>
@@ -323,15 +394,15 @@ async function submitBooking() {
         <!-- 左欄：預約明細 -->
         <div class="col-lg-7">
           <div class="card card-rounded shadow-sm border-0 p-4 h-100">
-            <h5 class="fw-bold mb-4">
+            <h4 class="fw-bold mb-4" style="font-size: 1.4rem">
               <i class="bi bi-clipboard-check me-2" style="color: var(--brand-sky)"></i>
               預約摘要
-            </h5>
+            </h4>
             <!-- 摘要表格 -->
-            <table class="table mb-4">
+            <table class="table mb-4" style="font-size: 1.05rem">
               <tbody>
                 <tr>
-                  <th class="text-secondary" style="width: 120px;">
+                  <th class="text-secondary" style="width: 130px;">
                     <i class="bi bi-building me-1"></i>場館
                   </th>
                   <td class="fw-semibold">{{ selectedVenue?.venueName }}</td>
@@ -358,10 +429,10 @@ async function submitBooking() {
             </table>
             <!-- 注意事項 -->
             <div class="p-3 rounded-3 mb-4" style="background-color: #F0F9FF;">
-              <p class="fw-bold mb-2" style="font-size: 0.85rem; color: var(--brand-sky);">
+              <p class="fw-bold mb-2" style="font-size: 1.05rem; color: var(--brand-sky);">
                 <i class="bi bi-info-circle me-1"></i>預約須知
               </p>
-              <ul class="mb-0 text-secondary" style="font-size: 0.8rem; padding-left: 1.2rem;">
+              <ul class="mb-0 text-secondary" style="font-size: 1rem; padding-left: 1.2rem; line-height: 1.8;">
                 <li>請於預約時段前 10 分鐘抵達場館</li>
                 <li>如需取消，請於預約日前一天通知</li>
                 <li>場館提供球拍租借服務（另計費用）</li>
@@ -369,8 +440,8 @@ async function submitBooking() {
             </div>
             <!-- 送出按鈕 -->
             <div class="d-flex gap-3">
-              <button class="btn btn-outline-secondary" @click="currentStep = 2">← 上一步</button>
-              <button class="btn btn-brand" @click="submitBooking">✅ 確認預約</button>
+              <button class="btn btn-outline-secondary" style="font-size: 1.05rem; padding: 0.55rem 1.5rem" @click="currentStep = 2">← 上一步</button>
+              <button class="btn btn-brand" style="font-size: 1.05rem; padding: 0.55rem 1.5rem" @click="submitBooking">✅ 確認預約</button>
             </div>
           </div>
         </div>
@@ -381,15 +452,15 @@ async function submitBooking() {
           <div class="card card-rounded shadow-sm border-0 overflow-hidden mb-4">
             <div class="img-zoom" style="height: 200px;">
               <img
-                :src="getVenueImage(selectedVenue?.venueId)"
+                :src="getVenueImage(selectedVenue)"
                 :alt="selectedVenue?.venueName"
                 class="w-100 h-100"
                 style="object-fit: cover;"
               />
             </div>
             <div class="card-body p-3 text-center">
-              <h6 class="fw-bold mb-1">{{ selectedVenue?.venueName }}</h6>
-              <p class="text-secondary mb-0" style="font-size: 0.8rem;">
+              <h5 class="fw-bold mb-1" style="font-size: 1.2rem">{{ selectedVenue?.venueName }}</h5>
+              <p class="text-secondary mb-0" style="font-size: 0.95rem;">
                 <i class="bi bi-geo-alt me-1"></i>{{ selectedVenue?.address }}
               </p>
             </div>
@@ -397,17 +468,17 @@ async function submitBooking() {
 
           <!-- 金額摘要卡片 -->
           <div class="card card-rounded shadow-sm border-0 p-4" style="background: linear-gradient(135deg, var(--brand-teal-dark), var(--brand-sky-dark)); color: white;">
-            <p class="mb-2" style="font-size: 0.85rem; opacity: 0.9;">
+            <p class="mb-2" style="font-size: 1.05rem; opacity: 0.9;">
               <i class="bi bi-receipt me-1"></i>費用明細
             </p>
-            <div class="d-flex justify-content-between mb-2" style="font-size: 0.9rem;">
+            <div class="d-flex justify-content-between mb-2" style="font-size: 1.1rem;">
               <span>場地費 × {{ selectedSlots.length }} 小時</span>
               <span>NT$ {{ totalAmount }}</span>
             </div>
             <hr style="border-color: rgba(255,255,255,0.3);" />
             <div class="d-flex justify-content-between align-items-center">
-              <span class="fw-bold">應付金額</span>
-              <span class="fw-bold" style="font-size: 1.5rem;">NT$ {{ totalAmount }}</span>
+              <span class="fw-bold" style="font-size: 1.1rem">應付金額</span>
+              <span class="fw-bold" style="font-size: 1.75rem;">NT$ {{ totalAmount }}</span>
             </div>
           </div>
         </div>
@@ -418,14 +489,14 @@ async function submitBooking() {
 
 <style scoped>
 .step-circle {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.15rem;
   margin: 0 auto;
   border: 2px solid #cbd5e1;
   color: #94a3b8;
@@ -447,7 +518,7 @@ async function submitBooking() {
   height: 3px;
   background-color: #cbd5e1;
   margin: 0 0.5rem;
-  margin-bottom: 1.75rem; /* 對齊圓圈中心，避開下方文字 */
+  margin-bottom: 1.75rem;
   border-radius: 2px;
   transition: background-color 0.3s ease;
 }
@@ -455,16 +526,16 @@ async function submitBooking() {
   background-color: var(--brand-teal);
 }
 .step-label {
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   color: #64748b;
   white-space: nowrap;
 }
 
 /* ----- 時段格子 ----- */
 .slot-btn {
-  width: 80px;
-  padding: 0.5rem;
-  font-size: 0.85rem;
+  width: 135px;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.92rem;
   font-weight: 600;
   border-radius: 0.75rem;
   transition: all 0.2s ease;

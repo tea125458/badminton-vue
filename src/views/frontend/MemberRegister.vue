@@ -13,9 +13,10 @@ const router = useRouter()
 const form = ref({
   username: '',
   password: '',
+  confirmPassword: '',
   fullName: '',
   gender: '男',
-  birthday: '',
+  birthday: '2000-01-01',
   phone: '',
   email: '',
 })
@@ -51,6 +52,10 @@ async function handleRegister() {
   }
   if (d.password.length < 6 || d.password.length > 12) {
     errorMsg.value = '密碼必須為 6-12 碼英數字'
+    return
+  }
+  if (d.password !== d.confirmPassword) {
+    errorMsg.value = '兩次輸入的密碼不一致'
     return
   }
   const phoneDigits = d.phone.replace(/\D/g, '')
@@ -138,6 +143,26 @@ async function handleRegister() {
                 </div>
               </div>
 
+              <div class="mb-2">
+                <label class="form-label fw-semibold small text-secondary">
+                  確認密碼
+                </label>
+                <div class="position-relative">
+                  <input v-model="form.confirmPassword" :type="showPassword ? 'text' : 'password'"
+                         class="form-control rounded-3" placeholder="請再次輸入密碼" maxlength="12"
+                         autocomplete="new-password" />
+                </div>
+                <!-- 即時密碼驗證提示 -->
+                <div v-if="form.confirmPassword" class="mt-1 px-1">
+                  <span v-if="form.password === form.confirmPassword" class="text-success small fw-bold">
+                    <i class="bi bi-check-circle-fill me-1"></i>密碼一致
+                  </span>
+                  <span v-else class="text-danger small fw-bold">
+                    <i class="bi bi-x-circle-fill me-1"></i>密碼不一致
+                  </span>
+                </div>
+              </div>
+
               <div class="row mb-2">
                 <div class="col-7">
                   <label class="form-label fw-semibold small text-secondary">
@@ -166,14 +191,14 @@ async function handleRegister() {
                   <label class="form-label fw-semibold small text-secondary">
                     生日
                   </label>
-                  <input v-model="form.birthday" type="date" class="form-control rounded-3 px-2" :max="todayDate" />
+                  <input v-model="form.birthday" type="date" class="form-control rounded-3 px-2" :max="todayDate" @click="$event.target.showPicker()" />
                 </div>
                 <div class="col-6">
                   <label class="form-label fw-semibold small text-secondary">
                     電話
                   </label>
                   <input v-model="form.phone" type="text" class="form-control rounded-3"
-                         placeholder="09xx-xxx-xxx" maxlength="12" @input="formatPhone" />
+                         placeholder="0912-345-678" maxlength="12" @input="formatPhone" />
                 </div>
               </div>
 

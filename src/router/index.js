@@ -59,6 +59,11 @@ const router = createRouter({
           component: () => import('@/views/frontend/Checkout.vue'),
         },
         {
+          path: 'payment/linepay/confirm',
+          name: 'linePayConfirm',
+          component: () => import('@/views/frontend/LinePayCallback.vue'),
+        },
+        {
           path: 'order-success',
           name: 'orderSuccess',
           component: () => import('@/views/frontend/OrderSuccess.vue'),
@@ -67,6 +72,11 @@ const router = createRouter({
           path: 'my-orders',
           name: 'myOrders',
           component: () => import('@/views/frontend/MyOrders.vue'),
+        },
+        {
+          path: 'announcements',
+          name: 'announcements',
+          component: () => import('@/views/frontend/AnnouncementPage.vue'),
         },
       ],
     },
@@ -140,6 +150,11 @@ const router = createRouter({
           name: 'pickupGameManage',
           component: () => import('@/views/admin/PickupGameManage.vue'),
         },
+        {
+          path: 'logs',
+          name: 'logManage',
+          component: () => import('@/views/admin/LogManage.vue'),
+        },
       ],
     },
   ],
@@ -156,7 +171,19 @@ router.beforeEach((to, from, next) => {
       // 沒有管理員 Token → 導向管理員登入頁
       next({ name: 'adminLogin', query: { redirect: to.fullPath } })
     } else {
-      next()
+      // 權限角色檢查
+      const adminInfo = localStorage.getItem('adminInfo')
+      const role = adminInfo ? JSON.parse(adminInfo).role : null
+
+      // 定義僅限經理 (MANAGER) 訪問的路由名稱
+      const managerOnlyRoutes = ['adminManage', 'logManage']
+
+      if (managerOnlyRoutes.includes(to.name) && role !== 'MANAGER') {
+        alert('權限不足，僅限管理者訪問')
+        next({ name: 'dashboard' })
+      } else {
+        next()
+      }
     }
   } else {
     next()
