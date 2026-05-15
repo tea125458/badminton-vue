@@ -15,9 +15,6 @@
  */
 import HomeHero from '@/components/frontend/HomeHero.vue'
 import HomeNewsVideo from '@/components/frontend/HomeNewsVideo.vue'
-import HomePickupGames from '@/components/frontend/HomePickupGames.vue'
-import HomeVenues from '@/components/frontend/HomeVenues.vue'
-import HomeProducts from '@/components/frontend/HomeProducts.vue'
 import HomeEnvironment from '@/components/frontend/HomeEnvironment.vue'
 import HomeGuide from '@/components/frontend/HomeGuide.vue'
 import HomeCta from '@/components/frontend/HomeCta.vue'
@@ -27,14 +24,35 @@ import HomeCta from '@/components/frontend/HomeCta.vue'
   <div class="home-page">
     <!-- Hero 滿版：不受 container 限制 -->
     <HomeHero />
-    <div class="container py-4">
+    <!-- 公告 + 場館資訊：寬版佈局 -->
+    <div class="news-section py-5">
       <HomeNewsVideo />
-      <HomePickupGames />
-      <HomeVenues />
-      <HomeProducts />
+    </div>
+    <div class="container py-4">
       <HomeEnvironment />
       <HomeGuide />
       <HomeCta />
     </div>
   </div>
 </template>
+
+<style scoped>
+.news-section {
+  padding-left: 15%;
+  padding-right: 15%;
+}
+
+@media (max-width: 1199.98px) {
+  .news-section {
+    padding-left: 5%;
+    padding-right: 5%;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .news-section {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+</style>
