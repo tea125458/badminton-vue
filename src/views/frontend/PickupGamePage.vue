@@ -18,6 +18,7 @@ const selectedDateFilter = ref('全部') // 記錄目前點了哪個日期，可
 const createModalRef = ref(null)
 const manageModalRef = ref(null)
 const managedGame = ref(null)
+const loggedInMemberId = ref(null)
 
 // 進階篩選變數
 const advancedFilters = ref({
@@ -81,7 +82,9 @@ const availableGames = computed(() => {
   })
 
   // 🌟 1. 快速日期篩選
-  if (selectedDateFilter.value === '今天') {
+  if (selectedDateFilter.value === '我的開團' && loggedInMemberId.value) {
+    result = result.filter(g => String(g.host?.memberId) === String(loggedInMemberId.value))
+  } else if (selectedDateFilter.value === '今天') {
     result = result.filter(g => g.gameDate === getTodayStr())
   } else if (selectedDateFilter.value === '明天') {
     result = result.filter(g => g.gameDate === getTomorrowStr())
@@ -360,6 +363,7 @@ onMounted(async () => {
   await fetchGames()
   const memberInfo = JSON.parse(localStorage.getItem('memberInfo')) || {}
   if (memberInfo.memberId) {
+    loggedInMemberId.value = memberInfo.memberId
     await fetchMyRegisteredGames(memberInfo.memberId)
   }
 })
@@ -406,16 +410,25 @@ const handleManageGame = (game) => {
           @click="selectedDateFilter = '本週末'"
         >本週末</button>
 
+        <button
+          v-if="loggedInMemberId"
+          class="btn btn-sm rounded-pill px-4 border-0 transition-all d-flex align-items-center gap-1"
+          :class="selectedDateFilter === '我的開團' ? 'bg-white shadow-sm fw-bold text-sky-blue' : 'text-secondary opacity-75'"
+          @click="selectedDateFilter = '我的開團'"
+        >
+          <i class="bi bi-person-fill"></i> 我的開團
+        </button>
+
         <div class="text-secondary opacity-25 mx-1">|</div>
 
         <!-- 選擇日期 (自訂) -->
         <div
           class="btn btn-sm rounded-pill px-3 border-0 transition-all position-relative overflow-hidden mb-0 d-flex align-items-center"
-          :class="!['全部','今天','明天','本週末'].includes(selectedDateFilter) ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'"
+          :class="!['全部','今天','明天','本週末','我的開團'].includes(selectedDateFilter) ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'"
           style="cursor: pointer;"
         >
           <i class="bi bi-calendar3 me-2" style="color: #65a30d;"></i>
-          <span>{{ !['全部','今天','明天','本週末'].includes(selectedDateFilter) ? '📅 ' + selectedDateFilter : '選擇日期' }}</span>
+          <span>{{ !['全部','今天','明天','本週末','我的開團'].includes(selectedDateFilter) ? '📅 ' + selectedDateFilter : '選擇日期' }}</span>
           <input
             type="date"
             class="position-absolute top-0 start-0 opacity-0 w-100 h-100 date-input-overlay"
