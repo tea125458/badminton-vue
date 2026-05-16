@@ -3,16 +3,38 @@
  * 會員管理頁 — 完整 CRUD
  * 參照 templates/member/list.html 邏輯，遷移至 Vue 3
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { adminApi } from '@/api/admin'
 import { memberApi } from '@/api/member'
 import Swal from 'sweetalert2'
+import { useExport } from '@/composables/useExport'
+
+const { exportData } = useExport()
 
 // ===== 狀態 =====
 const members = ref([])
 const isLoading = ref(false)
 const keyword = ref('')
 const isSearching = ref(false)
+
+// ===== 分頁狀態 =====
+const currentPage = ref(1)
+const pageSize = ref(10)
+
+const totalPages = computed(() => Math.ceil(members.value.length / pageSize.value))
+
+const paginatedMembers = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return members.value.slice(start, end)
+})
+
+function changePage(p) {
+  if (p >= 1 && p <= totalPages.value) {
+    currentPage.value = p
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
 
 // 目前登入者角色
 const isManager = ref(false)
@@ -67,6 +89,7 @@ async function searchMembers() {
   try {
     members.value = await adminApi.searchMembers(keyword.value.trim())
     isSearching.value = true
+    currentPage.value = 1 // 重設回第一頁
   } catch (e) {
     alert('搜尋失敗：' + e.message)
   } finally {
@@ -285,6 +308,30 @@ function getLevelClass(l) {
 function getLevelLabel(l) {
   return l === 'VIP' ? 'VIP' : '一般'
 }
+
+// ===== 匯出功能 =====
+function getExportData() {
+  return members.value.map((m) => ({
+    會員編號: m.memberId,
+    帳號: m.username,
+    姓名: m.fullName || '-',
+    性別: m.gender || '-',
+    生日: m.birthday || '-',
+    電話: m.phone || '-',
+    Email: m.email || '-',
+    會員等級: m.membershipLevel === 'VIP' ? 'VIP' : '一般',
+    狀態: m.status === 'ACTIVE' ? '正常' : '停權',
+    備註: m.note || '-',
+    註冊時間: m.createdAt || '-',
+  }))
+}
+
+function handleExport(format) {
+  const fileName = `會員資料`
+  // useExport 支援的格式為大寫: 'EXCEL', 'JSON', 'PDF'
+  const exportFormat = format.toUpperCase()
+  exportData(getExportData(), exportFormat, fileName)
+}
 </script>
 
 <template>
@@ -293,6 +340,35 @@ function getLevelLabel(l) {
     <div class="page-header">
       <h2><i class="bi bi-people"></i> 會員管理</h2>
       <div class="header-actions">
+        <!-- 匯出按鈕 -->
+        <div class="dropdown">
+          <button
+            class="btn btn-export dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            匯出
+          </button>
+          <ul class="dropdown-menu shadow-sm border-0" style="border-radius: 0.75rem; font-size: 0.85rem">
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2 py-2" @click="handleExport('excel')">
+                <i class="bi bi-file-earmark-excel text-success"></i> 匯出 Excel
+              </button>
+            </li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2 py-2" @click="handleExport('json')">
+                <i class="bi bi-filetype-json text-primary"></i> 匯出 JSON
+              </button>
+            </li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2 py-2" @click="handleExport('pdf')">
+                <i class="bi bi-file-earmark-pdf text-danger"></i> 匯出 PDF
+              </button>
+            </li>
+          </ul>
+        </div>
+
         <div class="search-box">
           <input
             v-model="keyword"
@@ -342,7 +418,7 @@ function getLevelLabel(l) {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="m in members" :key="m.memberId">
+          <tr v-for="m in paginatedMembers" :key="m.memberId">
             <td class="td-id">{{ m.memberId }}</td>
             <td>
               <strong>{{ m.username }}</strong>
@@ -379,26 +455,26 @@ function getLevelLabel(l) {
                 >
                   <i class="bi bi-sticky"></i>
                 </button>
+                <!-- 刪除 (僅限管理員) -->
                 <button
+                  v-if="isManager"
                   class="btn btn-sm action-btn action-btn-delete"
-                  :class="{ 'btn-disabled': !isManager }"
-                  :disabled="!isManager"
-                  :title="isManager ? '刪除會員' : '權限不足'"
-                  @click="isManager && deleteMember(m.memberId, m.username)"
+                  title="刪除會員"
+                  @click="deleteMember(m.memberId, m.username)"
                 >
                   <i class="bi bi-trash3"></i>
                 </button>
-                <div class="dropdown">
+
+                <!-- 變更狀態 (僅限管理員) -->
+                <div v-if="isManager" class="dropdown">
                   <button
                     class="btn btn-sm action-btn action-btn-status dropdown-toggle"
-                    :class="{ 'btn-disabled': !isManager }"
-                    :disabled="!isManager"
                     data-bs-toggle="dropdown"
                     title="變更狀態"
                   >
                     <i class="bi bi-arrow-repeat"></i>
                   </button>
-                  <ul v-if="isManager" class="dropdown-menu">
+                  <ul class="dropdown-menu">
                     <li>
                       <a class="dropdown-item" href="#" @click.prevent="changeStatus(m.memberId, 'ACTIVE')">
                         <i class="bi bi-check-circle text-success me-1"></i>正常
@@ -416,6 +492,40 @@ function getLevelLabel(l) {
           </tr>
         </tbody>
       </table>
+
+      <!-- 分頁控制 -->
+      <div v-if="members.length > 0" class="table-footer">
+        <div class="table-footer-left">
+          共 <strong>{{ members.length }}</strong> 筆
+        </div>
+        <nav class="table-footer-center">
+          <ul class="pagination pagination-custom mb-0">
+            <li class="page-item" :class="{ disabled: currentPage === 1 }">
+              <button class="page-link" @click="changePage(currentPage - 1)">
+                <i class="bi bi-chevron-left"></i>
+              </button>
+            </li>
+            <li
+              v-for="page in totalPages"
+              :key="page"
+              class="page-item"
+              :class="{ active: currentPage === page }"
+            >
+              <button class="page-link" @click="changePage(page)">{{ page }}</button>
+            </li>
+            <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+              <button class="page-link" @click="changePage(currentPage + 1)">
+                <i class="bi bi-chevron-right"></i>
+              </button>
+            </li>
+          </ul>
+        </nav>
+        <div class="table-footer-right">
+          顯示第 <strong>{{ (currentPage - 1) * pageSize + 1 }}</strong
+          >–<strong>{{ Math.min(currentPage * pageSize, members.length) }}</strong>
+          筆，第 <strong>{{ currentPage }}</strong> / <strong>{{ totalPages }}</strong> 頁
+        </div>
+      </div>
     </div>
 
     <!-- ===== 新增/編輯 Modal ===== -->
@@ -470,7 +580,7 @@ function getLevelLabel(l) {
               </div>
               <div class="form-col-half">
                 <label>會員等級</label>
-                <select v-model="form.membershipLevel" :disabled="!!editId && !isManager">
+                <select v-model="form.membershipLevel" :disabled="!isManager">
                   <option value="NORMAL">一般會員</option>
                   <option value="VIP">VIP 會員</option>
                 </select>
@@ -487,7 +597,7 @@ function getLevelLabel(l) {
                 />
               </div>
               <div class="form-col-third">
-                <label>電話</label>
+                <label>手機號碼</label>
                 <input
                   v-model="form.phone"
                   type="text"
@@ -547,9 +657,9 @@ function getLevelLabel(l) {
 }
 .page-header h2 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   font-weight: 700;
-  color: var(--brand-dark);
+  color: #1e293b;
 }
 .page-header h2 i {
   margin-right: 0.4rem;
@@ -576,8 +686,8 @@ function getLevelLabel(l) {
   border: none;
   outline: none;
   padding: 0.5rem 0.75rem;
-  font-size: 0.85rem;
-  width: 200px;
+  font-size: 0.95rem;
+  width: 210px;
   background: #f8fafc;
 }
 .btn-search {
@@ -602,13 +712,29 @@ function getLevelLabel(l) {
   font-weight: 600;
   cursor: pointer;
 }
-.btn-add {
+.btn-export {
   padding: 0.5rem 1rem;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  border-radius: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-export:hover {
+  background: #f8fafc;
+  border-color: var(--brand-sky);
+  color: var(--brand-sky);
+}
+.btn-add {
+  padding: 0.65rem 1.5rem;
   border: none;
   border-radius: 0.75rem;
-  background: linear-gradient(135deg, var(--brand-sky), var(--brand-teal));
+  background: #00B4B4; /* 品牌藍綠色 (與商品管理一致) */
   color: white;
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
@@ -663,7 +789,7 @@ function getLevelLabel(l) {
   color: white;
 }
 .data-table th {
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1.1rem;
   font-family: 'Inter', 'Noto Sans TC', sans-serif;
   font-size: 1.12rem;
   font-weight: 400;
@@ -672,10 +798,90 @@ function getLevelLabel(l) {
   white-space: nowrap;
 }
 .data-table td {
-  padding: 0.75rem 1rem;
-  font-size: 0.85rem;
+  padding: 0.85rem 1.1rem;
+  font-size: 0.95rem;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
+}
+
+/* ===== 分頁 (Table Footer) ===== */
+.table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #f1f5f9;
+  background: #fafbfc;
+  border-radius: 0 0 0.75rem 0.75rem;
+}
+
+.table-footer-left {
+  font-size: 0.8rem;
+  color: #64748b;
+  flex: 1;
+}
+
+.table-footer-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.table-footer-right {
+  font-size: 0.8rem;
+  color: #64748b;
+  flex: 1;
+  text-align: right;
+}
+
+.table-footer strong {
+  color: var(--brand-dark);
+}
+
+.pagination-custom .page-link {
+  border: none;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.5rem;
+  margin: 0 2px;
+  transition: all 0.2s ease;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.pagination-custom .page-link:hover {
+  background: #f0f9ff;
+  color: var(--brand-sky);
+}
+
+.pagination-custom .active .page-link {
+  background: var(--brand-sky) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+}
+
+.pagination-custom .disabled .page-link {
+  color: #cbd5e1;
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+/* ===== 日期輸入框內部微調 (解決年/月/日間距不一) ===== */
+input[type="date"]::-webkit-datetime-edit-text {
+  padding: 0 0.1rem;
+  color: #94a3b8;
+}
+
+input[type="date"]::-webkit-datetime-edit-year-field {
+  padding: 0;
+  margin-right: -0.1rem;
+}
+
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field {
+  padding: 0;
 }
 .data-table tbody tr {
   transition: background 0.15s;
@@ -689,10 +895,10 @@ function getLevelLabel(l) {
 }
 .text-sub {
   color: #94a3b8;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
 }
 .text-sm {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
 }
 
 /* ===== Badges ===== */
@@ -700,7 +906,7 @@ function getLevelLabel(l) {
   display: inline-block;
   padding: 0.3rem 0.7rem;
   border-radius: 9999px;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 700;
 }
 .badge-active {
