@@ -145,12 +145,12 @@ function copyEmail() {
 .footer-main {
   background: #0f172a;
   color: #cbd5e1;
-  padding: 3.5rem 0 2.5rem;
+  padding: 1.75rem 0 1.4rem;
 }
 
 /* 品牌 */
 .footer-brand {
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   font-weight: 800;
   background: linear-gradient(135deg, #5EEAD4, #38BDF8);
   -webkit-background-clip: text;
@@ -160,9 +160,9 @@ function copyEmail() {
 
 .footer-desc {
   color: #94a3b8;
-  font-size: 1rem;
-  line-height: 1.8;
-  margin-bottom: 1.2rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  margin-bottom: 0.75rem;
 }
 
 /* 社群圖示 */
@@ -172,8 +172,8 @@ function copyEmail() {
 }
 
 .social-icon {
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   border-radius: 0.6rem;
   background: rgba(255, 255, 255, 0.06);
   color: #94a3b8;
@@ -195,8 +195,8 @@ function copyEmail() {
 .footer-heading {
   color: #f1f5f9;
   font-weight: 700;
-  font-size: 1.05rem;
-  margin-bottom: 1rem;
+  font-size: 0.92rem;
+  margin-bottom: 0.6rem;
   letter-spacing: 0.03em;
   position: relative;
   padding-bottom: 0.6rem;
@@ -221,13 +221,13 @@ function copyEmail() {
 }
 
 .footer-links li {
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.35rem;
 }
 
 .footer-links a {
   color: #94a3b8;
   text-decoration: none;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   transition: color 0.2s ease, padding-left 0.2s ease;
 }
 
@@ -246,10 +246,10 @@ function copyEmail() {
 .footer-info-list li {
   display: flex;
   align-items: flex-start;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   color: #94a3b8;
-  margin-bottom: 0.75rem;
-  line-height: 1.6;
+  margin-bottom: 0.4rem;
+  line-height: 1.5;
 }
 
 .footer-info-list li i {
@@ -264,7 +264,7 @@ function copyEmail() {
   border: none;
   color: #94a3b8;
   padding: 0;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   cursor: pointer;
   transition: color 0.2s ease;
   text-decoration: underline;
@@ -296,8 +296,8 @@ function copyEmail() {
 /* ===== 底部版權列 ===== */
 .footer-bottom {
   background: #0b1120;
-  padding: 1rem 0;
-  font-size: 0.88rem;
+  padding: 0.6rem 0;
+  font-size: 0.78rem;
   color: #64748b;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }

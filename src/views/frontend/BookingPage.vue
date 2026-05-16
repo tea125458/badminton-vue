@@ -1,8 +1,18 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { venueApi } from '@/api/venue'
 import { courtApi } from '@/api/court'
 import { bookingApi } from '@/api/booking'
+import { useMemberStore } from '@/stores/member'
+import { useLinePay } from '@/composables/useLinePay'
+import AuthModal from '@/components/frontend/AuthModal.vue'
+import CreditCardMock from '@/components/payment/CreditCardMock.vue'
+
+const router = useRouter()
+const memberStore = useMemberStore()
+const { requestPayment } = useLinePay()
+const showAuthModal = ref(false)
 
 const currentStep = ref(1) // 目前步驟 (1/2/3)
 
@@ -134,6 +144,17 @@ function goToConfirm() {
     alert('請至少選擇一個時段')
     return
   }
+  // 檢查是否已登入，未登入則彈出 AuthModal
+  if (!memberStore.isLoggedIn) {
+    showAuthModal.value = true
+    return
+  }
+  currentStep.value = 3
+}
+
+// AuthModal 登入/註冊成功 → 自動推進到 Step 3
+function onAuthSuccess() {
+  showAuthModal.value = false
   currentStep.value = 3
 }
 
@@ -144,7 +165,7 @@ onMounted(async () => {
   allCourts.value = await courtApi.findAll() // ← 加這行
 })
 
-// === Step 3：確認預約 ===
+// === Step 3：確認預約 + 付款 ===
 // 起始時間（取 selectedSlots 的第一個）
 const startTime = computed(() => selectedSlots.value[0] || '')
 
@@ -159,28 +180,80 @@ const endTime = computed(() => {
 // 總金額 = 選了幾個時段 × 300
 const totalAmount = computed(() => selectedSlots.value.length * 300)
 
-// 送出預約
+// 付款方式
+const paymentType = ref('CASH')
+const showCreditCardModal = ref(false)
+const isSubmitting = ref(false)
+
+const paymentOptions = [
+  { value: 'CASH', label: '現場現金支付', icon: 'bi-cash-stack', desc: '打球時至櫃檯付款' },
+  { value: 'CREDIT_CARD', label: '信用卡', icon: 'bi-credit-card', desc: '支援 VISA / MasterCard / JCB' },
+  { value: 'TRANSFER', label: '銀行轉帳', icon: 'bi-bank', desc: '下單後請於 24 小時內完成匯款' },
+  { value: 'LINE_PAY', label: 'LINE Pay', icon: 'bi-chat-fill', desc: '使用 LINE Pay 行動支付' },
+]
+
+const cardLogos = [
+  { name: 'Visa', src: 'https://img.icons8.com/color/96/visa.png' },
+  { name: 'MasterCard', src: 'https://img.icons8.com/color/96/mastercard-logo.png' },
+  { name: 'JCB', src: 'https://img.icons8.com/color/96/jcb.png' },
+]
+
+// 送出預約（付款方式分流）
 async function submitBooking() {
+  if (isSubmitting.value) return
+
+  if (paymentType.value === 'CREDIT_CARD') {
+    // 彈出虛擬刷卡機 Modal
+    showCreditCardModal.value = true
+    return
+  }
+
+  await processBooking()
+}
+
+// 實際建立預約
+async function processBooking() {
+  isSubmitting.value = true
   const payload = {
     court: { courtId: selectedCourt.value.courtId },
-    member: { memberId: 1 }, // ⚠️ 暫時寫死，等 Pinia store 再改
+    member: { memberId: memberStore.memberId },
     bookingDate: selectedDate.value,
     startTime: startTime.value,
     endTime: endTime.value,
     totalAmount: totalAmount.value,
+    paymentType: paymentType.value,
   }
   try {
-    await bookingApi.create(payload)
-    alert('預約成功!🎉')
-    // 重置所有狀態，回到第一步
-    currentStep.value = 1
-    selectedVenue.value = null
-    selectedCourt.value = null
-    selectedDate.value = ''
-    selectedSlots.value = []
+    const newBooking = await bookingApi.create(payload)
+
+    if (paymentType.value === 'LINE_PAY') {
+      // 跳轉 LINE Pay 付款頁面
+      await requestPayment({
+        orderId: `BKG-${newBooking.bookingId}`,
+        amount: totalAmount.value,
+        productName: `羽過天晴場地預約 #${newBooking.bookingId}`
+      })
+    } else {
+      // 現金 / 轉帳 / 信用卡(已模擬) → 顯示成功
+      alert('預約成功！🎉')
+      resetBookingState()
+      router.push({ path: '/profile', query: { tab: 'bookings' } })
+    }
   } catch (error) {
-    alert('預約失敗：' + error.message)
+    alert('預約失敗：' + (error.response?.data || error.message))
+  } finally {
+    isSubmitting.value = false
   }
+}
+
+// 重置所有狀態
+function resetBookingState() {
+  currentStep.value = 1
+  selectedVenue.value = null
+  selectedCourt.value = null
+  selectedDate.value = ''
+  selectedSlots.value = []
+  paymentType.value = 'CASH'
 }
 </script>
 
@@ -388,12 +461,12 @@ async function submitBooking() {
         </div>
       </div>
     </div>
-    <!-- Step 3：確認預約 -->
+    <!-- Step 3：確認預約 + 付款 -->
     <div v-else>
       <div class="row g-4">
-        <!-- 左欄：預約明細 -->
+        <!-- 左欄：預約明細 + 付款方式 -->
         <div class="col-lg-7">
-          <div class="card card-rounded shadow-sm border-0 p-4 h-100">
+          <div class="card card-rounded shadow-sm border-0 p-4">
             <h4 class="fw-bold mb-4" style="font-size: 1.4rem">
               <i class="bi bi-clipboard-check me-2" style="color: var(--brand-sky)"></i>
               預約摘要
@@ -427,7 +500,45 @@ async function submitBooking() {
                 </tr>
               </tbody>
             </table>
-            <!-- 注意事項 -->
+
+            <!-- 付款方式 -->
+            <div class="mb-4">
+              <h5 class="fw-bold mb-3" style="font-size: 1.15rem">
+                <i class="bi bi-wallet2 me-2" style="color: var(--brand-sky)"></i>
+                付款方式
+              </h5>
+              <div class="payment-list">
+                <label
+                  v-for="opt in paymentOptions"
+                  :key="opt.value"
+                  class="payment-option"
+                  :class="{ active: paymentType === opt.value }"
+                >
+                  <input type="radio" v-model="paymentType" :value="opt.value" />
+                  <div class="payment-radio-circle">
+                    <div class="payment-radio-dot"></div>
+                  </div>
+                  <div class="payment-info">
+                    <span class="payment-label">{{ opt.label }}</span>
+                    <div v-if="opt.value === 'CREDIT_CARD'" class="payment-desc-wrap">
+                      <span class="payment-desc">支援</span>
+                      <span class="card-inline-logos">
+                        <template v-for="(logo, idx) in cardLogos" :key="logo.name">
+                          <span class="card-name-logo">{{ logo.name }}<img :src="logo.src" :alt="logo.name" class="card-logo-sm" /></span>
+                          <span v-if="idx < cardLogos.length - 1" class="card-sep">/</span>
+                        </template>
+                      </span>
+                    </div>
+                    <span v-else-if="opt.value === 'LINE_PAY'" class="payment-desc">
+                      使用 LINE Pay <img src="https://img.icons8.com/color/96/line-me.png" alt="LINE Pay" class="card-logo-sm" style="height: 19px;" /> 行動支付
+                    </span>
+                    <span v-else class="payment-desc">{{ opt.desc }}</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- 預約須知 -->
             <div class="p-3 rounded-3 mb-4" style="background-color: #F0F9FF;">
               <p class="fw-bold mb-2" style="font-size: 1.05rem; color: var(--brand-sky);">
                 <i class="bi bi-info-circle me-1"></i>預約須知
@@ -441,7 +552,10 @@ async function submitBooking() {
             <!-- 送出按鈕 -->
             <div class="d-flex gap-3">
               <button class="btn btn-outline-secondary" style="font-size: 1.05rem; padding: 0.55rem 1.5rem" @click="currentStep = 2">← 上一步</button>
-              <button class="btn btn-brand" style="font-size: 1.05rem; padding: 0.55rem 1.5rem" @click="submitBooking">✅ 確認預約</button>
+              <button class="btn btn-brand" style="font-size: 1.05rem; padding: 0.55rem 1.5rem" :disabled="isSubmitting" @click="submitBooking">
+                <span v-if="isSubmitting" class="spinner-border spinner-border-sm me-2"></span>
+                {{ isSubmitting ? '處理中...' : '✅ 確認付款' }}
+              </button>
             </div>
           </div>
         </div>
@@ -484,6 +598,17 @@ async function submitBooking() {
         </div>
       </div>
     </div>
+
+    <!-- 登入/註冊彈窗 -->
+    <AuthModal v-model="showAuthModal" @login-success="onAuthSuccess" />
+
+    <!-- 信用卡虛擬刷卡機 Modal -->
+    <CreditCardMock
+      v-if="showCreditCardModal"
+      :amount="totalAmount"
+      @close="showCreditCardModal = false"
+      @payment-success="() => { showCreditCardModal = false; processBooking() }"
+    />
   </div>
 </template>
 
@@ -565,5 +690,101 @@ async function submitBooking() {
   border: 2px solid #e2e8f0;
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+/* ----- 付款方式 ----- */
+.payment-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.payment-option {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #F1F5F9;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.payment-option:last-child {
+  border-bottom: none;
+}
+.payment-option:hover {
+  background: #FAFBFC;
+}
+.payment-option input[type="radio"] {
+  display: none;
+}
+
+.payment-radio-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #CBD5E1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.2s;
+}
+.payment-option.active .payment-radio-circle {
+  border-color: var(--brand-teal);
+}
+
+.payment-radio-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background 0.2s;
+}
+.payment-option.active .payment-radio-dot {
+  background: var(--brand-teal);
+}
+
+.payment-info {
+  display: flex;
+  flex-direction: column;
+}
+.payment-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1E293B;
+}
+.payment-desc {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  margin-top: 0.15rem;
+}
+.payment-desc-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 2px;
+}
+.card-inline-logos {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+.card-name-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.78rem;
+  color: #475569;
+}
+.card-logo-sm {
+  height: 17px;
+  width: auto;
+  vertical-align: middle;
+}
+.card-sep {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  margin: 0 1px;
 }
 </style>

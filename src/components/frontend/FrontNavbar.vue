@@ -7,21 +7,26 @@
  *   - 未登入 → 登入按鈕
  *   - 已登入 → 姓名 + 下拉選單（會員中心 / 登出）
  */
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { memberApi } from '@/api/member'
 import { useCartStore } from '@/stores/cart'
+import { useMemberStore } from '@/stores/member'
+import CartOffcanvas from '@/components/frontend/CartOffcanvas.vue'
 
 const router = useRouter()
 const route = useRoute()
 // TODO: 等通知 store 建立後再啟用
 // const notificationStore = useNotificationStore()
 const cart = useCartStore()
+const memberStore = useMemberStore()
 
-const isLoggedIn = ref(false)
-const memberName = ref('會員')
-const memberAvatar = ref(null)
+// 使用 Pinia store 的 computed 屬性（自動同步）
+const isLoggedIn = computed(() => memberStore.isLoggedIn)
+const memberName = computed(() => memberStore.fullName)
+const memberAvatar = computed(() => memberStore.avatar)
 const showDropdown = ref(false)
+const showCart = ref(false)
 
 // 切換下拉選單
 function toggleDropdown() {
@@ -47,33 +52,11 @@ onUnmounted(() => {
   // notificationStore.disconnect()
 })
 
-// 每次切換路由時重新讀取 localStorage
-function checkLoginState() {
-  const token = localStorage.getItem('memberToken')
-  const wasLoggedIn = isLoggedIn.value
-  isLoggedIn.value = !!token
-  
-  // if (isLoggedIn.value && !wasLoggedIn) {
-  //   notificationStore.connect()
-  // } else if (!isLoggedIn.value && wasLoggedIn) {
-  //   notificationStore.disconnect()
-  // }
-  
-  try {
-    const info = JSON.parse(localStorage.getItem('memberInfo'))
-    memberName.value = info?.fullName || '會員'
-    memberAvatar.value = info?.profilePicture || null
-  } catch {
-    memberName.value = '會員'
-    memberAvatar.value = null
-  }
-}
 
-// 初始化 + 監聽路由變化
-checkLoginState()
+
+
 watch(() => route.path, () => {
-  checkLoginState()
-  showDropdown.value = false  // 換頁時關閉選單
+  showDropdown.value = false
 })
 
 async function handleLogout() {
@@ -84,9 +67,7 @@ async function handleLogout() {
     console.error('Logout API failed:', e)
   }
   
-  localStorage.removeItem('memberToken')
-  localStorage.removeItem('memberInfo')
-  isLoggedIn.value = false
+  memberStore.logout()
   showDropdown.value = false
   // notificationStore.disconnect()
   router.push('/login')
@@ -143,7 +124,7 @@ async function handleLogout() {
             </RouterLink>
           </template>
 
-          <!-- 已登入：姓名 + 下拉選單 + 購物車 -->
+          <!-- 已登入：姓名 + 下拉選單 -->
           <template v-else>
             <!-- TODO: 小鈴鐺通知（等 notificationStore 建立後再啟用）-->
 
@@ -176,22 +157,24 @@ async function handleLogout() {
                 </li>
               </ul>
             </div>
-
-            <!-- 購物車圖示（右側彈跳視窗） -->
-            <button
-              class="navbar-cart-btn"
-              data-bs-toggle="offcanvas"
-              data-bs-target="#cartOffcanvas"
-              title="購物車"
-            >
-              <i class="bi bi-cart3"></i>
-              <span v-if="cart.count > 0" class="cart-count-badge">{{ cart.count }}</span>
-            </button>
           </template>
+
+          <!-- 購物車圖示（不管登入與否都顯示） -->
+          <button
+            class="navbar-cart-btn"
+            title="購物車"
+            @click="showCart = true"
+          >
+            <i class="bi bi-cart3"></i>
+            <span v-if="cart.count > 0" class="cart-count-badge">{{ cart.count }}</span>
+          </button>
         </div>
       </div>
     </div>
   </nav>
+
+  <!-- 購物車側邊欄（全域） -->
+  <CartOffcanvas v-model="showCart" />
 </template>
 
 <style scoped>
