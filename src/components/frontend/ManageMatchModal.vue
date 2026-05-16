@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router' // 🌟 引入路由
 import * as bootstrap from 'bootstrap'
 import api from '@/api'
 import Swal from 'sweetalert2'
@@ -8,6 +9,8 @@ const props = defineProps({
   game: { type: Object, default: null }
 })
 const emit = defineEmits(['refresh-list'])
+
+const router = useRouter() // 🌟 宣告 router 實例
 
 // ============================
 // 🎯 Modal 控制
@@ -27,6 +30,19 @@ const showModal = () => {
   modalInstance.show()
 }
 defineExpose({ showModal })
+
+// 🌟 點擊按鈕跳轉至前台詳細頁
+const goToDetailPage = () => {
+  if (!props.game?.gameId) return
+  
+  // 1. 先關閉目前的管理 Modal
+  if (modalInstance) {
+    modalInstance.hide()
+  }
+  
+  // 2. 帶入正確的 gameId 跳轉到臨打詳細活動頁
+  router.push(`/pickup/${props.game.gameId}`)
+}
 
 // ============================
 // 🏷️ 頁籤切換
@@ -64,8 +80,8 @@ const togglePayment = async (signup) => {
 const removePlayer = async (signup) => {
   const result = await Swal.fire({
     icon: 'warning',
-    title: '確定移除此球友？',
-    text: `即將移除「${signup.member?.fullName || '球友'}」的報名`,
+    title: '確定移除這位球友嗎？',
+    text: `將移除 ${signup.member?.fullName || '球友'} 的報名`,
     showCancelButton: true,
     confirmButtonText: '確定移除',
     cancelButtonText: '取消',
@@ -75,16 +91,9 @@ const removePlayer = async (signup) => {
   if (result.isConfirmed) {
     try {
       await api.delete(`/pickup-game-signups/${signup.signupId}`)
-      Swal.fire({
-        icon: 'success',
-        title: '已移除',
-        text: `${signup.member?.fullName || '球友'} 的報名已被移除`,
-        confirmButtonText: '好的',
-        confirmButtonColor: '#0ea5e9',
-        timer: 1500
-      })
-      await fetchRoster()
-      emit('refresh-list')
+      Swal.fire({ icon: 'success', title: '已移除', showConfirmButton: false, timer: 1000 })
+      fetchRoster()
+      emit('refresh-list') // 通知首頁更新人數
     } catch (err) {
       console.error('移除失敗', err)
       Swal.fire({ icon: 'error', title: '移除失敗', confirmButtonText: '我知道了' })
@@ -95,7 +104,6 @@ const removePlayer = async (signup) => {
 // 格式化手機號碼
 const formatPhone = (phone) => {
   if (!phone) return '未提供'
-  // 將 0912345678 格式化為 0912-345-678
   const cleaned = phone.replace(/\D/g, '')
   if (cleaned.length === 10) {
     return `${cleaned.slice(0,4)}-${cleaned.slice(4,7)}-${cleaned.slice(7)}`
@@ -115,7 +123,7 @@ const toggleStatus = async () => {
   if (!props.game) return
   const newStatus = props.game.status === 'OPEN' ? 'CLOSED' : 'OPEN'
   const actionText = newStatus === 'CLOSED' ? '停止報名' : '重新開放報名'
-  
+
   try {
     await api.put(`/pickup-games/${props.game.gameId}`, {
       ...props.game,
@@ -203,12 +211,10 @@ const broadcastMessage = ref('')
 const isSending = ref(false)
 
 const sendBroadcast = async () => {
-  // 防呆：確認訊息不為空
   if (!broadcastMessage.value.trim()) {
     Swal.fire({ icon: 'warning', title: '請輸入公告內容', confirmButtonText: '好的' })
     return
   }
-  // 二次確認
   const confirm = await Swal.fire({
     icon: 'question',
     title: '確定要發送公告嗎？',
@@ -225,11 +231,10 @@ const sendBroadcast = async () => {
     const res = await api.post(`/pickup-games/${props.game.gameId}/broadcast`, {
       message: broadcastMessage.value.trim()
     })
-    const data = res
     Swal.fire({
       icon: 'success',
       title: '公告已發送！',
-      text: `成功寄出 ${data.sent} / ${data.total} 封 Email`,
+      text: `成功寄出 ${res.sent} / ${res.total} 封 Email`,
       confirmButtonText: '太好了',
       confirmButtonColor: '#0ea5e9',
     })
@@ -242,12 +247,12 @@ const sendBroadcast = async () => {
   }
 }
 </script>
+
 <template>
   <div class="modal fade" ref="modalRef" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content border-0 shadow-lg rounded-4">
 
-        <!-- ▌Modal Header -->
         <div class="modal-header border-bottom-0 bg-light rounded-top-4 pb-2 pt-3 px-4">
           <h5 class="modal-title fw-bold text-dark d-flex align-items-center">
             <i class="bi bi-gear-fill text-secondary me-2 fs-5"></i>
@@ -259,7 +264,6 @@ const sendBroadcast = async () => {
           <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
 
-        <!-- ▌活動摘要卡片 -->
         <div class="px-4 pt-3" v-if="game">
           <div class="card bg-light border-0 rounded-3 p-3 mb-0">
             <div class="d-flex flex-wrap gap-3 align-items-center text-secondary small fw-medium">
@@ -277,7 +281,6 @@ const sendBroadcast = async () => {
           </div>
         </div>
 
-        <!-- ▌頁籤 (nav-tabs) -->
         <div class="px-4 pt-3">
           <ul class="nav nav-tabs border-bottom-0">
             <li class="nav-item">
@@ -298,15 +301,9 @@ const sendBroadcast = async () => {
           </ul>
         </div>
 
-        <!-- ▌Modal Body -->
         <div class="modal-body px-4 pt-3 pb-4">
 
-          <!-- ============================================ -->
-          <!-- 📋 頁籤 1：報名名單 (Roster)                -->
-          <!-- ============================================ -->
           <div v-show="activeTab === 'roster'">
-
-            <!-- 頂部進度 -->
             <div class="d-flex justify-content-between align-items-center mb-3">
               <span class="fw-bold text-dark">
                 <i class="bi bi-person-check me-1 text-primary"></i> 報名進度
@@ -317,171 +314,120 @@ const sendBroadcast = async () => {
               </span>
             </div>
 
-            <!-- 進度條 -->
             <div class="progress mb-4 rounded-pill" style="height: 6px;">
               <div class="progress-bar bg-primary rounded-pill" role="progressbar"
                    :style="{ width: game?.maxPlayers ? ((game.currentPlayers / game.maxPlayers) * 100) + '%' : '0%' }"></div>
             </div>
 
-            <!-- Loading -->
             <div v-if="rosterLoading" class="text-center py-4 text-muted">
-              <div class="spinner-border spinner-border-sm me-2"></div>
-              載入中...
+              <div class="spinner-border spinner-border-sm me-2"></div>載入中...
             </div>
 
-            <!-- 空名單 -->
             <div v-else-if="roster.length === 0" class="text-center py-5 text-muted">
-              <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
-              目前還沒有人報名
+              <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>目前還沒有人報名
             </div>
 
-            <!-- 名單列表 -->
             <ul v-else class="list-group list-group-flush">
               <li v-for="(signup, idx) in roster" :key="signup.signupId"
                   class="list-group-item px-0 py-3 d-flex align-items-center justify-content-between">
-                
-                <!-- 左側：序號 + 頭像 + 姓名/電話 -->
                 <div class="d-flex align-items-center gap-3">
-                  <span class="text-muted fw-bold" style="width: 24px; font-size: 0.8rem;">
-                    #{{ idx + 1 }}
-                  </span>
+                  <span class="text-muted fw-bold" style="width: 24px; font-size: 0.8rem;">#{{ idx + 1 }}</span>
                   <img :src="signup.member?.photoUrl || `https://i.pravatar.cc/150?u=${signup.member?.memberId}`"
-                       class="rounded-circle" width="36" height="36" alt="avatar"
-                       style="border: 2px solid #e2e8f0; object-fit: cover;">
+                       class="rounded-circle" width="36" height="36" alt="avatar" style="border: 2px solid #e2e8f0; object-fit: cover;">
                   <div>
                     <div class="fw-bold text-dark small">{{ signup.member?.fullName || '球友' }}</div>
                     <div class="text-muted" style="font-size: 0.72rem;">
-                      <i class="bi bi-telephone me-1"></i>
-                      {{ formatPhone(signup.member?.phone) }}
+                      <i class="bi bi-telephone me-1"></i>{{ formatPhone(signup.member?.phone) }}
                     </div>
                   </div>
                 </div>
 
-                <!-- 右側：已付款 Toggle + 移除按鈕 -->
                 <div class="d-flex align-items-center gap-3">
-                  <!-- 已付款 Toggle -->
                   <div class="form-check form-switch mb-0">
                     <input class="form-check-input shadow-none" type="checkbox"
-                           :id="`paid-${signup.signupId}`"
-                           :checked="signup.paid"
-                           @change="togglePayment(signup)"
-                           style="width: 40px; height: 20px; cursor: pointer;">
-                    <label class="form-check-label small fw-medium ms-1"
-                           :class="signup.paid ? 'text-success' : 'text-muted'"
-                           :for="`paid-${signup.signupId}`"
-                           style="cursor: pointer;">
+                           :id="`paid-${signup.signupId}`" :checked="signup.paid" @change="togglePayment(signup)" style="width: 40px; height: 20px; cursor: pointer;">
+                    <label class="form-check-label small fw-medium ms-1" :class="signup.paid ? 'text-success' : 'text-muted'" :for="`paid-${signup.signupId}`" style="cursor: pointer;">
                       {{ signup.paid ? '已付款' : '未付款' }}
                     </label>
                   </div>
-
-                  <!-- 移除按鈕 -->
-                  <button class="btn btn-sm text-danger fw-bold px-0" 
-                          style="font-size: 0.78rem;"
-                          @click="removePlayer(signup)">
-                    <i class="bi bi-x-circle me-1"></i>移除
-                  </button>
                 </div>
               </li>
             </ul>
           </div>
 
-          <!-- ============================================ -->
-          <!-- ⚙️ 頁籤 2：活動狀態 (Status & Danger Zone) -->
-          <!-- ============================================ -->
           <div v-show="activeTab === 'status'">
-            
-            <!-- 上半部：報名狀態控制 -->
             <div class="card border rounded-3 mb-4">
               <div class="card-body p-4">
                 <div class="d-flex justify-content-between align-items-center">
                   <div>
-                    <h6 class="fw-bold text-dark mb-1">
-                      <i class="bi bi-door-open me-1 text-primary"></i>
-                      報名開關
-                    </h6>
-                    <p class="text-muted small mb-0">
-                      {{ game?.status === 'OPEN' ? '目前開放報名中，球友可以自由加入。' : '報名已關閉，不再接受新的報名。' }}
-                    </p>
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-door-open me-1 text-primary"></i>報名開關</h6>
+                    <p class="text-muted small mb-0">{{ game?.status === 'OPEN' ? '目前開放報名中，球友可以自由加入。' : '報名已關閉，不再接受新的報名。' }}</p>
                   </div>
                   <div class="form-check form-switch mb-0">
-                    <input class="form-check-input shadow-none" type="checkbox"
-                           :checked="game?.status === 'OPEN'"
-                           @change="toggleStatus"
-                           :disabled="game?.status === 'CANCELLED'"
-                           style="width: 48px; height: 24px; cursor: pointer;">
-                    <label class="form-check-label fw-bold ms-2"
-                           :class="game?.status === 'OPEN' ? 'text-success' : 'text-warning'">
-                      {{ game?.status === 'OPEN' ? '開放報名' : '停止報名' }}
-                    </label>
+                    <input class="form-check-input shadow-none" type="checkbox" :checked="game?.status === 'OPEN'" @change="toggleStatus" :disabled="game?.status === 'CANCELLED'" style="width: 48px; height: 24px; cursor: pointer;">
+                    <label class="form-check-label fw-bold ms-2" :class="game?.status === 'OPEN' ? 'text-success' : 'text-warning'">{{ game?.status === 'OPEN' ? '開放報名' : '停止報名' }}</label>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- 下半部：Danger Zone -->
             <div class="card border-danger rounded-3">
               <div class="card-body p-4">
-                <h6 class="fw-bold text-danger mb-2">
-                  <i class="bi bi-exclamation-triangle-fill me-1"></i> 危險操作區
-                </h6>
-                <p class="text-muted small mb-3">
-                  取消後所有報名資料將保留，但狀態會變為「已取消」，且無法復原。
-                </p>
-                <button class="btn btn-danger w-100 fw-bold rounded-pill py-2"
-                        @click="cancelGame"
-                        :disabled="game?.status === 'CANCELLED'">
-                  <i class="bi bi-trash3-fill me-1"></i>
-                  {{ game?.status === 'CANCELLED' ? '此揪團已取消' : '取消本次揪團' }}
+                <h6 class="fw-bold text-danger mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>危險操作區</h6>
+                <p class="text-muted small mb-3">取消後所有報名資料將保留，但狀態會變為「已取消」，且無法復原。</p>
+                <button class="btn btn-danger w-100 fw-bold rounded-pill py-2" @click="cancelGame" :disabled="game?.status === 'CANCELLED'">
+                  <i class="bi bi-trash3-fill me-1"></i>{{ game?.status === 'CANCELLED' ? '此揪團已取消' : '取消本次揪團' }}
                 </button>
               </div>
             </div>
-
           </div>
 
-          <!-- ============================================ -->
-          <!-- 📢 頁籤 3：群發公告 (Broadcast)               -->
-          <!-- ============================================ -->
           <div v-show="activeTab === 'broadcast'">
             <div class="card border rounded-3">
               <div class="card-body p-4">
-                <h6 class="fw-bold text-dark mb-1">
-                  <i class="bi bi-megaphone me-1 text-primary"></i>
-                  群發 Email 公告
-                </h6>
-                <p class="text-muted small mb-3">
-                  輸入公告內容後，系統會自動寄送 Email 給所有已報名成功的球友。
-                </p>
-                <textarea 
-                  v-model="broadcastMessage" 
-                  class="form-control shadow-none mb-3" 
-                  rows="5" 
-                  placeholder="例如：今天有事延後 30 分鐘開始，請大家留意時間嗡！"
-                  style="resize: vertical; border-color: #dee2e6;"
-                  :disabled="isSending"
-                ></textarea>
+                <h6 class="fw-bold text-dark mb-1"><i class="bi bi-megaphone me-1 text-primary"></i>群發 Email 公告</h6>
+                <p class="text-muted small mb-3">輸入公告內容後，系統會自動寄送 Email 給所有已報名成功的球友。</p>
+                <textarea v-model="broadcastMessage" class="form-control shadow-none mb-3" rows="5" placeholder="例如：今天有事延後 30 分鐘開始，請大家留意時間嗡！" style="resize: vertical; border-color: #dee2e6;" :disabled="isSending"></textarea>
                 <div class="d-flex justify-content-between align-items-center">
-                  <span class="text-muted small">
-                    <i class="bi bi-info-circle me-1"></i>
-                    將寄送至所有報名球友的 Email 信箱
-                  </span>
-                  <button class="btn btn-primary rounded-pill fw-bold px-4"
-                          :disabled="isSending || !broadcastMessage.trim()"
-                          @click="sendBroadcast">
+                  <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>將寄送至所有報名球友的 Email 信箱</span>
+                  <button class="btn btn-primary rounded-pill fw-bold px-4" :disabled="isSending || !broadcastMessage.trim()" @click="sendBroadcast">
                     <span v-if="isSending" class="spinner-border spinner-border-sm me-1"></span>
-                    <i v-else class="bi bi-send-fill me-1"></i>
-                    {{ isSending ? '發送中...' : '發送公告' }}
+                    <i v-else class="bi bi-send-fill me-1"></i>{{ isSending ? '發送中...' : '發送公告' }}
                   </button>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-      </div>
+          <div class="d-flex justify-content-center pt-3 border-top border-light mt-4">
+            <button 
+              type="button"
+              class="btn rounded-pill px-5 fw-bold text-secondary bg-light btn-detail-mori" 
+              @click="goToDetailPage">
+              <i class="bi bi-arrow-up-right-square me-2"></i> 查看本團完整詳情頁面
+            </button>
+          </div>
+
+        </div> </div>
     </div>
   </div>
 </template>
+
 <style scoped>
+/* 日系柔和森系按鈕微調 */
+.btn-detail-mori {
+  border: 1px solid #e2e8f0; 
+  font-size: 0.9rem; 
+  background-color: #faf9f6 !important; /* 帶一點極淡的棉麻米白 */
+  color: #5c5c5c !important;
+  transition: all 0.2s ease;
+}
+.btn-detail-mori:hover {
+  background-color: #f1f0ea !important;
+  color: #2b2b2b !important;
+  transform: translateY(-1px);
+}
+
 /* 頁籤啟用態 */
 .nav-tabs .nav-link {
   color: #6c757d;

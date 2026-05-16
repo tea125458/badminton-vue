@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePickupGameApi } from '@/composables/usePickupGameApi'
 import SignupPanel from '@/components/frontend/SignupPanel.vue'
 import GoogleMap from '@/components/common/GoogleMap.vue'
+import Swal from 'sweetalert2'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,8 +21,6 @@ const skillMap = {
   INTERMEDIATE: '中級',
   ADVANCED: '高級',
 }
-
-
 
 onMounted(async () => {
   await Promise.all([
@@ -42,7 +41,7 @@ const signups = computed(() => {
 // ============================
 // 🎯 核心商業邏輯：報名權限判定
 // ============================
-const currentMemberId = 1 // 假資料：目前登入的會員 ID
+const currentMemberId = JSON.parse(localStorage.getItem('memberInfo'))?.memberId // 假資料：目前登入的會員 ID
 
 const isCurrentUserHost = computed(() => {
   if (!game.value || !game.value.host) return false
@@ -98,28 +97,86 @@ const displaySignups = computed(() => {
   })
 })
 
-const onJoinGame = async (payload) => {
+/* const onJoinGame = async (payload) => {
+
+
   if (isButtonDisabled.value) return
 
-  // 🌟 前台詳情頁性別防呆檢查
   const memberInfo = JSON.parse(localStorage.getItem('memberInfo')) || {}
   const reqGender = game.value?.requiredGender || game.value?.genderLimit
-  
+
   if (reqGender === 'FEMALE' && memberInfo.gender !== 'FEMALE' && memberInfo.gender !== '女') {
-    Swal.fire({ 
-      icon: 'error', 
-      title: '資格不符', 
-      text: '不好意思，本場次為主揪設定之女性專屬場次喔！', 
+    Swal.fire({
+      icon: 'error',
+      title: '資格不符',
+      text: '不好意思，本場次為主揪設定之女性專屬場次喔！',
       confirmButtonColor: '#ec4899',
       confirmButtonText: '我知道了'
     })
     return
   }
   if (reqGender === 'MALE' && memberInfo.gender !== 'MALE' && memberInfo.gender !== '男') {
-    Swal.fire({ 
-      icon: 'error', 
-      title: '資格不符', 
-      text: '不好意思，本場次為主揪設定之男性專屬場次喔！', 
+    Swal.fire({
+      icon: 'error',
+      title: '資格不符',
+      text: '不好意思，本場次為主揪設定之男性專屬場次喔！',
+      confirmButtonColor: '#0ea5e9',
+      confirmButtonText: '我知道了'
+    })
+    return
+  }
+
+  isJoining.value = true
+  await joinPickupGame(gameId, currentMemberId)
+
+  await Promise.all([
+    fetchGames(),
+    fetchSignups(gameId)
+  ])
+  isJoining.value = false
+}
+ */
+
+ const onJoinGame = async (payload) => {
+  if (isButtonDisabled.value) return
+
+  const memberInfo = JSON.parse(localStorage.getItem('memberInfo')) || {}
+  const reqGender = game.value?.requiredGender || game.value?.genderLimit
+
+  // 性別防呆
+  if (reqGender === 'FEMALE' && memberInfo.gender !== 'FEMALE' && memberInfo.gender !== '女') {
+    Swal.fire({
+      icon: 'error',
+      title: '資格不符',
+      text: '不好意思，本場次為主揪設定之女性專屬場次喔！',
+      confirmButtonColor: '#ec4899',
+      confirmButtonText: '我知道了'
+    })
+    return
+  }
+  if (reqGender === 'MALE' && memberInfo.gender !== 'MALE' && memberInfo.gender !== '男') {
+    Swal.fire({
+      icon: 'error',
+      title: '資格不符',
+      text: '不好意思，本場次為主揪設定之男性專屬場次喔！',
+      confirmButtonColor: '#0ea5e9',
+      confirmButtonText: '我知道了'
+    })
+    return
+  }
+
+  // 程度防呆
+  const levelRank = { '初級': 1, '中級': 2, '高級': 3 }
+  const reqLevel = game.value?.skillLevel
+  const levelCodeToName = { BEGINNER: '初級', INTERMEDIATE: '中級', ADVANCED: '高級' }
+  const reqLevelName = levelCodeToName[reqLevel]
+  const selectedLevelName = payload.level  // SignupPanel emit 出來的是 '初級' / '中級' / '高級'
+
+  if (reqLevel && reqLevel !== 'ALL' && levelRank[selectedLevelName] < levelRank[reqLevelName]) {
+    Swal.fire({
+      icon: 'error',
+      title: '程度不符',
+      text: `本場次最低程度要求為「${reqLevelName}」，您選擇的「${selectedLevelName}」不符合資格！`,
       confirmButtonColor: '#0ea5e9',
       confirmButtonText: '我知道了'
     })
@@ -136,44 +193,41 @@ const onJoinGame = async (payload) => {
   isJoining.value = false
 }
 
+
+ // 主揪踢除成員功能
 // 主揪踢除成員功能
 const handleKick = async (signupId, memberName) => {
-  const result = await removeSignup(signupId, gameId, memberName)
+  await removeSignup(signupId, gameId, memberName)
   await Promise.all([
     fetchGames(),
     fetchSignups(gameId)
   ])
 }
+
 </script>
 
 <template>
   <div class="page-bg">
 
-    <!-- 讀取中 -->
     <div v-if="!isLoaded" class="vh-100 d-flex align-items-center justify-content-center">
       <div class="spinner-border text-sky-blue" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
     </div>
 
-    <!-- 找不到資料 -->
     <div v-else-if="!game" class="vh-100 d-flex flex-column align-items-center justify-content-center">
       <i class="bi bi-emoji-frown fs-1 text-secondary mb-3"></i>
       <h4 class="text-secondary mb-4">找不到該筆揪團紀錄</h4>
       <button class="btn btn-outline-secondary rounded-pill px-4" @click="router.push('/pickup')">回揪團列表</button>
     </div>
 
-    <!-- 內容區 -->
     <div v-else class="content-wrapper pb-5">
 
-      <!-- 1. Hero Banner (全寬頂部視覺) -->
       <div class="hero-banner position-relative" style="background-image: url('/banner_c.jpg'); background-size: cover; background-position: center; height: 350px;">
-        <!-- 漸層遮罩：左深右淺 -->
         <div class="position-absolute w-100 h-100 top-0 start-0" style="background: linear-gradient(to right, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 70%);"></div>
 
         <div class="container position-relative h-100 d-flex align-items-center">
           <div class="w-100 text-white z-3">
-            <!-- Tags (毛玻璃效果) -->
             <div class="d-flex gap-2 mb-3">
               <span class="badge rounded-pill glass-badge px-3 py-2 fw-medium">
                 <i class="bi bi-trophy-fill text-warning me-1"></i> {{ skillMap[game.skillLevel] }}
@@ -182,9 +236,7 @@ const handleKick = async (signupId, memberName) => {
                 <i class="bi bi-circle-fill text-success me-1" style="font-size: 8px;"></i> 報名中
               </span>
             </div>
-            <!-- Title -->
             <h1 class="fw-bold display-4 mb-3">{{ game.court?.venue?.venueName || '羽過天晴' }} 臨打團</h1>
-            <!-- Meta Info -->
             <div class="d-flex flex-wrap gap-4 text-light opacity-75">
               <div class="d-flex align-items-center fs-5"><i class="bi bi-calendar-event me-2 text-sky-blue"></i> {{ game.gameDate }}</div>
               <div class="d-flex align-items-center fs-5"><i class="bi bi-clock me-2 text-sky-blue"></i> {{ game.startTime }} - {{ game.endTime }}</div>
@@ -194,14 +246,11 @@ const handleKick = async (signupId, memberName) => {
         </div>
       </div>
 
-      <!-- 2. 下半部內容 (重疊在 Banner 上方) -->
       <div class="container main-content position-relative z-3">
         <div class="row g-4 g-lg-5">
 
-          <!-- 左側資訊區 -->
           <div class="col-lg-8">
 
-            <!-- 🌟 主揪推薦區塊 (移至上方，增加人情味) -->
             <div class="card border-0 shadow-sm rounded-4 mb-4">
               <div class="card-body p-4 p-md-5 d-flex align-items-start position-relative overflow-hidden">
                 <div class="host-badge position-absolute top-0 end-0 bg-sky-blue text-white px-3 py-1 fw-bold rounded-bottom-start shadow-sm">
@@ -220,7 +269,6 @@ const handleKick = async (signupId, memberName) => {
               </div>
             </div>
 
-            <!-- 👥 已報名隊友 -->
             <div class="card border-0 shadow-sm rounded-4 mb-4">
               <div class="card-body p-4 p-md-5">
                 <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
@@ -229,9 +277,7 @@ const handleKick = async (signupId, memberName) => {
                 </div>
 
                 <div class="d-flex flex-wrap gap-4 pt-2">
-                  <!-- 已經報名的人 -->
                   <div v-for="s in displaySignups" :key="s.signupId" class="text-center position-relative player-avatar-wrapper" style="width: 80px;">
-                    <!-- 踢出按鈕 -->
                     <button
                       v-if="isCurrentUserHost && s.displayTag !== '主揪' && game.status !== 'CANCELLED' && new Date(`${game.gameDate}T${game.endTime}`) >= new Date()"
                       @click="handleKick(s.signupId, s.member?.fullName)"
@@ -250,13 +296,11 @@ const handleKick = async (signupId, memberName) => {
                     <div class="small fw-bold text-truncate w-100 text-dark">{{ s.member?.fullName }}</div>
                     <div v-if="s.displayTag" class="small text-sky-blue fw-medium" style="font-size: 0.75rem;">{{ s.displayTag }}</div>
 
-                    <!-- 聯絡方式 -->
                     <div v-if="isCurrentUserHost" class="text-secondary mt-1 px-1 rounded bg-light border" style="font-size: 0.65rem;">
                       {{ s.member?.phone || '無電話' }}
                     </div>
                   </div>
 
-                  <!-- 剩下的空位 (帶有 hover 動畫的虛線框) -->
                   <div v-for="i in Math.max(0, game.maxPlayers - game.currentPlayers)" :key="'empty'+i" class="text-center empty-slot-wrapper" style="width: 80px;">
                     <div class="rounded-circle d-flex align-items-center justify-content-center bg-light mx-auto mb-2 empty-slot position-relative">
                       <i class="bi bi-plus-lg text-secondary fs-4"></i>
@@ -267,7 +311,6 @@ const handleKick = async (signupId, memberName) => {
               </div>
             </div>
 
-            <!-- 📝 活動細則與場館規格 -->
             <div class="card border-0 shadow-sm rounded-4 mb-4">
               <div class="card-body p-4 p-md-5">
                 <h4 class="fw-bold mb-4 pb-2 border-bottom"><i class="bi bi-ui-checks-grid text-sky-blue me-2"></i>活動細則與規格</h4>
@@ -303,7 +346,6 @@ const handleKick = async (signupId, memberName) => {
               </div>
             </div>
 
-            <!-- 🗺️ 真實地圖區塊 -->
             <div class="card border-0 shadow-sm rounded-4 mb-5">
               <div class="card-body p-4 p-md-5">
                 <h4 class="fw-bold mb-4 pb-2 border-bottom"><i class="bi bi-geo-alt-fill text-sky-blue me-2"></i>場館位置</h4>
@@ -313,23 +355,57 @@ const handleKick = async (signupId, memberName) => {
 
           </div>
 
-          <!-- 右側：固定報名卡片 (保持原本強大的元件邏輯) -->
           <div class="col-lg-4">
-            <!-- 確保 SignupPanel 是 sticky-top -->
             <div class="sticky-panel">
-              <SignupPanel
-                :game="game"
-                :is-joining="isJoining"
-                :button-text="signupButtonText"
-                :is-disabled-by-logic="isButtonDisabled"
-                @submit-signup="onJoinGame"
-              />
+
+              <template v-if="isCurrentUserHost">
+                <div class="card border-0 shadow-sm rounded-4 p-4 text-start bg-white">
+                  <div class="badge bg-warning text-dark rounded-pill px-3 py-1 mb-3 fw-bold align-self-start" style="font-size: 0.78rem;">
+                    👑 您是此場活動主揪
+                  </div>
+                  <div class="mb-4">
+                    <div class="text-secondary small fw-medium">目前預估總經費收支</div>
+                    <div class="fs-1 fw-bold mt-1 text-mori-blue">
+                      NT$ {{ (game.feePerPerson || 120) * (game.currentPlayers || 1) }}
+                    </div>
+                    <small class="text-muted d-block mt-1">
+                      ( 每人單價 {{ game.feePerPerson || 120 }} × 已報名人數 {{ game.currentPlayers }} 人 )
+                    </small>
+                  </div>
+
+                  <hr class="border-light opacity-50 my-3">
+
+                  <button
+                    class="btn btn-mori-blue w-100 rounded-pill fw-bold py-2 shadow-sm d-flex align-items-center justify-content-center gap-2 mb-2"
+                    @click="router.push('/pickup')">
+                    <i class="bi bi-collection-play-fill"></i> 回大廳進行點名管理
+                  </button>
+
+                  <button
+                    class="btn btn-light border text-secondary w-100 rounded-pill fw-bold py-2 small"
+                    @click="router.push('/pickup')">
+                    <i class="bi bi-arrow-left"></i> 返回臨打大廳
+                  </button>
+                </div>
+              </template>
+
+              <template v-else>
+                <SignupPanel
+                  :game="game"
+                  :is-joining="isJoining"
+                  :button-text="signupButtonText"
+                  :is-disabled-by-logic="isButtonDisabled"
+                  @submit-signup="onJoinGame"
+                />
+              </template>
+
             </div>
           </div>
 
         </div>
       </div>
     </div>
+
   </div>
 </template>
 
@@ -340,9 +416,23 @@ const handleKick = async (signupId, memberName) => {
   min-height: 100vh;
 }
 
-/* 品牌色 */
+/* 品牌色與森系字色 */
 .text-sky-blue { color: #0ea5e9 !important; }
 .bg-sky-blue { background-color: #0ea5e9 !important; }
+.text-mori-blue { color: #4A90E2 !important; }
+
+/* 專屬主揪管理按鈕 */
+.btn-mori-blue {
+  background-color: #F0F7FF !important;
+  color: #4A90E2 !important;
+  border: none;
+  transition: all 0.2s ease;
+}
+.btn-mori-blue:hover {
+  background-color: #E1F0FF !important;
+  color: #2C73C4 !important;
+  transform: translateY(-1px);
+}
 
 /* Banner 特效 */
 .glass-badge {
@@ -352,7 +442,7 @@ const handleKick = async (signupId, memberName) => {
   color: white;
 }
 .main-content {
-  margin-top: -60px; /* 向上重疊 Banner，製造空間深度 */
+  margin-top: -60px;
 }
 
 /* 頭像與動畫 */
@@ -375,19 +465,7 @@ const handleKick = async (signupId, memberName) => {
   transition: all 0.3s ease;
   background-color: transparent !important;
 }
-.empty-slot-wrapper {
-  cursor: pointer;
-}
-.empty-slot-wrapper:hover .empty-slot {
-  border-color: #0ea5e9;
-  background-color: #f0f9ff !important;
-  transform: scale(1.08);
-}
-.empty-slot-wrapper:hover .empty-slot i {
-  color: #0ea5e9 !important;
-  transform: scale(1.2);
-  transition: transform 0.3s ease;
-}
+
 
 /* 踢除按鈕 */
 .kick-btn {
@@ -411,7 +489,7 @@ const handleKick = async (signupId, memberName) => {
   background-color: #b91c1c !important;
 }
 
-/* 特色小卡 (Feature Tiles) */
+/* 特色小卡 */
 .feature-tile {
   background-color: #ffffff;
   border: 1px solid #e2e8f0;
@@ -425,7 +503,6 @@ const handleKick = async (signupId, memberName) => {
   transition: all 0.3s ease;
 }
 
-/* 主揪推薦卡片標籤 */
 .host-badge {
   letter-spacing: 1px;
 }

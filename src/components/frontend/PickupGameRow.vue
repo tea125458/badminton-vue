@@ -1,9 +1,14 @@
 <script setup>
 import { computed } from 'vue'
+
 const props = defineProps({
   game: {
     type: Object,
     required: true
+  },
+  isRegistered: {
+    type: Boolean,
+    default: false
   }
 })
 const emit = defineEmits(['open-quick-view', 'manage-game'])
@@ -20,6 +25,7 @@ const isHost = computed(() => {
   return currentUser.value.memberId && props.game.host?.memberId && 
          currentUser.value.memberId === props.game.host.memberId
 })
+
 
 // 🌟 1. 程度翻譯對照表
 const levelMap = {
@@ -180,6 +186,13 @@ const handleCardClick = () => {
             <button class="btn btn-outline-dark btn-sm mt-2 w-100 rounded-pill fw-bold"
                     @click.stop="$emit('manage-game', game)">
               <i class="bi bi-gear-fill me-1"></i>管理揪團
+            </button>
+          </template>
+          <template v-else-if="isRegistered">
+            <!-- 已報名的狀態 -->
+            <button class="btn btn-outline-success btn-sm mt-2 w-100 rounded-pill fw-bold"
+                    @click.stop="$emit('open-quick-view', game)">
+              ✅ 查看報名資訊
             </button>
           </template>
           <template v-else>

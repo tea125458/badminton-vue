@@ -25,6 +25,7 @@ export function usePickupGameApi() {
   const pickupGames = ref([])          // 揪團列表
   const courts = ref([])               // 場地列表（給下拉選單用）
   const signupsMap = ref({})           // 每場揪團的報名名單，key = gameId
+  const myRegisteredGameIds = ref([])  // 🌟 當前會員已報名的揪團 ID 集合
 
   // 新增揪團表單相關
   const memberKeyword = ref('')        // 搜尋主揪的關鍵字
@@ -344,6 +345,21 @@ export function usePickupGameApi() {
     }
   }
 
+  // 🌟 抓取當前登入會員已報名的所有揪團 ID
+  const fetchMyRegisteredGames = async (memberId) => {
+    if (!memberId) return
+    try {
+      const res = await axios.get(`/api/pickup-game-signups/my-signups/${memberId}`)
+      // 取出所有 JOINED 狀態的揪團 ID
+      myRegisteredGameIds.value = res.data
+        .filter(signup => signup.status === 'JOINED')
+        .map(signup => signup.game?.gameId)
+        .filter(Boolean)
+    } catch (err) {
+      console.error('抓取會員報名紀錄失敗', err)
+    }
+  }
+
   // 搜尋會員（報名區用，跟新增揪團的搜尋分開）
   const searchSignupMembers = async () => {
     if (!signupKeyword.value.trim()) {
@@ -539,6 +555,7 @@ export function usePickupGameApi() {
     joinPickupGame,
     memberBookings,       // 🌟 主揪的可用預約清單
     selectedBookingId,    // 🌟 選中的預約 ID
+    myRegisteredGameIds,
 
     // API 方法
     fetchGames,
@@ -551,6 +568,7 @@ export function usePickupGameApi() {
     cancelPickupGame,
     batchCancel,
     fetchSignups,
+    fetchMyRegisteredGames,
     searchSignupMembers,
     selectSignupMember,
     addSignup,
