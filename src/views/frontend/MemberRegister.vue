@@ -60,7 +60,7 @@ async function handleRegister() {
   }
   const phoneDigits = d.phone.replace(/\D/g, '')
   if (phoneDigits.length !== 10 || !phoneDigits.startsWith('09')) {
-    errorMsg.value = '電話格式錯誤，需為 09 開頭的 10 位數字'
+    errorMsg.value = '手機號碼格式錯誤，需為 09 開頭的 10 位數字'
     return
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) {
@@ -195,7 +195,7 @@ async function handleRegister() {
                 </div>
                 <div class="col-6">
                   <label class="form-label fw-semibold small text-secondary">
-                    電話
+                    手機號碼
                   </label>
                   <input v-model="form.phone" type="text" class="form-control rounded-3"
                          placeholder="0912-345-678" maxlength="12" @input="formatPhone" />

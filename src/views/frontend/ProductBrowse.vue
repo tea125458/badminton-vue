@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { productApi } from '@/api/product'
 import { useCartStore } from '@/stores/cart'
@@ -120,29 +120,8 @@ function addToCart() {
 }
 
 function goToCheckout() {
-  const el = document.getElementById('cartOffcanvas')
-  if (el && window.bootstrap) {
-    const offcanvas = window.bootstrap.Offcanvas.getOrCreateInstance(el)
-    el.addEventListener('hidden.bs.offcanvas', () => router.push('/cart'), { once: true })
-    offcanvas.hide()
-  } else {
-    router.push('/cart')
-  }
+  router.push('/cart')
 }
-
-onUnmounted(() => {
-  // 元件卸載時確保 Bootstrap offcanvas 與殘留的 body scroll lock 被清除
-  const el = document.getElementById('cartOffcanvas')
-  if (el && window.bootstrap) {
-    const instance = window.bootstrap.Offcanvas.getInstance(el)
-    if (instance) instance.dispose()
-  }
-  // 移除殘留的 backdrop
-  document.querySelectorAll('.offcanvas-backdrop').forEach(b => b.remove())
-  document.body.style.overflow = ''
-  document.body.style.paddingRight = ''
-  document.body.classList.remove('offcanvas-open')
-})
 
 // ===================== 商品詳情 Modal =====================
 const detailModal = ref({ show: false, product: null })
@@ -269,70 +248,7 @@ function openCartFromDetail() {
       </div>
     </div>
 
-    <!-- ====== 購物車 Offcanvas ====== -->
-    <div
-      id="cartOffcanvas"
-      class="offcanvas offcanvas-end cart-offcanvas"
-      tabindex="-1"
-    >
-      <div class="offcanvas-header cart-header">
-        <h5 class="offcanvas-title fw-bold">
-          <i class="bi bi-cart3 me-2"></i>購物車
-        </h5>
-        <button
-          type="button"
-          class="btn-close btn-close-white"
-          data-bs-dismiss="offcanvas"
-        ></button>
-      </div>
-
-      <div class="offcanvas-body cart-body">
-        <!-- 空購物車 -->
-        <div v-if="cart.items.length === 0" class="cart-empty">
-          <i class="bi bi-cart-x"></i>
-          <p>購物車是空的</p>
-        </div>
-
-        <!-- 商品清單 -->
-        <ul v-else class="cart-list">
-          <li v-for="item in cart.items" :key="item.id" class="cart-item">
-            <div class="cart-item-img">
-              <img :src="item.imageUrl || defaultImage" :alt="item.name" class="cart-thumb" @error="onImageError" />
-            </div>
-            <div class="cart-item-info">
-              <p class="cart-item-name">{{ item.name }}</p>
-              <p class="cart-item-price">${{ item.price.toLocaleString() }}</p>
-              <div class="qty-control">
-                <button class="qty-btn" @click="cart.decrease(item.id)">
-                  <i class="bi bi-dash"></i>
-                </button>
-                <span class="qty-num">{{ item.qty }}</span>
-                <button class="qty-btn" @click="cart.increase(item.id)">
-                  <i class="bi bi-plus"></i>
-                </button>
-              </div>
-            </div>
-            <div class="cart-item-right">
-              <p class="cart-item-subtotal">${{ (item.price * item.qty).toLocaleString() }}</p>
-              <button class="remove-btn" @click="cart.remove(item.id)">
-                <i class="bi bi-trash3"></i>
-              </button>
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      <!-- 結帳區 -->
-      <div class="cart-footer">
-        <div class="cart-total">
-          <span>合計</span>
-          <span class="total-price">${{ cart.total.toLocaleString() }}</span>
-        </div>
-        <button class="btn-brand checkout-btn" :disabled="cart.items.length === 0" @click="goToCheckout">
-          <i class="bi bi-credit-card me-2"></i>前往結帳
-        </button>
-      </div>
-    </div>
+    <!-- 購物車已移至全域 CartOffcanvas 元件（由 FrontNavbar 管理） -->
 
     <!-- ====== 商品詳情 Modal ====== -->
     <Transition name="modal">
