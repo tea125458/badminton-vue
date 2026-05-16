@@ -6,12 +6,13 @@
  * - 下方：個人資料表單（姓名、性別不可改）
  */
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { memberApi } from '@/api/member'
 import { bookingApi } from '@/api/booking'
 import { orderApi } from '@/api/order'
 
 const router = useRouter()
+const route = useRoute()
 
 const member = ref(null)
 const isLoading = ref(true)
@@ -193,6 +194,12 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+
+  // 若 URL 帶有 ?tab=bookings，自動切換到對應頁籤
+  const tabParam = route.query.tab
+  if (tabParam && menuItems.some(m => m.id === tabParam)) {
+    switchTab(tabParam)
+  }
 })
 
 // 儲存變更
@@ -283,7 +290,7 @@ const filteredBookings = computed(() => {
   const today = new Date().toISOString().split('T')[0] // yyyy-MM-dd
   return bookings.value.filter((b) => {
     if (bookingFilter.value === 'upcoming') {
-      return b.bookingDate >= today && b.status === 'CONFIRMED'
+      return b.bookingDate >= today && (b.status === 'CONFIRMED' || b.status === 'PENDING')
     }
     if (bookingFilter.value === 'completed') {
       return b.status === 'COMPLETED' || (b.status === 'CONFIRMED' && b.bookingDate < today)
@@ -321,6 +328,8 @@ function switchTab(tabId) {
 // 狀態顯示輔助
 function getStatusInfo(booking) {
   const today = new Date().toISOString().split('T')[0]
+  if (booking.status === 'PENDING')
+    return { label: '待付款', cls: 'status-pending', icon: 'bi-hourglass-split' }
   if (booking.status === 'CANCELLED')
     return { label: '已取消', cls: 'status-cancelled', icon: 'bi-x-circle' }
   if (
@@ -1268,6 +1277,9 @@ async function handleAvatarUpload(event) {
 }
 
 /* 狀態左邊線顏色 */
+.booking-card.status-pending {
+  border-left-color: #f59e0b;
+}
 .booking-card.status-upcoming {
   border-left-color: #10b981;
 }
@@ -1307,6 +1319,10 @@ async function handleAvatarUpload(event) {
   font-weight: 600;
   padding: 0.35rem 0.75rem;
   border-radius: 2rem;
+}
+.booking-status-badge.status-pending {
+  background-color: #fef3c7;
+  color: #d97706;
 }
 .booking-status-badge.status-upcoming {
   background-color: #ecfdf5;

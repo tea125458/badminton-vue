@@ -73,6 +73,7 @@ function clearSearch() {
 // ========== 狀態顯示 ==========
 function statusText(status) {
   const map = {
+    PENDING: '待付款',
     CONFIRMED: '已確認',
     COMPLETED: '已完成',
     CANCELLED: '已取消',
@@ -83,6 +84,7 @@ function statusText(status) {
 
 function statusClass(status) {
   const map = {
+    PENDING: 'badge-pending',
     CONFIRMED: 'badge-active',
     COMPLETED: 'badge-completed',
     CANCELLED: 'badge-inactive',
@@ -375,6 +377,15 @@ const today = computed(() => {
                     <a
                       class="dropdown-item"
                       href="#"
+                      @click.prevent="changeStatus(b.bookingId, 'PENDING')"
+                    >
+                      <i class="bi bi-hourglass-split text-warning me-1"></i>待付款
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      href="#"
                       @click.prevent="changeStatus(b.bookingId, 'CONFIRMED')"
                     >
                       <i class="bi bi-check-circle text-success me-1"></i>已確認
@@ -620,5 +631,9 @@ const today = computed(() => {
   background: var(--brand-sky, #0ea5e9);
   color: white;
   border-color: var(--brand-sky, #0ea5e9);
+}
+.badge-pending {
+  background: #FEF3C7;
+  color: #D97706;
 }
 </style>

@@ -47,6 +47,9 @@ onMounted(async () => {
       setTimeout(() => {
         if (orderId.startsWith('ORD-')) {
           router.push({ path: '/order-success', query: { orderId: orderId.split('-')[1] } })
+        } else if (orderId.startsWith('BKG-')) {
+          // 場地預約 LINE Pay 付款成功 → 跳轉到會員中心預約紀錄
+          router.push({ path: '/profile', query: { tab: 'bookings' } })
         } else {
           // 其他組員的業務可以導向他們自己的頁面
           router.push('/')

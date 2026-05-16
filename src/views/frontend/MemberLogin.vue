@@ -8,9 +8,11 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { memberApi } from '@/api/member'
+import { useMemberStore } from '@/stores/member'
 
 const router = useRouter()
 const route = useRoute()
+const memberStore = useMemberStore()
 
 const username = ref('')
 const password = ref('')
@@ -34,8 +36,7 @@ onMounted(() => {
 })
 
 // 進入登入頁時清除舊的 Token（等同於登出）
-localStorage.removeItem('memberToken')
-localStorage.removeItem('memberInfo')
+memberStore.logout()
 
 async function handleLogin() {
   if (!username.value.trim() || !password.value.trim()) {
@@ -48,8 +49,7 @@ async function handleLogin() {
 
   try {
     const res = await memberApi.login(username.value.trim(), password.value)
-    localStorage.setItem('memberToken', res.token)
-    localStorage.setItem('memberInfo', JSON.stringify(res.member))
+    memberStore.login(res.token, res.member)
     router.push('/')
   } catch (err) {
     if (err.response?.status === 401) {
@@ -73,6 +73,7 @@ async function handleGoogleLogin(response) {
     
     localStorage.setItem('memberToken', res.token)
     localStorage.setItem('memberInfo', JSON.stringify(res.member))
+    memberStore.login(res.token, res.member)
     router.push('/')
   } catch (err) {
     console.error('Google 登入失敗:', err)
