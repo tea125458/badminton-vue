@@ -64,8 +64,8 @@ const togglePayment = async (signup) => {
 const removePlayer = async (signup) => {
   const result = await Swal.fire({
     icon: 'warning',
-    title: '確定移除此球友？',
-    text: `即將移除「${signup.member?.fullName || '球友'}」的報名`,
+    title: '確定移除這位球友嗎？',
+    text: `將移除 ${signup.member?.fullName || '球友'} 的報名`,
     showCancelButton: true,
     confirmButtonText: '確定移除',
     cancelButtonText: '取消',
@@ -75,19 +75,35 @@ const removePlayer = async (signup) => {
   if (result.isConfirmed) {
     try {
       await api.delete(`/pickup-game-signups/${signup.signupId}`)
-      Swal.fire({
-        icon: 'success',
-        title: '已移除',
-        text: `${signup.member?.fullName || '球友'} 的報名已被移除`,
-        confirmButtonText: '好的',
-        confirmButtonColor: '#0ea5e9',
-        timer: 1500
-      })
-      await fetchRoster()
-      emit('refresh-list')
+      Swal.fire({ icon: 'success', title: '已移除', showConfirmButton: false, timer: 1000 })
+      fetchRoster()
+      emit('refresh-list') // 通知首頁更新人數
     } catch (err) {
       console.error('移除失敗', err)
       Swal.fire({ icon: 'error', title: '移除失敗', confirmButtonText: '我知道了' })
+    }
+  }
+}
+
+const markAsNoShow = async (signup) => {
+  const result = await Swal.fire({
+    icon: 'warning',
+    title: '標記未到 (放鳥)？',
+    text: `確定要標記 ${signup.member?.fullName || '球友'} 為無故未到嗎？此紀錄將影響該球友信用。`,
+    showCancelButton: true,
+    confirmButtonText: '確定標記',
+    cancelButtonText: '取消',
+    confirmButtonColor: '#dc3545',
+    cancelButtonColor: '#6c757d',
+  })
+  if (result.isConfirmed) {
+    try {
+      await api.put(`/pickup-game-signups/${signup.signupId}/no-show`)
+      Swal.fire({ icon: 'success', title: '已標記', showConfirmButton: false, timer: 1000 })
+      fetchRoster()
+    } catch (err) {
+      console.error('標記失敗', err)
+      Swal.fire({ icon: 'error', title: '標記失敗', confirmButtonText: '我知道了' })
     }
   }
 }
@@ -374,12 +390,24 @@ const sendBroadcast = async () => {
                     </label>
                   </div>
 
-                  <!-- 移除按鈕 -->
-                  <button class="btn btn-sm text-danger fw-bold px-0" 
-                          style="font-size: 0.78rem;"
-                          @click="removePlayer(signup)">
-                    <i class="bi bi-x-circle me-1"></i>移除
-                  </button>
+                  <!-- 標記未到 / 移除區塊 -->
+                  <div class="d-flex flex-column align-items-end gap-1">
+                    <span v-if="signup.isNoShow" class="text-danger fw-bold small">
+                      <i class="bi bi-x-circle-fill me-1"></i>已標記為未到
+                    </span>
+                    <button v-else class="btn btn-sm btn-outline-danger fw-bold rounded-pill" 
+                            style="font-size: 0.75rem; padding: 2px 10px;"
+                            @click="markAsNoShow(signup)">
+                      🚨 標記未到
+                    </button>
+                    
+                    <!-- 移除按鈕 -->
+                    <button class="btn btn-sm text-secondary fw-bold px-0 mt-1" 
+                            style="font-size: 0.75rem;"
+                            @click="removePlayer(signup)">
+                      <i class="bi bi-trash3 me-1"></i>移除名額
+                    </button>
+                  </div>
                 </div>
               </li>
             </ul>

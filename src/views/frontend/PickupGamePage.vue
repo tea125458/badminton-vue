@@ -311,7 +311,7 @@ const cancelMySignup = async () => {
       // 我們透過後端新增加的 API：DELETE /api/pickup-game-signups/member/{memberId}/game/{gameId} 來取消報名
       // 因為需要 import axios，所以如果前面沒有 import，請直接使用全域或 api instance
       // 由於 usePickupGameApi 沒有匯出，這裡直接使用 api / axios
-      const { data } = await api.delete(`/api/pickup-game-signups/member/${currentMemberId}/game/${quickViewGame.value.gameId}`)
+      const { data } = await api.delete(`/pickup-game-signups/member/${currentMemberId}/game/${quickViewGame.value.gameId}`)
 
       Swal.fire({
         icon: 'success',
