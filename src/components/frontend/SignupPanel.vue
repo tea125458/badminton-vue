@@ -48,7 +48,7 @@ const totalFee = computed(() => {
   const duration = Math.max(0, endHours - startHours)
   
   // 每小時 300 元
-  return Math.round(duration * 300)
+  return Math.ceil(totalCost / (props.game.currentPlayers || 1))
 })
 
 // ============================
@@ -115,21 +115,12 @@ const progressPercent = computed(() => {
   <div class="card border-0 shadow-sm rounded-4 sticky-top signup-panel">
     <div class="card-body p-4 p-lg-5">
       
-      <!-- 💰 費用區塊 (Fee Section) -->
-      <div class="mb-4">
-        <div class="d-flex align-items-center mb-1">
-          <span class="small text-secondary fw-bold me-2">費用與報名</span>
-          <!-- 📌 現場繳費 Badge -->
-          <span class="badge bg-warning text-dark px-2 py-1 rounded-pill small">
-            📌 現場繳交給主揪
-          </span>
-        </div>
-        <div class="d-flex align-items-baseline mt-2">
-          <h2 class="text-sky-blue fw-bold mb-0 me-1">${{ totalFee }}</h2>
-          <span class="text-secondary fw-medium">/人</span>
-        </div>
-        <div class="text-muted small mt-1">(收費標準：$300 /小時)</div>
-      </div>
+    <div class="mb-4">
+  <div class="text-secondary small fw-medium">費用與報名</div>
+  <div class="text-secondary mt-2 p-3 bg-light rounded" style="font-size: 0.85rem;">
+    <i class="bi bi-wallet2 me-1"></i> 本場次費用與付款方式，請於現場依主揪指示結算。
+  </div>
+</div>
 
       <!-- 📊 人數進度條 (Progress Bar) -->
       <div class="mb-4">

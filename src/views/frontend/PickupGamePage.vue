@@ -194,6 +194,31 @@ const qvSkillLabel = computed(() => {
   if (!quickViewGame.value) return '不限'
   return skillMap[quickViewGame.value.skillLevel] || '不限'
 })
+// Quick View 專用：動態計算單人費用
+const qvCalculatedFee = computed(() => {
+  if (!quickViewGame.value || !quickViewGame.value.startTime || !quickViewGame.value.endTime) return 0
+
+  const parseTime = (timeStr) => {
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    return hours + (minutes / 60)
+  }
+
+  const startHours = parseTime(quickViewGame.value.startTime)
+  const endHours = parseTime(quickViewGame.value.endTime)
+  const duration = Math.max(0, endHours - startHours)
+
+  const totalCost = duration * 300
+
+  // 判斷當前使用者是否已經報名
+  const isJoined = isQuickViewRegistered.value
+  // 如果還沒報名，就算入他自己 (分母 +1)；如果已經報名，就直接用當前人數
+  const divisor = isJoined
+    ? (quickViewGame.value.currentPlayers || 1)
+    : (quickViewGame.value.currentPlayers + 1)
+
+  return Math.ceil(totalCost / divisor)
+})
+
 const qvGenderBadge = computed(() => {
   if (!quickViewGame.value) return null
   const g = quickViewGame.value.requiredGender || 'ALL'
@@ -720,13 +745,10 @@ const handleManageGame = (game) => {
                 <i class="bi bi-x-circle me-1"></i>已額滿
               </div>
             </div>
-
-            <!-- ▌4. 費用 -->
-            <div class="d-flex align-items-baseline gap-1 mb-3 pb-3" style="border-bottom: 1px solid #f1f5f9;">
-              <span class="fw-bold fs-5" style="color: #0ea5e9;">NT$ {{ quickViewGame.feePerPerson || 0 }}</span>
-              <span class="text-secondary small">/ 人</span>
-              <span class="text-muted small ms-1">(預估費用，依現場人數微調)</span>
-            </div>
+<!-- ▌4. 費用 -->
+<div class="text-secondary mb-3 pb-3" style="font-size: 0.85rem; border-bottom: 1px solid #f1f5f9;">
+  <i class="bi bi-wallet2 me-1"></i> 本場次費用與付款方式，請於現場依主揪指示結算。
+</div>
 
             <template v-if="!isQuickViewRegistered">
               <!-- ▌5. 程度選擇區塊 (未報名時顯示) -->

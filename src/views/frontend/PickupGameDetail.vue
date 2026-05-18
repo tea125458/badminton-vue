@@ -68,6 +68,29 @@ const isButtonDisabled = computed(() => {
 })
 
 // ============================
+// 💰 動態費用計算邏輯
+// ============================
+const calculatedFeePerPerson = computed(() => {
+  if (!game.value || !game.value.startTime || !game.value.endTime || !game.value.maxPlayers) return 0
+
+  // 將 "14:00" 轉成數字 14.0
+  const parseTime = (timeStr) => {
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    return hours + (minutes / 60)
+  }
+
+  const startHours = parseTime(game.value.startTime)
+  const endHours = parseTime(game.value.endTime)
+  const duration = Math.max(0, endHours - startHours)
+
+  // 總場地費：每小時 300 元
+  const totalCost = duration * 300
+
+  // 每人單價：總費用 / 人數上限 (使用 Math.ceil 無條件進位)
+  return Math.ceil(totalCost / (game.value.currentPlayers || 1))
+})
+
+// ============================
 // 🎯 視覺處理：報名名單顯示標籤
 // ============================
 const displaySignups = computed(() => {
@@ -363,15 +386,12 @@ const handleKick = async (signupId, memberName) => {
                   <div class="badge bg-warning text-dark rounded-pill px-3 py-1 mb-3 fw-bold align-self-start" style="font-size: 0.78rem;">
                     👑 您是此場活動主揪
                   </div>
-                  <div class="mb-4">
-                    <div class="text-secondary small fw-medium">目前預估總經費收支</div>
-                    <div class="fs-1 fw-bold mt-1 text-mori-blue">
-                      NT$ {{ (game.feePerPerson || 120) * (game.currentPlayers || 1) }}
-                    </div>
-                    <small class="text-muted d-block mt-1">
-                      ( 每人單價 {{ game.feePerPerson || 120 }} × 已報名人數 {{ game.currentPlayers }} 人 )
-                    </small>
-                  </div>
+                 <div class="mb-4">
+  <div class="text-secondary small fw-medium">經費收支說明</div>
+  <div class="text-secondary mt-2 p-3 bg-light rounded" style="font-size: 0.85rem;">
+    <i class="bi bi-info-circle me-1"></i> 平台已完成場館預約扣款，請記得於現場向球友收取分攤費用喔！
+  </div>
+</div>
 
                   <hr class="border-light opacity-50 my-3">
 
