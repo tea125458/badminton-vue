@@ -31,7 +31,7 @@ const note = ref('')
 
 // 發票相關
 const invoiceType = ref('') // 初始為空，縮短頁面空間。選項：INDIVIDUAL, DONATION, COMPANY
-const carrierType = ref('MOBILE') // MOBILE, CERTIFICATE, PAPER
+const carrierType = ref('PAPER') // MOBILE, CERTIFICATE, PAPER
 const mobileCarrier = ref('')
 const certificateCarrier = ref('')
 const donationUnit = ref('')
@@ -73,7 +73,7 @@ const paymentOptions = [
     value: 'CREDIT_CARD', 
     label: '信用卡', 
     logos: [
-      'https://img.icons8.com/color/96/visa.png',
+      '/visa.svg',
       'https://img.icons8.com/color/96/mastercard-logo.png',
       'https://img.icons8.com/color/96/jcb.png',
       'https://img.icons8.com/color/96/amex.png'
@@ -87,7 +87,7 @@ const paymentOptions = [
   { 
     value: 'LINE_PAY', 
     label: 'LINE Pay', 
-    logos: ['https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg'] 
+    logos: ['/linepay.svg'] 
   },
 ]
 
@@ -146,7 +146,7 @@ async function processOrder() {
       if (carrierType.value === 'MOBILE') computedCarrier = mobileCarrier.value
       else if (carrierType.value === 'CERTIFICATE') computedCarrier = certificateCarrier.value
     } else if (invoiceType.value === 'DONATION') {
-      computedCarrier = donationCode.value
+      computedCarrier = donationUnit.value === 'CUSTOM' ? donationCode.value : donationUnit.value
     } else if (invoiceType.value === 'COMPANY') {
       computedTaxId = taxId.value
     }
@@ -180,10 +180,11 @@ async function processOrder() {
         productName: `羽過天晴商品訂單 #${newOrder.orderId}`
       })
     } else {
-      // 現金、轉帳、信用卡(已模擬成功) → 直接導向詳情頁
+      // 現金、轉帳、信用卡(已模擬成功) → 刻意製造 1.2 秒的「訂單處理中」視覺停留時間，讓使用者感受更真實、安心的交易體驗
       cart.clear()
+      await new Promise(resolve => setTimeout(resolve, 1200))
       router.push({
-        path: '/my-orders',
+        path: '/order-success',
         query: { orderId: newOrder.orderId }
       })
     }
@@ -247,8 +248,10 @@ async function processOrder() {
                   </div>
                   <span class="payment-card-label">{{ opt.label }}</span>
                   
-                  <div class="payment-logos ms-auto d-flex flex-wrap gap-1 justify-content-end">
-                    <img v-for="(logo, idx) in opt.logos" :key="idx" :src="logo" class="payment-logo-img" :alt="opt.label">
+                  <div class="payment-logos ms-auto d-flex flex-nowrap gap-1 justify-content-end">
+                    <img v-for="(logo, idx) in opt.logos" :key="idx" :src="logo" 
+                      class="payment-logo-img" 
+                      :alt="opt.label">
                   </div>
                 </div>
               </div>
@@ -297,45 +300,61 @@ async function processOrder() {
               </div>
 
               <div v-if="invoiceType === 'INDIVIDUAL'" class="invoice-detail-panel p-3 rounded-3 bg-light animate__animated animate__fadeInUp">
-                <div class="d-flex flex-wrap gap-3 mb-1">
-                  <div class="d-flex align-items-center gap-2 cursor-pointer" @click="carrierType = 'MOBILE'">
-                    <div class="payment-radio-circle" :class="{ 'active-border': carrierType === 'MOBILE' }" style="width:18px; height:18px;">
-                      <div class="payment-radio-dot" :class="{ 'active-dot': carrierType === 'MOBILE' }" style="width:8px; height:8px;"></div>
-                    </div>
-                    <span class="small" :class="{ 'text-dark fw-bold': carrierType === 'MOBILE' }">手機條碼載具</span>
-                  </div>
-                  <div class="d-flex align-items-center gap-2 cursor-pointer" @click="carrierType = 'CERTIFICATE'">
-                    <div class="payment-radio-circle" :class="{ 'active-border': carrierType === 'CERTIFICATE' }" style="width:18px; height:18px;">
-                      <div class="payment-radio-dot" :class="{ 'active-dot': carrierType === 'CERTIFICATE' }" style="width:8px; height:8px;"></div>
-                    </div>
-                    <span class="small" :class="{ 'text-dark fw-bold': carrierType === 'CERTIFICATE' }">自然人憑證載具</span>
-                  </div>
+                <div class="d-flex flex-wrap gap-4 mb-3">
+                  <!-- 電子發票 -->
                   <div class="d-flex align-items-center gap-2 cursor-pointer" @click="carrierType = 'PAPER'">
                     <div class="payment-radio-circle" :class="{ 'active-border': carrierType === 'PAPER' }" style="width:18px; height:18px;">
                       <div class="payment-radio-dot" :class="{ 'active-dot': carrierType === 'PAPER' }" style="width:8px; height:8px;"></div>
                     </div>
-                    <span class="small" :class="{ 'text-dark fw-bold': carrierType === 'PAPER' }">紙本發票</span>
+                    <span class="small" :class="{ 'text-dark fw-bold': carrierType === 'PAPER' }">電子發票</span>
+                  </div>
+                  <!-- 雲端發票 -->
+                  <div class="d-flex align-items-center gap-2 cursor-pointer" @click="carrierType = (carrierType === 'PAPER' ? 'MOBILE' : carrierType)">
+                    <div class="payment-radio-circle" :class="{ 'active-border': carrierType !== 'PAPER' }" style="width:18px; height:18px;">
+                      <div class="payment-radio-dot" :class="{ 'active-dot': carrierType !== 'PAPER' }" style="width:8px; height:8px;"></div>
+                    </div>
+                    <span class="small" :class="{ 'text-dark fw-bold': carrierType !== 'PAPER' }">雲端發票</span>
                   </div>
                 </div>
                 
-                <div v-if="carrierType === 'MOBILE'" class="floating-input-wrap mt-4">
-                  <label class="floating-label">手機載具</label>
-                  <input type="text" v-model="mobileCarrier" class="form-control aesop-input" placeholder="/ABC1234">
-                  <div v-if="showErrors && !mobileCarrier" class="text-danger small mt-1 animate__animated animate__shakeX">
-                    <i class="bi bi-exclamation-triangle-fill"></i> 請輸入手機載具
+                <!-- 雲端發票細項 -->
+                <div v-if="carrierType !== 'PAPER'" class="p-3 bg-white rounded-3 border animate__animated animate__fadeIn">
+                  <div class="d-flex flex-wrap gap-3 mb-3 border-bottom pb-2">
+                    <div class="d-flex align-items-center gap-2 cursor-pointer" @click="carrierType = 'MOBILE'">
+                      <div class="payment-radio-circle" :class="{ 'active-border': carrierType === 'MOBILE' }" style="width:16px; height:16px;">
+                        <div class="payment-radio-dot" :class="{ 'active-dot': carrierType === 'MOBILE' }" style="width:6px; height:6px;"></div>
+                      </div>
+                      <span class="small text-muted" :class="{ 'text-dark fw-bold': carrierType === 'MOBILE' }">手機條碼載具</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 cursor-pointer" @click="carrierType = 'CERTIFICATE'">
+                      <div class="payment-radio-circle" :class="{ 'active-border': carrierType === 'CERTIFICATE' }" style="width:16px; height:16px;">
+                        <div class="payment-radio-dot" :class="{ 'active-dot': carrierType === 'CERTIFICATE' }" style="width:6px; height:6px;"></div>
+                      </div>
+                      <span class="small text-muted" :class="{ 'text-dark fw-bold': carrierType === 'CERTIFICATE' }">自然人憑證載具</span>
+                    </div>
+                  </div>
+                  
+                  <div v-if="carrierType === 'MOBILE'" class="floating-input-wrap">
+                    <label class="floating-label">手機載具</label>
+                    <input type="text" :value="mobileCarrier" @input="e => mobileCarrier = e.target.value.toUpperCase()" class="form-control aesop-input" placeholder="/ABC1234" maxlength="8">
+                    <div v-if="showErrors && !mobileCarrier" class="text-danger small mt-1 animate__animated animate__shakeX">
+                      <i class="bi bi-exclamation-triangle-fill"></i> 請輸入手機載具
+                    </div>
+                  </div>
+                  <div v-if="carrierType === 'CERTIFICATE'" class="floating-input-wrap">
+                    <label class="floating-label">自然人憑證條碼</label>
+                    <input type="text" :value="certificateCarrier" @input="e => certificateCarrier = e.target.value.toUpperCase()" class="form-control aesop-input" placeholder="兩碼大寫英文+14碼數字" maxlength="16">
+                    <div v-if="showErrors && !certificateCarrier" class="text-danger small mt-1 animate__animated animate__shakeX">
+                      <i class="bi bi-exclamation-triangle-fill"></i> 請輸入自然人憑證條碼
+                    </div>
                   </div>
                 </div>
-                <div v-if="carrierType === 'CERTIFICATE'" class="floating-input-wrap mt-4">
-                  <label class="floating-label">自然人憑證條碼</label>
-                  <input type="text" v-model="certificateCarrier" class="form-control aesop-input" placeholder="兩碼大寫英文+14碼數字">
-                  <div v-if="showErrors && !certificateCarrier" class="text-danger small mt-1 animate__animated animate__shakeX">
-                    <i class="bi bi-exclamation-triangle-fill"></i> 請輸入自然人憑證條碼
-                  </div>
-                </div>
-                <div v-if="carrierType === 'PAPER'" class="mt-4 p-2 border-start border-3 border-info bg-white rounded-1 animate__animated animate__fadeIn">
+
+                <!-- 電子發票細項 (PAPER) -->
+                <div v-if="carrierType === 'PAPER'" class="p-2 border-start border-3 border-info bg-white rounded-1 animate__animated animate__fadeIn">
                   <div class="small text-muted">
                     <i class="bi bi-info-circle-fill text-info me-1"></i>
-                    發票將於您 **現場取貨時** 隨貨交付紙本證明聯。
+                    發票將於您 **現場取貨時** 隨貨交付電子發票證明聯。
                   </div>
                 </div>
               </div>
@@ -661,13 +680,13 @@ async function processOrder() {
 
 /* ===== 支付 Logo 樣式 ===== */
 .payment-logo-img {
-  height: 22px; 
+  height: 30px; 
   width: auto;
   object-fit: contain;
 }
 
 .payment-logos {
-  max-width: 55%; 
+  max-width: 75%; 
 }
 
 /* 滾動條樣式共用 */

@@ -631,7 +631,7 @@ function getInvoiceTypeText(order) {
   if (!order || !order.invoiceType) return '尚未設定'
   
   if (order.invoiceType === 'INDIVIDUAL') {
-    if (!order.invoiceCarrier) return '個人電子發票 (會員載具)'
+    if (!order.invoiceCarrier) return '個人電子發票 (現場取貨時隨貨交付)'
     if (order.invoiceCarrier.startsWith('/')) {
       return `個人電子發票 (手機條碼：${order.invoiceCarrier})`
     }
@@ -642,7 +642,23 @@ function getInvoiceTypeText(order) {
   }
   
   if (order.invoiceType === 'DONATION') {
-    return `捐贈發票 (捐贈碼：${order.invoiceCarrier || '未提供'})`
+    const code = order.invoiceCarrier || ''
+    const unitMap = {
+      '919': '財團法人創世社會福利基金會',
+      '25885': '財團法人伊甸社會福利基金會',
+      '13579': '財團法人陽光社會福利基金會',
+      '5678': '財團法人台灣兒童暨家庭扶助基金會',
+      '520': '財團法人罕見疾病基金會',
+      '135': '財團法人董氏基金會',
+      '001': '財團法人羅慧夫顱顏基金會',
+      '888': '財團法人台灣癌症基金會',
+      '999': '財團法人喜憨兒社會福利基金會',
+      '111': '財團法人弘道老人福利基金會'
+    }
+    if (unitMap[code]) {
+      return `捐贈發票 (${unitMap[code]}，捐贈碼：${code})`
+    }
+    return `捐贈發票 (捐贈碼：${code || '未提供'})`
   }
   
   if (order.invoiceType === 'COMPANY') {
@@ -781,7 +797,7 @@ function getInvoiceTypeText(order) {
             v-model="keyword"
             type="text"
             class="form-control border-start-0"
-            placeholder="搜尋訂單 (#編號可精確查詢)"
+            placeholder="搜尋編號、會員、訂購日期......"
           />
         </div>
       </div>

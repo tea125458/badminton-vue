@@ -42,9 +42,25 @@ const pwdSuccessMsg = ref('')
 const pwdErrorMsg = ref('')
 const isChangingPwd = ref(false)
 
-// 訂單相關
 const orders = ref([])
 const loadingOrders = ref(false)
+
+// 發票捐贈單位對照表
+const getDonationUnit = (code) => {
+  const unitMap = {
+    '919': '財團法人創世社會福利基金會',
+    '25885': '財團法人伊甸社會福利基金會',
+    '13579': '財團法人陽光社會福利基金會',
+    '5678': '財團法人台灣兒童暨家庭扶助基金會',
+    '520': '財團法人罕見疾病基金會',
+    '135': '財團法人董氏基金會',
+    '001': '財團法人羅慧夫顱顏基金會',
+    '888': '財團法人台灣癌症基金會',
+    '999': '財團法人喜憨兒社會福利基金會',
+    '111': '財團法人弘道老人福利基金會'
+  }
+  return unitMap[code] || ''
+}
 
 // 狀態對照 (同步 MyOrders.vue)
 const statusMap = {
@@ -327,6 +343,10 @@ async function loadBookings() {
 // 切換到預約紀錄頁籤時載入
 function switchTab(tabId) {
   activeTab.value = tabId
+  
+  // 核心修復：在切換頁籤時，同步更新 URL query 參數，確保「上一頁」能正確返回該頁籤
+  router.replace({ query: { ...route.query, tab: tabId } })
+
   if (tabId === 'bookings') {
     loadBookings()
   }
@@ -823,7 +843,7 @@ async function handleAvatarUpload(event) {
                         <div class="d-flex justify-content-between align-items-center">
                           <div class="d-flex align-items-center gap-4">
                             <div class="fw-bold" style="font-size: 1.25rem; color: #0D9488;">NT$ {{ orders[0].totalAmount.toLocaleString() }}</div>
-                            <router-link :to="'/my-orders?orderId=' + orders[0].orderId" class="btn btn-sm rounded-pill px-3 shadow-sm" style="background: #0D9488; color: white; border: none; font-size: 0.85rem;" @click.stop>訂單詳情</router-link>
+                            <router-link :to="'/my-orders?orderId=' + orders[0].orderId" class="btn btn-sm rounded-pill px-3 shadow-sm" style="background: #0D9488; color: white; border: none; font-size: 0.85rem;" @click.stop>我的訂單</router-link>
                           </div>
                           <i class="bi fs-5" style="color: #0D9488;" :class="expandedId === orders[0].orderId ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
                         </div>
@@ -940,6 +960,7 @@ async function handleAvatarUpload(event) {
                               <template v-if="orders[0].invoiceType === 'INDIVIDUAL'">
                                 <span>個人電子發票</span>
                                 <span v-if="orders[0].invoiceCarrier" class="text-muted ms-1">（載具：{{ orders[0].invoiceCarrier }}）</span>
+                                <span v-else class="ms-1 fw-bold" style="color: #ea580c;">（現場取貨時隨貨交付）</span>
                               </template>
                               <template v-else-if="orders[0].invoiceType === 'COMPANY'">
                                 <span>公司發票</span>
@@ -947,7 +968,12 @@ async function handleAvatarUpload(event) {
                               </template>
                               <template v-else-if="orders[0].invoiceType === 'DONATION'">
                                 <span>發票捐贈</span>
-                                <span class="text-muted ms-2">捐贈碼：{{ orders[0].invoiceCarrier }}</span>
+                                <span class="text-muted ms-2" v-if="getDonationUnit(orders[0].invoiceCarrier)">
+                                  {{ getDonationUnit(orders[0].invoiceCarrier) }} (捐贈碼：{{ orders[0].invoiceCarrier }})
+                                </span>
+                                <span class="text-muted ms-2" v-else>
+                                  捐贈碼：{{ orders[0].invoiceCarrier }}
+                                </span>
                               </template>
                             </div>
                           </div>
@@ -1146,6 +1172,7 @@ async function handleAvatarUpload(event) {
                               <template v-if="order.invoiceType === 'INDIVIDUAL'">
                                 <span>個人電子發票</span>
                                 <span v-if="order.invoiceCarrier" class="text-muted ms-1">（載具：{{ order.invoiceCarrier }}）</span>
+                                <span v-else class="ms-1 fw-bold" style="color: #ea580c;">（現場取貨時隨貨交付）</span>
                               </template>
                               <template v-else-if="order.invoiceType === 'COMPANY'">
                                 <span>公司發票</span>
@@ -1153,7 +1180,12 @@ async function handleAvatarUpload(event) {
                               </template>
                               <template v-else-if="order.invoiceType === 'DONATION'">
                                 <span>發票捐贈</span>
-                                <span class="text-muted ms-2">捐贈碼：{{ order.invoiceCarrier }}</span>
+                                <span class="text-muted ms-2" v-if="getDonationUnit(order.invoiceCarrier)">
+                                  {{ getDonationUnit(order.invoiceCarrier) }} (捐贈碼：{{ order.invoiceCarrier }})
+                                </span>
+                                <span class="text-muted ms-2" v-else>
+                                  捐贈碼：{{ order.invoiceCarrier }}
+                                </span>
                               </template>
                             </div>
                           </div>
