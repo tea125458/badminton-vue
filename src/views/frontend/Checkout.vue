@@ -66,7 +66,7 @@ const autoDonationUnit = computed(() => {
 const paymentOptions = [
   { 
     value: 'CASH', 
-    label: '現場現金支付', 
+    label: '現金支付', 
     logos: ['https://img.icons8.com/color/96/cash.png']
   },
   { 

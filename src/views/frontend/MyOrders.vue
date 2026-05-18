@@ -24,7 +24,7 @@ const statusMap = {
 }
 
 const paymentMap = {
-  CASH: '現場現金支付', CREDIT_CARD: '信用卡', TRANSFER: '銀行轉帳', LINE_PAY: 'LINE Pay',
+  CASH: '現金支付', CREDIT_CARD: '信用卡', TRANSFER: '銀行轉帳', LINE_PAY: 'LINE Pay',
 }
 
 // 模擬發票號碼生成 (根據訂單 ID)

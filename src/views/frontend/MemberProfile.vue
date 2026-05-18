@@ -71,9 +71,9 @@ const statusMap = {
   CANCELLED: { label: '已取消', color: '#F43F5E', bg: '#FFE4E6', icon: 'bi-x-circle' },
 }
 const paymentMap = {
-  CASH: '現金',
+  CASH: '現金支付',
   CREDIT_CARD: '信用卡',
-  TRANSFER: '轉帳',
+  TRANSFER: '銀行轉帳',
   LINE_PAY: 'LINE Pay',
 }
 
@@ -171,6 +171,29 @@ function formatDate(dateStr) {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+}
+
+function formatDateTime(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const date = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return `${date} ${time}`
+}
+
+function getInvoiceLabel(order) {
+  if (!order.invoiceType) return '未設定'
+  if (order.invoiceType === 'INDIVIDUAL') {
+    return order.invoiceCarrier ? `個人電子發票（載具：${order.invoiceCarrier}）` : '個人電子發票（現場取貨時隨貨交付）'
+  }
+  if (order.invoiceType === 'COMPANY') {
+    return `公司發票（統編：${order.invoiceTaxId}）`
+  }
+  if (order.invoiceType === 'DONATION') {
+    const unit = getDonationUnit(order.invoiceCarrier)
+    return unit ? `捐贈發票 — ${unit}（捐贈碼：${order.invoiceCarrier}）` : `捐贈發票（捐贈碼：${order.invoiceCarrier}）`
+  }
+  return '未設定'
 }
 
 // 電話格式化
@@ -907,6 +930,31 @@ async function handleAvatarUpload(event) {
                             </div>
                           </div>
 
+                          <!-- 訂單資訊卡（同步後台資訊） -->
+                          <div class="order-info-card mb-3">
+                            <div class="order-info-grid">
+                              <div class="order-info-item">
+                                <div class="order-info-label"><i class="bi bi-calendar3 me-1"></i>訂購日期</div>
+                                <div class="order-info-value">{{ formatDateTime(orders[0].orderDate) }}</div>
+                              </div>
+                              <div class="order-info-item">
+                                <div class="order-info-label"><i class="bi bi-credit-card me-1"></i>付款方式</div>
+                                <div class="order-info-value">
+                                  <span class="payment-badge">{{ paymentMap[orders[0].paymentType] || '未設定' }}</span>
+                                </div>
+                              </div>
+                              <div class="order-info-item">
+                                <div class="order-info-label"><i class="bi bi-geo-alt me-1"></i>取貨方式</div>
+                                <div class="order-info-value">球館自取</div>
+                                <div class="order-info-sub">羽過天晴羽球館</div>
+                              </div>
+                              <div class="order-info-item">
+                                <div class="order-info-label"><i class="bi bi-receipt me-1"></i>電子發票</div>
+                                <div class="order-info-value" style="font-size: 0.8rem;">{{ getInvoiceLabel(orders[0]) }}</div>
+                              </div>
+                            </div>
+                          </div>
+
                           <!-- 商品明细 -->
                           <div v-if="loadingItems === orders[0].orderId" class="text-center py-3">
                             <div class="spinner-border spinner-border-sm text-info"></div>
@@ -1039,7 +1087,7 @@ async function handleAvatarUpload(event) {
                             </div>
                             <div class="mt-2 d-flex justify-content-between align-items-end">
                               <div class="order-summary-text text-secondary small">
-                                共 {{ orderItems[order.orderId]?.length || '...' }} 項商品 ·
+                                共 {{ orderItems[order.orderId]?.length || '...' }} 項商品，共 {{ orderItems[order.orderId]?.reduce((sum, item) => sum + item.quantity, 0) || '...' }} 件 ·
                                 {{ paymentMap[order.paymentType] }}
                               </div>
                               <div
@@ -1116,6 +1164,31 @@ async function handleAvatarUpload(event) {
                               </div>
                               <div class="step-text">{{ statusMap[step].label }}</div>
                               <div class="step-time">{{ getStepTime(order, step) }}</div>
+                            </div>
+                          </div>
+
+                          <!-- 訂單資訊卡（同步後台資訊） -->
+                          <div class="order-info-card mb-3">
+                            <div class="order-info-grid">
+                              <div class="order-info-item">
+                                <div class="order-info-label"><i class="bi bi-calendar3 me-1"></i>訂購日期</div>
+                                <div class="order-info-value">{{ formatDateTime(order.orderDate) }}</div>
+                              </div>
+                              <div class="order-info-item">
+                                <div class="order-info-label"><i class="bi bi-credit-card me-1"></i>付款方式</div>
+                                <div class="order-info-value">
+                                  <span class="payment-badge">{{ paymentMap[order.paymentType] || '未設定' }}</span>
+                                </div>
+                              </div>
+                              <div class="order-info-item">
+                                <div class="order-info-label"><i class="bi bi-geo-alt me-1"></i>取貨方式</div>
+                                <div class="order-info-value">球館自取</div>
+                                <div class="order-info-sub">羽過天晴羽球館</div>
+                              </div>
+                              <div class="order-info-item">
+                                <div class="order-info-label"><i class="bi bi-receipt me-1"></i>電子發票</div>
+                                <div class="order-info-value" style="font-size: 0.8rem;">{{ getInvoiceLabel(order) }}</div>
+                              </div>
                             </div>
                           </div>
 
@@ -1671,5 +1744,66 @@ async function handleAvatarUpload(event) {
 }
 .progress-step-mini.active .step-time {
   color: var(--brand-dark);
+}
+
+/* ===== 訂單資訊卡（同步後台資訊） ===== */
+.order-info-card {
+  background: #f8fafb;
+  border: 1px solid #e8f0f6;
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+
+.order-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem 1.5rem;
+}
+
+.order-info-item {
+  min-width: 0;
+}
+
+.order-info-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.2rem;
+}
+
+.order-info-label i {
+  color: #0D9488;
+}
+
+.order-info-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+  word-break: break-all;
+}
+
+.order-info-sub {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-top: 0.1rem;
+}
+
+.payment-badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  background: #e2e8f0;
+  border-radius: 6px;
+}
+
+@media (max-width: 480px) {
+  .order-info-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
 }
 </style>

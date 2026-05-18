@@ -74,25 +74,48 @@ function clearSelection() {
 
 // 批次變更狀態
 const showBatchStatusMenu = ref(false)
-async function batchChangeStatus(newStatus) {
+
+// 批次狀態變更 — 使用置中 ConfirmDialog 取代瀏覽器原生 confirm()
+const showBatchStatusConfirm = ref(false)
+const pendingBatchStatus = ref('')
+const pendingBatchIds = ref([])
+const batchStatusConfirmMsg = ref('')
+
+function batchChangeStatus(newStatus) {
   showBatchStatusMenu.value = false
   const ids = [...selectedIds.value]
   if (ids.length === 0) return
   const label = statusMap[newStatus]?.label || newStatus
-  if (!confirm(`確定要將 ${ids.length} 筆訂單批次變更為「${label}」嗎？`)) return
+  pendingBatchStatus.value = newStatus
+  pendingBatchIds.value = ids
+  batchStatusConfirmMsg.value = `確定要將 ${ids.length} 筆訂單批次變更為「${label}」嗎？`
+  showBatchStatusConfirm.value = true
+}
+
+async function executeBatchStatusChange() {
+  showBatchStatusConfirm.value = false
+  const ids = pendingBatchIds.value
+  const label = statusMap[pendingBatchStatus.value]?.label || pendingBatchStatus.value
   try {
     for (const id of ids) {
-      await orderApi.updateStatus(id, newStatus)
+      await orderApi.updateStatus(id, pendingBatchStatus.value)
     }
     clearSelection()
     await loadOrders()
-    alert(`已成功將 ${ids.length} 筆訂單變更為「${label}」`)
+    // 使用結果提示 Dialog
+    batchResultMsg.value = `已成功將 ${ids.length} 筆訂單變更為「${label}」`
+    showBatchResult.value = true
   } catch (e) {
     console.error('批次狀態更新失敗', e)
-    alert('部分訂單狀態更新失敗，請重新整理頁面確認')
+    batchResultMsg.value = '部分訂單狀態更新失敗，請重新整理頁面確認'
+    showBatchResult.value = true
     await loadOrders()
   }
 }
+
+// 通用結果提示 Dialog（取代 alert）
+const showBatchResult = ref(false)
+const batchResultMsg = ref('')
 
 // 批次刪除
 const showBatchDeleteConfirm = ref(false)
@@ -105,10 +128,12 @@ async function handleBatchDelete() {
     }
     clearSelection()
     await loadOrders()
-    alert(`已成功刪除 ${ids.length} 筆訂單`)
+    batchResultMsg.value = `已成功刪除 ${ids.length} 筆訂單`
+    showBatchResult.value = true
   } catch (e) {
     console.error('批次刪除失敗', e)
-    alert('部分訂單刪除失敗，請重新整理頁面確認')
+    batchResultMsg.value = '部分訂單刪除失敗，請重新整理頁面確認'
+    showBatchResult.value = true
     await loadOrders()
   }
 }
@@ -361,9 +386,9 @@ const statusMap = {
 const statusOptions = Object.entries(statusMap)
 
 const paymentMap = {
-  CASH: '現金',
+  CASH: '現金支付',
   CREDIT_CARD: '信用卡',
-  TRANSFER: '轉帳',
+  TRANSFER: '銀行轉帳',
   LINE_PAY: 'LINE Pay',
 }
 
@@ -771,7 +796,7 @@ function getInvoiceTypeText(order) {
               >
                 <span
                   class="segment-label"
-                  v-if="(statusCounts[tab.key] / statusCounts['']) * 100 > 8"
+                  v-if="(statusCounts[tab.key] / statusCounts['']) * 100 > 4"
                 >
                   {{ tab.label }} {{ statusCounts[tab.key] }}
                 </span>
@@ -1629,6 +1654,33 @@ function getInvoiceTypeText(order) {
             {{ creating ? '建立中...' : '送出訂單' }}
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 批次狀態變更確認 Dialog（置中） ====== -->
+  <div v-if="showBatchStatusConfirm" class="confirm-overlay" @click.self="showBatchStatusConfirm = false">
+    <div class="confirm-dialog">
+      <div class="confirm-icon-wrap">
+        <i class="bi bi-exclamation-triangle-fill confirm-icon"></i>
+      </div>
+      <p class="confirm-message">{{ batchStatusConfirmMsg }}</p>
+      <div class="confirm-actions">
+        <button class="confirm-btn-cancel" @click="showBatchStatusConfirm = false">取消</button>
+        <button class="confirm-btn-ok" @click="executeBatchStatusChange">確定變更</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 操作結果通知 Dialog（置中，取代 alert） ====== -->
+  <div v-if="showBatchResult" class="confirm-overlay" @click.self="showBatchResult = false">
+    <div class="confirm-dialog">
+      <div class="confirm-icon-wrap">
+        <i class="bi bi-check-circle-fill confirm-icon" style="color: #10b981;"></i>
+      </div>
+      <p class="confirm-message">{{ batchResultMsg }}</p>
+      <div class="confirm-actions">
+        <button class="confirm-btn-ok" @click="showBatchResult = false">確認</button>
       </div>
     </div>
   </div>
@@ -2647,5 +2699,90 @@ table td {
 .batch-bar-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+/* ===== 置中確認 / 結果 Dialog ===== */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.15s ease;
+}
+
+.confirm-dialog {
+  background: white;
+  border-radius: 1rem;
+  padding: 2.5rem 2rem 1.75rem;
+  min-width: 380px;
+  max-width: 440px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  text-align: center;
+  animation: dialogBounce 0.3s ease-out;
+}
+
+@keyframes dialogBounce {
+  0% { opacity: 0; transform: scale(0.85) translateY(10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.confirm-icon-wrap {
+  margin-bottom: 1rem;
+}
+
+.confirm-icon {
+  font-size: 3.2rem;
+  color: #f59e0b;
+}
+
+.confirm-message {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.confirm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.confirm-btn-cancel {
+  padding: 0.55rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-btn-cancel:hover {
+  background: #e2e8f0;
+}
+
+.confirm-btn-ok {
+  padding: 0.55rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  background: #f59e0b;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-btn-ok:hover {
+  background: #d97706;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
 }
 </style>

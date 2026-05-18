@@ -186,7 +186,7 @@ const showCreditCardModal = ref(false)
 const isSubmitting = ref(false)
 
 const paymentOptions = [
-  { value: 'CASH', label: '現場現金支付', icon: 'bi-cash-stack', desc: '打球時至櫃檯付款' },
+  { value: 'CASH', label: '現金支付', icon: 'bi-cash-stack', desc: '打球時至櫃檯付款' },
   { value: 'CREDIT_CARD', label: '信用卡', icon: 'bi-credit-card', desc: '支援 VISA / MasterCard / JCB' },
   { value: 'TRANSFER', label: '銀行轉帳', icon: 'bi-bank', desc: '下單後請於 24 小時內完成匯款' },
   { value: 'LINE_PAY', label: 'LINE Pay', icon: 'bi-chat-fill', desc: '使用 LINE Pay 行動支付' },

@@ -2,6 +2,13 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  // 每次換頁自動捲回頂部（業界標準行為）
+  scrollBehavior(to, from, savedPosition) {
+    // 如果是瀏覽器「上一頁/下一頁」，恢復之前的捲動位置
+    if (savedPosition) return savedPosition
+    // 其他情況一律捲回頂部
+    return { top: 0 }
+  },
   routes: [
     // ============================
     // 🟢 前台（使用者）
