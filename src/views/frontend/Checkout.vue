@@ -139,12 +139,27 @@ async function processOrder() {
 
   isSubmitting.value = true
   try {
+    let computedCarrier = null
+    let computedTaxId = null
+    
+    if (invoiceType.value === 'INDIVIDUAL') {
+      if (carrierType.value === 'MOBILE') computedCarrier = mobileCarrier.value
+      else if (carrierType.value === 'CERTIFICATE') computedCarrier = certificateCarrier.value
+    } else if (invoiceType.value === 'DONATION') {
+      computedCarrier = donationCode.value
+    } else if (invoiceType.value === 'COMPANY') {
+      computedTaxId = taxId.value
+    }
+
     // Step 1: 建立訂單主檔
     const newOrder = await orderApi.create({
       member: { memberId: memberId },
       totalAmount: cart.total,
       paymentType: paymentType.value,
       note: note.value || null,
+      invoiceType: invoiceType.value,
+      invoiceCarrier: computedCarrier,
+      invoiceTaxId: computedTaxId,
     })
 
     // Step 2: 逐筆建立訂單明細（後端會自動扣庫存 + 計算 subtotal）

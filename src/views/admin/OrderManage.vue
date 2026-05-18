@@ -626,6 +626,31 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
+
+function getInvoiceTypeText(order) {
+  if (!order || !order.invoiceType) return '尚未設定'
+  
+  if (order.invoiceType === 'INDIVIDUAL') {
+    if (!order.invoiceCarrier) return '個人電子發票 (會員載具)'
+    if (order.invoiceCarrier.startsWith('/')) {
+      return `個人電子發票 (手機條碼：${order.invoiceCarrier})`
+    }
+    if (/^[A-Z]{2}\d{14}$/.test(order.invoiceCarrier)) {
+      return `個人電子發票 (自然人憑證：${order.invoiceCarrier})`
+    }
+    return `個人電子發票 (載具：${order.invoiceCarrier})`
+  }
+  
+  if (order.invoiceType === 'DONATION') {
+    return `捐贈發票 (捐贈碼：${order.invoiceCarrier || '未提供'})`
+  }
+  
+  if (order.invoiceType === 'COMPANY') {
+    return `公司發票 (統編：${order.invoiceTaxId || '未提供'})`
+  }
+  
+  return '尚未設定'
+}
 </script>
 
 <template>
@@ -1040,6 +1065,27 @@ onUnmounted(() => {
                         <span class="badge" style="background: #f1f5f9; color: #475569">{{
                           paymentMap[selectedOrder.paymentType] || '未設定'
                         }}</span>
+                      </div>
+                    </div>
+                    <div class="col-12 border-top pt-2 mt-3">
+                      <div class="row g-3">
+                        <div class="col-6 border-end">
+                          <div class="info-label"><i class="bi bi-geo-alt me-1"></i>取貨資訊</div>
+                          <div class="info-value" style="font-size: 0.85rem; color: var(--brand-dark); font-weight: 600;">
+                            球館自取
+                          </div>
+                          <div class="text-muted mt-1" style="font-size: 0.7rem;">羽過天晴羽球館</div>
+                        </div>
+                        <div class="col-6">
+                          <div class="info-label"><i class="bi bi-receipt me-1"></i>發票號碼</div>
+                          <div class="info-value fw-bold mb-2" style="font-size: 0.85rem; color: var(--brand-teal);">
+                            XY-{{ String(selectedOrder?.orderId || '').padStart(8, '0') }}
+                          </div>
+                          <div class="info-label"><i class="bi bi-card-heading me-1"></i>發票形式</div>
+                          <div class="info-value" style="font-size: 0.85rem; color: var(--brand-dark); font-weight: 600;">
+                            {{ getInvoiceTypeText(selectedOrder) }}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

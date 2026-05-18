@@ -62,6 +62,31 @@ function formatDate(dateStr) {
     hour: '2-digit', minute: '2-digit'
   })
 }
+
+function getInvoiceTypeText(order) {
+  if (!order || !order.invoiceType) return '尚未設定'
+  
+  if (order.invoiceType === 'INDIVIDUAL') {
+    if (!order.invoiceCarrier) return '個人電子發票 (會員載具)'
+    if (order.invoiceCarrier.startsWith('/')) {
+      return `個人電子發票 (手機條碼：${order.invoiceCarrier})`
+    }
+    if (/^[A-Z]{2}\d{14}$/.test(order.invoiceCarrier)) {
+      return `個人電子發票 (自然人憑證：${order.invoiceCarrier})`
+    }
+    return `個人電子發票 (載具：${order.invoiceCarrier})`
+  }
+  
+  if (order.invoiceType === 'DONATION') {
+    return `捐贈發票 (捐贈碼：${order.invoiceCarrier || '未提供'})`
+  }
+  
+  if (order.invoiceType === 'COMPANY') {
+    return `公司發票 (統編：${order.invoiceTaxId || '未提供'})`
+  }
+  
+  return '尚未設定'
+}
 </script>
 
 <template>
@@ -142,7 +167,7 @@ function formatDate(dateStr) {
                 </div>
                 <div class="col-6 text-end">
                   <div class="info-label">發票形式</div>
-                  <div class="info-value">個人電子發票 (會員載具)</div>
+                  <div class="info-value">{{ getInvoiceTypeText(order) }}</div>
                 </div>
               </div>
             </div>

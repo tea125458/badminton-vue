@@ -929,6 +929,28 @@ async function handleAvatarUpload(event) {
                               </div>
                             </div>
                           </div>
+
+                          <!-- 發票資訊 -->
+                          <div v-if="orders[0].invoiceType" class="mt-3 pt-3 border-top" style="border-color: rgba(94, 234, 212, 0.2) !important;">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                              <i class="bi bi-receipt" style="color: #0D9488;"></i>
+                              <span class="fw-semibold" style="font-size: 0.88rem; color: #334155;">發票資訊</span>
+                            </div>
+                            <div style="font-size: 0.85rem; color: #64748b; padding-left: 1.4rem;">
+                              <template v-if="orders[0].invoiceType === 'INDIVIDUAL'">
+                                <span>個人電子發票</span>
+                                <span v-if="orders[0].invoiceCarrier" class="text-muted ms-1">（載具：{{ orders[0].invoiceCarrier }}）</span>
+                              </template>
+                              <template v-else-if="orders[0].invoiceType === 'COMPANY'">
+                                <span>公司發票</span>
+                                <span class="text-muted ms-2">統編：{{ orders[0].invoiceTaxId }}</span>
+                              </template>
+                              <template v-else-if="orders[0].invoiceType === 'DONATION'">
+                                <span>發票捐贈</span>
+                                <span class="text-muted ms-2">捐贈碼：{{ orders[0].invoiceCarrier }}</span>
+                              </template>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -1111,6 +1133,28 @@ async function handleAvatarUpload(event) {
                               >
                                 NT$ {{ (item.unitPrice * item.quantity).toLocaleString() }}
                               </div>
+                            </div>
+                          </div>
+
+                          <!-- 發票資訊 -->
+                          <div v-if="order.invoiceType" class="mt-3 pt-3 border-top" style="border-color: rgba(94, 234, 212, 0.2) !important;">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                              <i class="bi bi-receipt" style="color: #0D9488;"></i>
+                              <span class="fw-semibold" style="font-size: 0.88rem; color: #334155;">發票資訊</span>
+                            </div>
+                            <div style="font-size: 0.85rem; color: #64748b; padding-left: 1.4rem;">
+                              <template v-if="order.invoiceType === 'INDIVIDUAL'">
+                                <span>個人電子發票</span>
+                                <span v-if="order.invoiceCarrier" class="text-muted ms-1">（載具：{{ order.invoiceCarrier }}）</span>
+                              </template>
+                              <template v-else-if="order.invoiceType === 'COMPANY'">
+                                <span>公司發票</span>
+                                <span class="text-muted ms-2">統編：{{ order.invoiceTaxId }}</span>
+                              </template>
+                              <template v-else-if="order.invoiceType === 'DONATION'">
+                                <span>發票捐贈</span>
+                                <span class="text-muted ms-2">捐贈碼：{{ order.invoiceCarrier }}</span>
+                              </template>
                             </div>
                           </div>
                         </div>
