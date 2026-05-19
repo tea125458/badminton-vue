@@ -91,6 +91,21 @@ const pagedProducts = computed(() => {
 const totalCount = computed(() => products.value.length)
 const filteredCount = computed(() => filteredProducts.value.length)
 
+// 把目前的篩選條件組成一句中文：管理{狀態}{標籤}{類別}商品；都沒選就是「所有」
+const filterSummary = computed(() => {
+  const parts = [
+    statusMap[filterStatus.value]?.label,
+    filterTag.value,
+    categoryMap[filterCategory.value],
+  ].filter(Boolean)
+  return parts.length ? parts.join(' ') : '所有羽球'
+})
+
+// 是否有任何篩選條件（給「清除篩選」鍵判斷要不要顯示）
+const hasActiveFilter = computed(
+  () => !!(keyword.value || filterCategory.value || filterStatus.value || filterTag.value)
+)
+
 // ===================== 方法 =====================
 function createEmptyForm() {
   return {
@@ -208,6 +223,14 @@ function onFilterChange() {
   currentPage.value = 1
 }
 
+function clearFilters() {
+  keyword.value = ''
+  filterCategory.value = ''
+  filterStatus.value = ''
+  filterTag.value = ''
+  onFilterChange()
+}
+
 function formatPrice(val) {
   return val != null ? `NT$ ${Number(val).toLocaleString()}` : 'NT$ 0'
 }
@@ -248,8 +271,8 @@ function onImageError(e) {
       <h2 class="fw-bold mb-1" style="font-size: 1.5rem">
         <i class="bi bi-box-seam me-2" style="color: var(--brand-sky)"></i>商品管理
       </h2>
-      <p class="text-secondary mb-0" style="font-size: 0.85rem">
-        管理所有羽球商品，共 {{ totalCount }} 件商品
+      <p class="text-secondary mb-0" style="font-size: 1.1rem">
+        管理 {{ filterSummary }}商品，共 {{ totalCount }} 件商品
         <span v-if="filteredCount !== totalCount">，篩選結果 {{ filteredCount }} 件</span>
       </p>
     </div>
@@ -300,8 +323,24 @@ function onImageError(e) {
               <option value="熱銷">熱銷</option>
             </select>
           </div>
+          <!-- 清除篩選 -->
+          <div class="col-6 col-md-auto">
+            <label class="form-label small d-block">&nbsp;</label>
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-brand-admin w-auto text-nowrap"
+              title="清除全部篩選（關鍵字／分類／狀態／標籤）"
+              :disabled="!hasActiveFilter"
+              @click="clearFilters"
+            >
+              <i class="bi bi-x-lg me-1"></i>清除
+            </button>
+          </div>
+
           <!-- 匯出 + 新增按鈕 -->
-          <div class="col-12 col-md-auto d-flex justify-content-end align-items-center gap-2 ms-md-auto">
+          <div class="col-12 col-md-auto ms-md-auto">
+            <label class="form-label small d-block">&nbsp;</label>
+            <div class="d-flex justify-content-end align-items-center gap-2">
             <div class="dropdown flex-shrink-0">
               <button
                 class="btn btn-outline-secondary btn-brand-admin dropdown-toggle w-auto text-nowrap"
@@ -332,6 +371,7 @@ function onImageError(e) {
             <button class="btn btn-brand btn-brand-admin w-auto text-nowrap flex-shrink-0" @click="openCreate">
               <i class="bi bi-plus-lg me-1"></i>新增商品
             </button>
+            </div>
           </div>
         </div>
       </div>
@@ -352,7 +392,8 @@ function onImageError(e) {
     </div>
 
     <!-- ====== 商品列表（表格式）====== -->
-    <div v-else class="card card-rounded shadow-sm border-0 overflow-hidden">
+    <div v-else class="card card-rounded shadow-sm border-0">
+      <div class="table-scroll">
       <table class="table table-hover align-middle mb-0 product-table">
         <thead>
           <tr>
@@ -388,7 +429,7 @@ function onImageError(e) {
             <td>
               <div class="d-flex flex-column gap-1">
                 <span class="text-secondary">{{ categoryMap[product.category] || product.category }}</span>
-                <span class="text-secondary" style="font-size:0.78rem; color:#94A3B8 !important">{{ product.brand || '—' }}</span>
+                <span class="text-secondary" style="font-size:0.85rem; color:#94A3B8 !important">{{ product.brand || '—' }}</span>
               </div>
             </td>
             <td class="fw-semibold text-price">${{ Number(product.price).toLocaleString() }}</td>
@@ -442,6 +483,7 @@ function onImageError(e) {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <!-- ====== 分頁 ====== -->
@@ -470,7 +512,7 @@ function onImageError(e) {
 
     <!-- ====== 新增/編輯 Modal ====== -->
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
-      <div class="modal-container">
+      <div class="modal-container form-modal">
         <div class="modal-header-custom">
           <h5 class="fw-bold mb-0">
             <i :class="isEditing ? 'bi bi-pencil-square' : 'bi bi-plus-circle'" class="me-2" style="color: var(--brand-sky)"></i>
@@ -480,70 +522,76 @@ function onImageError(e) {
         </div>
 
         <div class="modal-body-custom">
-          <div class="row g-3">
-            <!-- 商品名稱 -->
-            <div class="col-md-8">
-              <label class="form-label small fw-semibold">商品名稱 <span class="text-danger">*</span></label>
-              <input v-model="formData.productName" type="text" class="form-control" placeholder="例：YONEX ASTROX 88D PRO" />
-            </div>
-            <!-- 品牌 -->
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">品牌</label>
-              <input v-model="formData.brand" type="text" class="form-control" placeholder="例：YONEX" />
-            </div>
-            <!-- 分類 -->
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">分類</label>
-              <select v-model="formData.category" class="form-select">
-                <option v-for="[val, label] in categoryOptions" :key="val" :value="val">{{ label }}</option>
-              </select>
-            </div>
-            <!-- 價格 -->
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">價格 <span class="text-danger">*</span></label>
-              <div class="input-group">
-                <span class="input-group-text">NT$</span>
-                <input v-model="formData.price" type="number" class="form-control" placeholder="0" min="0" />
+          <div class="row g-4">
+            <!-- 左欄：欄位 -->
+            <div class="col-lg-8">
+              <!-- 商品名稱(長) ｜ 品牌(短) -->
+              <div class="pm-form-row">
+                <div class="pm-col-wide">
+                  <label class="form-label small fw-semibold mb-1">商品名稱 <span class="text-danger">*</span></label>
+                  <input v-model="formData.productName" type="text" class="form-control" placeholder="例：YONEX ASTROX 88D PRO" />
+                </div>
+                <div class="pm-col-half">
+                  <label class="form-label small fw-semibold mb-1">品牌</label>
+                  <input v-model="formData.brand" type="text" class="form-control" placeholder="例：YONEX" />
+                </div>
+              </div>
+              <!-- 分類(最前·窄) ｜ 價格 ｜ 庫存 -->
+              <div class="pm-form-row">
+                <div class="pm-col-half">
+                  <label class="form-label small fw-semibold mb-1">分類</label>
+                  <select v-model="formData.category" class="form-select">
+                    <option v-for="[val, label] in categoryOptions" :key="val" :value="val">{{ label }}</option>
+                  </select>
+                </div>
+                <div class="pm-col">
+                  <label class="form-label small fw-semibold mb-1">價格 <span class="text-danger">*</span></label>
+                  <div class="input-group">
+                    <span class="input-group-text">NT$</span>
+                    <input v-model="formData.price" type="number" class="form-control" placeholder="0" min="0" />
+                  </div>
+                </div>
+                <div class="pm-col">
+                  <label class="form-label small fw-semibold mb-1">庫存數量</label>
+                  <input v-model="formData.stockQty" type="number" class="form-control" placeholder="0" min="0" />
+                </div>
+              </div>
+              <!-- 規格 ｜ 行銷標籤(窄) ｜ 狀態(窄) -->
+              <div class="pm-form-row">
+                <div class="pm-col">
+                  <label class="form-label small fw-semibold mb-1">規格</label>
+                  <input v-model="formData.spec" type="text" class="form-control" placeholder="例：4U、鵝毛" maxlength="10" />
+                </div>
+                <div class="pm-col-half">
+                  <label class="form-label small fw-semibold mb-1">行銷標籤</label>
+                  <select v-model="formData.marketingTag" class="form-select">
+                    <option value="">無</option>
+                    <option value="促銷">促銷</option>
+                    <option value="精選">精選</option>
+                    <option value="熱銷">熱銷</option>
+                  </select>
+                </div>
+                <div class="pm-col-half">
+                  <label class="form-label small fw-semibold mb-1">狀態</label>
+                  <select v-model="formData.status" class="form-select">
+                    <option value="ACTIVE">上架中</option>
+                    <option value="INACTIVE">已下架</option>
+                    <option value="PREPARING">備貨中</option>
+                  </select>
+                </div>
+              </div>
+              <!-- 商品描述 -->
+              <div class="pm-form-row">
+                <div class="pm-col">
+                  <label class="form-label small fw-semibold mb-1">商品描述</label>
+                  <textarea v-model="formData.description" class="form-control" rows="2" placeholder="商品說明..."></textarea>
+                </div>
               </div>
             </div>
-            <!-- 庫存 -->
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">庫存數量</label>
-              <input v-model="formData.stockQty" type="number" class="form-control" placeholder="0" min="0" />
-            </div>
-            <!-- 狀態 -->
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">狀態</label>
-              <select v-model="formData.status" class="form-select">
-                <option value="ACTIVE">上架中</option>
-                <option value="INACTIVE">已下架</option>
-                <option value="PREPARING">備貨中</option>
-              </select>
-            </div>
-            <!-- 規格 -->
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">規格</label>
-              <input v-model="formData.spec" type="text" class="form-control" placeholder="例：4U、鵝毛" maxlength="10" />
-            </div>
-            <!-- 行銷標籤 -->
-            <div class="col-md-4">
-              <label class="form-label small fw-semibold">行銷標籤</label>
-              <select v-model="formData.marketingTag" class="form-select">
-                <option value="">無</option>
-                <option value="促銷">促銷</option>
-                <option value="精選">精選</option>
-                <option value="熱銷">熱銷</option>
-              </select>
-            </div>
-            <!-- 說明 -->
-            <div class="col-md-8">
-              <label class="form-label small fw-semibold">商品描述</label>
-              <textarea v-model="formData.description" class="form-control" rows="3" placeholder="商品說明..."></textarea>
-            </div>
-            <!-- 圖片上傳 -->
-            <div class="col-12">
-              <label class="form-label small fw-semibold">商品圖片</label>
-              <div class="upload-area" @click="$refs.fileInput.click()">
+            <!-- 右欄：商品圖片（一開啟即可見，免捲動）-->
+            <div class="col-lg-4 d-flex flex-column">
+              <label class="form-label small fw-semibold mb-1">商品圖片</label>
+              <div class="upload-area flex-grow-1" @click="$refs.fileInput.click()">
                 <img v-if="imagePreview" :src="imagePreview" class="upload-preview" />
                 <div v-else class="upload-placeholder">
                   <i class="bi bi-cloud-arrow-up" style="font-size: 2rem; color: var(--brand-sky)"></i>
@@ -606,7 +654,7 @@ function onImageError(e) {
                   <span v-if="detailProduct.marketingTag" :class="['marketing-badge', tagClassMap[detailProduct.marketingTag]]">{{ detailProduct.marketingTag }}</span>
                 </div>
                 <h4 class="fw-bold mb-1">{{ detailProduct.productName }}</h4>
-                <p class="text-secondary mb-0" style="font-size:0.85rem">ID：{{ detailProduct.productId }}</p>
+                <p class="text-secondary mb-0" style="font-size:0.92rem">商品編號：{{ detailProduct.productId }}</p>
               </div>
               <!-- 價格 -->
               <div class="detail-price mb-3">${{ Number(detailProduct.price).toLocaleString() }}</div>
@@ -630,12 +678,12 @@ function onImageError(e) {
               <!-- 商品描述 -->
               <div v-if="detailProduct.description">
                 <p class="detail-label mb-1">商品描述</p>
-                <p class="text-secondary mb-0" style="font-size:0.875rem; line-height:1.6">{{ detailProduct.description }}</p>
+                <p class="text-secondary mb-0" style="font-size:1.1rem; line-height:1.6">{{ detailProduct.description }}</p>
               </div>
               <!-- 規格 -->
               <div v-if="detailProduct.spec" class="mt-3">
                 <p class="detail-label mb-1">規格</p>
-                <p class="text-secondary mb-0" style="font-size:0.875rem; line-height:1.6; white-space:pre-line">{{ detailProduct.spec }}</p>
+                <p class="text-secondary mb-0" style="font-size:1.1rem; line-height:1.6; white-space:pre-line">{{ detailProduct.spec }}</p>
               </div>
             </div>
           </div>
@@ -667,6 +715,24 @@ function onImageError(e) {
 }
 
 /* ===== 列表表格 ===== */
+/* fixed = 欄寬只看下面設定的 width，精確遵守；沒設 width 的欄平分剩餘空間 */
+/* 橫向捲動容器：表格比這裡的寬度窄時，底部出現左右捲軸 */
+/* 桌機不裁切：讓「狀態」下拉能展開到下方空白、免捲動。只有視窗比表格窄時才需要左右捲動 */
+@media (max-width: 991.98px) {
+  .table-scroll {
+    overflow-x: auto;
+  }
+}
+/* card 拿掉 overflow:hidden 後，改由表格自身四角圓角維持外觀 */
+.product-table thead th:first-child { border-top-left-radius: 0.5rem; }
+.product-table thead th:last-child { border-top-right-radius: 0.5rem; }
+.product-table tbody tr:last-child td:first-child { border-bottom-left-radius: 0.5rem; }
+.product-table tbody tr:last-child td:last-child { border-bottom-right-radius: 0.5rem; }
+.product-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 900px;   /* 壓縮下限：視窗比這窄就改用捲動，不再擠壓欄位 */
+}
 .product-table thead tr {
   background: #1b4767;
   color: white;
@@ -681,11 +747,17 @@ function onImageError(e) {
   padding: 0.85rem 1rem;
   border: none;
   white-space: nowrap;
+  text-align: center;
 }
 .product-table tbody td {
-  padding: 0.75rem 1rem;
+  padding: 1.1rem 1rem;
   border-bottom: 1px solid #F1F5F9;
-  font-size: 0.875rem;
+  font-size: 1rem;
+  text-align: center;
+}
+/* 操作欄那排按鈕也置中，跟「操作」表頭對齊 */
+.product-table tbody td:nth-child(9) > .d-flex {
+  justify-content: center;
 }
 .product-table tbody tr:last-child td {
   border-bottom: none;
@@ -693,6 +765,27 @@ function onImageError(e) {
 .product-table tbody tr:hover td {
   background: #F8FAFC;
 }
+
+/* ===== 欄位寬度（table-layout:fixed 下，px 會被精確套用）=====
+   欄序：1編號 2圖片 3名稱 4標籤 5品類 6價格 7庫存 8狀態 9操作
+   只有「名稱」不設寬度 → 它會自動吃掉所有剩餘空間（其他欄都固定）*/
+.product-table th:nth-child(1),
+.product-table td:nth-child(1) { width: 72px; white-space: nowrap; }   /* 編號 */
+.product-table th:nth-child(2),
+.product-table td:nth-child(2) { width: 100px; }   /* 商品圖片 */
+/* 第3欄「名稱」故意不設，當彈性欄 */
+.product-table th:nth-child(4),
+.product-table td:nth-child(4) { width: 8%; }      /* 標籤 */
+.product-table th:nth-child(5),
+.product-table td:nth-child(5) { width: 10%; }     /* 品類 */
+.product-table th:nth-child(6),
+.product-table td:nth-child(6) { width: 10%; }      /* 價格 */
+.product-table th:nth-child(7),
+.product-table td:nth-child(7) { width: 6%; }      /* 庫存 */
+.product-table th:nth-child(8),
+.product-table td:nth-child(8) { width: 9%; }      /* 狀態 */
+.product-table th:nth-child(9),
+.product-table td:nth-child(9) { width: 148px; }   /* 操作 */
 
 /* ===== 列表縮圖 ===== */
 .product-list-img {
@@ -718,10 +811,14 @@ function onImageError(e) {
 
 /* ===== 商品名稱截斷 ===== */
 .product-name-cell {
-  max-width: 180px;
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* 「商品名稱」表頭也置中，跟欄位資料對齊（第3欄）*/
+.product-table th:nth-child(3) {
+  text-align: center;
 }
 
 /* ===== 價格文字 ===== */
@@ -730,28 +827,30 @@ function onImageError(e) {
 /* ===== 行銷標籤 ===== */
 .marketing-badge {
   display: inline-block;
-  align-self: flex-start;
+  align-self: center;
   text-align: center;
   font-size: 0.85rem;
   font-weight: 700;
+  line-height: 1.2;
+  min-width: 3.5rem;
   padding: 0.3rem 0.7rem;
   border-radius: 9999px;
   background: #FFF7ED;
   color: #EA580C;
   white-space: nowrap;
 }
-/* 三種行銷標籤各自的配色（覆蓋上面的 background/color） */
-.marketing-badge.tag-hot {       /* 熱銷：紅 */
+/* 三種行銷標籤各自的配色（對應商城 ProductBrowse 的 .mtag-*） */
+.marketing-badge.tag-hot {       /* 熱銷：淡黃底棕字 */
+  background: #FEF3C7;
+  color: #B45309;
+}
+.marketing-badge.tag-featured {  /* 精選：淡藍底深藍字 */
+  background: #E0F2FE;
+  color: #0369A1;
+}
+.marketing-badge.tag-promo {     /* 促銷：淡紅底紅字 */
   background: #FEE2E2;
   color: #DC2626;
-}
-.marketing-badge.tag-featured {  /* 精選：紫 */
-  background: #EDE9FE;
-  color: #7C3AED;
-}
-.marketing-badge.tag-promo {     /* 促銷：藍 */
-  background: #DBEAFE;
-  color: #2563EB;
 }
 
 /* ===== 狀態標籤 ===== */
@@ -763,6 +862,7 @@ function onImageError(e) {
   border-radius: 9999px;
   font-size: 0.85rem;
   font-weight: 700;
+  line-height: 1.2;
 }
 .badge-active {
   background: #dcfce7;
@@ -878,6 +978,77 @@ function onImageError(e) {
   border-radius: 0.5rem;
 }
 
+/* ===== 編輯/新增表單彈窗：兩欄式，圖片在右側免捲動 ===== */
+.modal-container.form-modal {
+  max-width: 820px;
+  border-radius: 1.25rem;
+}
+/* 仿會員編輯視窗：flex 列；文字欄 .pm-col(flex:1) 寬、下拉欄 .pm-col-half(flex:0.5) 自然變窄 */
+.pm-form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+.pm-form-row:last-child {
+  margin-bottom: 0;
+}
+.pm-col {
+  flex: 1;
+  min-width: 0;
+}
+.pm-col-half {
+  flex: 0.8;
+  min-width: 0;
+}
+.pm-col-wide {
+  flex: 1.5;
+  min-width: 0;
+}
+/* 仿會員輸入視覺（淺底、2px 圓角邊、focus 天藍）；不套用到 footer 按鈕 */
+.form-modal .form-control,
+.form-modal .form-select {
+  padding: 0.6rem 0.75rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.6rem;
+  font-size: 1rem;
+  background: #f8fafc;
+}
+.form-modal .form-control:focus,
+.form-modal .form-select:focus {
+  border-color: var(--brand-sky);
+  background: #fff;
+  box-shadow: none;
+}
+.form-modal .input-group-text {
+  border: 2px solid #e2e8f0;
+  background: #eef2f6;
+  font-size: 1rem;
+}
+/* input-group(NT$ 價格)左右接合，避免圓角各自跑開 */
+.form-modal .input-group > .input-group-text:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 0;
+}
+.form-modal .input-group > .form-control:not(:first-child) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.form-modal .form-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 0.3rem;
+}
+/* 右欄圖片區撐滿欄高，預覽圖可用較大空間 */
+.form-modal .upload-area {
+  min-height: 220px;
+  margin-bottom: 0;
+}
+.form-modal .upload-preview {
+  max-height: 300px;
+}
+
 /* ===== 列表行點擊 ===== */
 .row-clickable {
   cursor: pointer;
@@ -885,7 +1056,7 @@ function onImageError(e) {
 
 /* ===== 詳情 Modal ===== */
 .detail-modal {
-  max-width: 960px;
+  max-width: 820px;
 }
 .detail-img-col {
   background: #F8FAFC;
@@ -896,7 +1067,7 @@ function onImageError(e) {
 }
 .detail-img {
   max-width: 100%;
-  max-height: 240px;
+  max-height: 100%;
   object-fit: contain;
   border-radius: 0.375rem;
 }
@@ -919,23 +1090,25 @@ function onImageError(e) {
   gap: 0.3rem;
 }
 .detail-label {
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #94A3B8;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 .detail-value {
-  font-size: 1rem;
+  font-size: 1.2rem;
   color: #1E293B;
   font-weight: 500;
 }
 .no-tag-badge {
   display: inline-block;
-  align-self: flex-start;
+  align-self: center;
   text-align: center;
   font-size: 0.85rem;
   font-weight: 700;
+  line-height: 1.2;
+  min-width: 3.5rem;
   padding: 0.3rem 0.7rem;
   border-radius: 9999px;
   background: #F1F5F9;
@@ -991,5 +1164,9 @@ function onImageError(e) {
   background: var(--brand-sky, #0ea5e9);
   color: white;
   border-color: var(--brand-sky, #0ea5e9);
+}
+
+/* 分類／狀態／標籤下拉：限制寬度，不要被撐太寬 */
+.filter-select {
 }
 </style>

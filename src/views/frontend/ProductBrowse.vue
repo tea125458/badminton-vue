@@ -51,9 +51,23 @@ const availableCategories = computed(() => {
     .filter((c) => { if (seen.has(c)) return false; seen.add(c); return true })
 })
 
+// ===================== 行銷標籤篩選 =====================
+const filterTag = ref('') // '' | '精選' | '促銷' | '熱銷'
+const tagFilters = [
+  { value: '精選', label: '天晴精選', cls: 'tag-btn--featured' },
+  { value: '促銷', label: '特價商品', cls: 'tag-btn--sale' },
+  { value: '熱銷', label: '熱銷商品', cls: 'tag-btn--hot' },
+]
+function toggleTag(t) {
+  filterTag.value = filterTag.value === t ? '' : t
+}
+
 const filteredProducts = computed(() => {
-  if (!filterCategory.value) return products.value
-  return products.value.filter((p) => p.category === filterCategory.value)
+  return products.value.filter((p) => {
+    const matchCategory = !filterCategory.value || p.category === filterCategory.value
+    const matchTag = !filterTag.value || p.marketingTag === filterTag.value
+    return matchCategory && matchTag
+  })
 })
 
 // ===================== 分頁（比照 ProductManage.vue） =====================
@@ -62,8 +76,8 @@ const pageSize = 20 // 每頁 20 筆
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredProducts.value.length / pageSize)))
 
-// 換類別時回到第 1 頁
-watch(filterCategory, () => { currentPage.value = 1 })
+// 換類別或行銷標籤時回到第 1 頁
+watch([filterCategory, filterTag], () => { currentPage.value = 1 })
 
 // 筆數變少導致目前頁碼超出總頁數時，夾回最後一頁，避免卡在空白頁
 watch(totalPages, (tp) => {
@@ -150,6 +164,7 @@ function modalIncreaseQty() {
 function addToCart() {
   cart.add(modal.value.product, modal.value.qty)
   closeModal()
+  cart.openDrawer()
 }
 
 function goToCheckout() {
@@ -204,9 +219,7 @@ function onImgZoomLeave() {
 
     <!-- ====== Hero ====== -->
     <div class="browse-hero">
-      <span class="badge-teal tracking-widest mb-3 d-inline-block">BADMINTON STORE</span>
-      <h1 class="hero-title">精選羽球商品</h1>
-      <p class="hero-sub">專業裝備・嚴選品牌・快速到貨</p>
+      <img src="/images/product/product_banner.png" alt="天晴商城 精選羽球商品" class="browse-hero-img" />
     </div>
 
     <!-- ====== 商品 Grid ====== -->
@@ -227,6 +240,15 @@ function onImgZoomLeave() {
           :class="{ active: filterCategory === cat }"
           @click="filterCategory = cat"
         >{{ categoryMap[cat] || cat }}</button>
+
+        <!-- 行銷標籤篩選（同一排） -->
+        <button
+          v-for="t in tagFilters"
+          :key="t.value"
+          class="cat-btn tag-btn"
+          :class="[t.cls, { active: filterTag === t.value }]"
+          @click="toggleTag(t.value)"
+        >{{ t.label }}</button>
       </div>
 
       <!-- 載入中 -->
@@ -272,7 +294,7 @@ function onImgZoomLeave() {
 
               <!-- 右上角庫存 badge -->
               <span v-if="product.stockQty === 0" class="stock-badge stock-badge--empty">缺貨中</span>
-              <span v-else-if="product.stockQty < 5" class="stock-badge stock-badge--low">少量庫存</span>
+              <span v-else-if="product.stockQty <= 10" class="stock-badge stock-badge--low">少量庫存</span>
 
               <!-- 圖片底部橫幅（半透明疊層） -->
               <div v-if="product.stockQty === 0" class="img-stock-banner img-stock-banner--empty">
@@ -376,7 +398,7 @@ function onImgZoomLeave() {
                 <span v-if="marketingBadge" class="detail-marketing-badge" :class="marketingBadge.cls">
                   {{ marketingBadge.label }}
                 </span>
-                <span v-if="detailModal.product?.stockQty === 0" class="stock-badge stock-badge--empty detail-row-stock">缺貨中</span>
+                <!-- <span v-if="detailModal.product?.stockQty === 0" class="stock-badge stock-badge--empty detail-row-stock">缺貨中</span> -->
               </div>
               <p class="detail-modal-brand">{{ detailModal.product?.brand }}</p>
               <h4 class="detail-modal-name">{{ detailModal.product?.productName }}</h4>
@@ -400,7 +422,7 @@ function onImgZoomLeave() {
                   :class="detailModal.product?.stockQty === 0 ? 'bi bi-x-circle text-danger' : 'bi bi-check-circle text-success'"
                   class="me-1"
                 ></i>
-                <span v-if="detailModal.product?.stockQty === 0" class="text-danger">無庫存 補貨中</span>
+                <span v-if="detailModal.product?.stockQty === 0" class="text-danger">無庫存，補貨中</span>
                 <span v-else-if="detailModal.product?.stockQty <= 10" class="stock-low-text">僅剩 {{ detailModal.product?.stockQty }} 件</span>
                 <span v-else class="text-success">現貨充足</span>
               </div>
@@ -565,20 +587,15 @@ function onImgZoomLeave() {
 
 /* ===== Hero ===== */
 .browse-hero {
-  background: linear-gradient(135deg, var(--brand-sky), var(--brand-teal-dark));
-  color: white;
-  text-align: center;
-  padding: 3.5rem 1rem;
+  width: 100%;
+  overflow: hidden;
+  line-height: 0;
 }
-.hero-title {
-  font-size: 2.25rem;
-  font-weight: 800;
-  margin-bottom: 0.5rem;
-}
-.hero-sub {
-  font-size: 1rem;
-  opacity: 0.85;
-  margin: 0;
+.browse-hero-img {
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  object-fit: cover;
+  display: block;
 }
 
 /* ===== 商品 Grid ===== */
@@ -616,6 +633,37 @@ function onImgZoomLeave() {
   color: white;
 }
 
+/* 天晴精選 */
+.tag-btn--featured:hover {
+  border-color: #0EA5E9;
+  color: #0EA5E9;
+}
+.tag-btn--featured.active {
+  background: #0EA5E9;
+  border-color: #0EA5E9;
+  color: white;
+}
+/* 特價商品 */
+.tag-btn--sale:hover {
+  border-color: #DC2626;
+  color: #DC2626;
+}
+.tag-btn--sale.active {
+  background: #DC2626;
+  border-color: #DC2626;
+  color: white;
+}
+/* 熱銷商品 */
+.tag-btn--hot:hover {
+  border-color: #D97706;
+  color: #D97706;
+}
+.tag-btn--hot.active {
+  background: #F59E0B;
+  border-color: #F59E0B;
+  color: white;
+}
+
 /* ===== 商品卡片（card-rounded + hover-lift 來自 frontend.css） ===== */
 .product-card {
   background: white;
@@ -637,8 +685,8 @@ function onImgZoomLeave() {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.88rem;
+  font-weight: 500;
   padding: 0.35rem 0.65rem;
   border-radius: 9999px;
   z-index: 1;
@@ -660,7 +708,7 @@ function onImgZoomLeave() {
   top: 0.5rem;
   left: 0.5rem;
   z-index: 1;
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   border-radius: 9999px;
   padding: 0.35rem 0.65rem;
   letter-spacing: 0.05em;
@@ -673,7 +721,7 @@ function onImgZoomLeave() {
   bottom: 0;
   left: 0;
   right: 0;
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   font-weight: 700;
   text-align: center;
   padding: 0.35rem 1rem;
@@ -753,13 +801,13 @@ function onImgZoomLeave() {
   flex: 1;
 }
 .product-brand {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: #94A3B8;
   font-weight: 600;
   margin: 0.3rem 0 0.25rem;
 }
 .product-name {
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--brand-dark);
   line-height: 1.4;
@@ -1093,7 +1141,7 @@ function onImgZoomLeave() {
   flex-direction: column;
 }
 .detail-modal-brand {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: #94A3B8;
   font-weight: 600;
   margin: 0.5rem 0 0.35rem;
@@ -1119,7 +1167,7 @@ function onImgZoomLeave() {
   margin-bottom: 1rem;
 }
 .detail-modal-desc-label {
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--brand-teal-dark);
   letter-spacing: 0.05em;
@@ -1127,21 +1175,21 @@ function onImgZoomLeave() {
   margin-bottom: 0.35rem;
 }
 .detail-modal-desc {
-  font-size: 0.88rem;
+  font-size: 1rem;
   color: #475569;
   line-height: 1.65;
   margin: 0;
   white-space: pre-line;
 }
 .detail-modal-stock {
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   margin-bottom: 1.25rem;
   display: flex;
   align-items: center;
 }
 .stock-low-text {
   color: #D97706;
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   font-weight: 400;
 }
 .detail-modal-cart-btn {
@@ -1373,8 +1421,13 @@ function onImgZoomLeave() {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
+  align-items: stretch;
 }
-.rec-card { }
+.rec-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
 .rec-img-wrap {
   position: relative;
   aspect-ratio: 1 / 1;
@@ -1405,6 +1458,7 @@ function onImgZoomLeave() {
   color: var(--brand-dark);
   margin-bottom: 0.2rem;
   line-height: 1.35;
+  min-height: calc(0.8rem * 1.35 * 2);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1414,9 +1468,11 @@ function onImgZoomLeave() {
   font-size: 0.72rem;
   color: #94A3B8;
   margin-bottom: 0.5rem;
+  min-height: calc(0.72rem * 1.5);
 }
 .rec-cart-btn {
   width: 100%;
+  margin-top: auto;
   padding: 0.35rem 0;
   background: white;
   border: 1.5px solid #E2E8F0;

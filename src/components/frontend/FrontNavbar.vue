@@ -26,7 +26,11 @@ const isLoggedIn = computed(() => memberStore.isLoggedIn)
 const memberName = computed(() => memberStore.fullName)
 const memberAvatar = computed(() => memberStore.avatar)
 const showDropdown = ref(false)
-const showCart = ref(false)
+// 購物車側邊欄開關移到 cart store，讓其他頁面（如商品頁加入購物車後）也能打開
+const showCart = computed({
+  get: () => cart.drawerOpen,
+  set: (v) => { cart.drawerOpen = v },
+})
 
 // 切換下拉選單
 function toggleDropdown() {
@@ -68,6 +72,7 @@ async function handleLogout() {
   }
   
   memberStore.logout()
+  cart.clear()
   showDropdown.value = false
   // notificationStore.disconnect()
   router.push('/login')

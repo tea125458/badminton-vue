@@ -16,6 +16,12 @@ function loadItems() {
 export const useCartStore = defineStore('cart', () => {
   const items = ref(loadItems())
 
+  // 全域購物車側邊欄開關（由 FrontNavbar 渲染 CartOffcanvas，其他頁面可呼叫 openDrawer 打開）
+  const drawerOpen = ref(false)
+  function openDrawer() {
+    drawerOpen.value = true
+  }
+
   watch(
     items,
     (val) => {
@@ -78,5 +84,5 @@ export const useCartStore = defineStore('cart', () => {
     items.value = []
   }
 
-  return { items, total, count, add, increase, decrease, remove, clear }
+  return { items, total, count, drawerOpen, openDrawer, add, increase, decrease, remove, clear }
 })
