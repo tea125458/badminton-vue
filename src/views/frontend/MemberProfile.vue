@@ -132,9 +132,8 @@ async function fetchOrders() {
     // 確保 data 是陣列，避免 slice 報錯
     orders.value = Array.isArray(data) ? data.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate)) : []
 
-    // 為了顯示代表圖，預抓前 5 筆的明細
-    const prefetchCount = Math.min(orders.value.length, 5)
-    for (let i = 0; i < prefetchCount; i++) {
+    // 預抓所有訂單的明細，以正確顯示圖片與商品件數
+    for (let i = 0; i < orders.value.length; i++) {
       const oid = orders.value[i].orderId
       if (!orderItems.value[oid]) {
         orderApi.findItems(oid).then((items) => {
@@ -950,7 +949,8 @@ async function handleAvatarUpload(event) {
                               </div>
                               <div class="order-info-item">
                                 <div class="order-info-label"><i class="bi bi-receipt me-1"></i>電子發票</div>
-                                <div class="order-info-value" style="font-size: 0.8rem;">{{ getInvoiceLabel(orders[0]) }}</div>
+                                <div class="order-info-value" style="font-size: 0.8rem; line-height: 1.4;">{{ getInvoiceLabel(orders[0]) }}</div>
+                                <div class="order-info-sub fw-bold" style="color: var(--brand-teal); margin-top: 0.15rem; font-size: 0.75rem;">發票號碼：XY-{{ String(orders[0].orderId || '').padStart(8, '0') }}</div>
                               </div>
                             </div>
                           </div>
@@ -959,72 +959,40 @@ async function handleAvatarUpload(event) {
                           <div v-if="loadingItems === orders[0].orderId" class="text-center py-3">
                             <div class="spinner-border spinner-border-sm text-info"></div>
                           </div>
-                          <div v-else class="expanded-items-list px-2">
-                            <div
-                              v-for="item in orderItems[orders[0].orderId]"
-                              :key="item.itemId"
-                              class="d-flex align-items-center gap-3 mb-2 py-2 border-bottom-dashed"
-                            >
-                              <img
-                                :src="
-                                  item.product?.imageUrl?.startsWith('/')
-                                    ? item.product.imageUrl
-                                    : '/' + item.product.imageUrl
-                                "
-                                class="rounded-2"
-                                style="
-                                  width: 54px;
-                                  height: 54px;
-                                  object-fit: scale-down;
-                                  background: #fff;
-                                  border: 1.5px solid #f1f5f9;
-                                  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-                                "
-                              />
-                              <div class="flex-grow-1">
-                                <div class="fw-semibold" style="font-size: 0.88rem; color: #1E293B;">
-                                  {{ item.product?.productName }}
-                                </div>
-                                <div class="text-muted" style="font-size: 0.75rem">
-                                  NT$ {{ item.unitPrice.toLocaleString() }} x {{ item.quantity }}
-                                </div>
-                              </div>
+                          <div v-else class="expanded-items-list px-1">
+                            <div class="order-items-grid">
                               <div
-                                class="fw-bold"
-                                style="font-size: 0.88rem; color: var(--brand-dark)"
+                                v-for="item in orderItems[orders[0].orderId]"
+                                :key="item.itemId"
+                                class="order-item-card"
                               >
-                                NT$ {{ (item.unitPrice * item.quantity).toLocaleString() }}
+                                <div class="item-img-wrap">
+                                  <img
+                                    :src="
+                                      item.product?.imageUrl?.startsWith('/')
+                                        ? item.product.imageUrl
+                                        : '/' + item.product.imageUrl
+                                    "
+                                    alt="product"
+                                  />
+                                </div>
+                                <div class="item-details">
+                                  <div class="item-name" :title="item.product?.productName">
+                                    {{ item.product?.productName }}
+                                  </div>
+                                  <div class="item-meta">
+                                    <span class="item-price">NT$ {{ item.unitPrice.toLocaleString() }}</span>
+                                    <span class="item-qty">x {{ item.quantity }}</span>
+                                  </div>
+                                  <div class="item-subtotal">
+                                    NT$ {{ (item.unitPrice * item.quantity).toLocaleString() }}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
 
-                          <!-- 發票資訊 -->
-                          <div v-if="orders[0].invoiceType" class="mt-3 pt-3 border-top" style="border-color: rgba(94, 234, 212, 0.2) !important;">
-                            <div class="d-flex align-items-center gap-2 mb-1">
-                              <i class="bi bi-receipt" style="color: #0D9488;"></i>
-                              <span class="fw-semibold" style="font-size: 0.88rem; color: #334155;">發票資訊</span>
-                            </div>
-                            <div style="font-size: 0.85rem; color: #64748b; padding-left: 1.4rem;">
-                              <template v-if="orders[0].invoiceType === 'INDIVIDUAL'">
-                                <span>個人電子發票</span>
-                                <span v-if="orders[0].invoiceCarrier" class="text-muted ms-1">（載具：{{ orders[0].invoiceCarrier }}）</span>
-                                <span v-else class="ms-1 fw-bold" style="color: #ea580c;">（現場取貨時隨貨交付）</span>
-                              </template>
-                              <template v-else-if="orders[0].invoiceType === 'COMPANY'">
-                                <span>公司發票</span>
-                                <span class="text-muted ms-2">統編：{{ orders[0].invoiceTaxId }}</span>
-                              </template>
-                              <template v-else-if="orders[0].invoiceType === 'DONATION'">
-                                <span>發票捐贈</span>
-                                <span class="text-muted ms-2" v-if="getDonationUnit(orders[0].invoiceCarrier)">
-                                  {{ getDonationUnit(orders[0].invoiceCarrier) }} (捐贈碼：{{ orders[0].invoiceCarrier }})
-                                </span>
-                                <span class="text-muted ms-2" v-else>
-                                  捐贈碼：{{ orders[0].invoiceCarrier }}
-                                </span>
-                              </template>
-                            </div>
-                          </div>
+
                         </div>
                       </div>
 
@@ -1187,7 +1155,8 @@ async function handleAvatarUpload(event) {
                               </div>
                               <div class="order-info-item">
                                 <div class="order-info-label"><i class="bi bi-receipt me-1"></i>電子發票</div>
-                                <div class="order-info-value" style="font-size: 0.8rem;">{{ getInvoiceLabel(order) }}</div>
+                                <div class="order-info-value" style="font-size: 0.8rem; line-height: 1.4;">{{ getInvoiceLabel(order) }}</div>
+                                <div class="order-info-sub fw-bold" style="color: var(--brand-teal); margin-top: 0.15rem; font-size: 0.75rem;">發票號碼：XY-{{ String(order.orderId || '').padStart(8, '0') }}</div>
                               </div>
                             </div>
                           </div>
@@ -1196,72 +1165,40 @@ async function handleAvatarUpload(event) {
                           <div v-if="loadingItems === order.orderId" class="text-center py-3">
                             <div class="spinner-border spinner-border-sm text-info"></div>
                           </div>
-                          <div v-else class="expanded-items-list px-2">
-                            <div
-                              v-for="item in orderItems[order.orderId]"
-                              :key="item.itemId"
-                              class="d-flex align-items-center gap-3 mb-2 py-2 border-bottom-dashed"
-                            >
-                              <img
-                                :src="
-                                  item.product?.imageUrl?.startsWith('/')
-                                    ? item.product.imageUrl
-                                    : '/' + item.product.imageUrl
-                                "
-                                class="rounded-2"
-                                style="
-                                  width: 54px;
-                                  height: 54px;
-                                  object-fit: scale-down;
-                                  background: #fff;
-                                  border: 1.5px solid #f1f5f9;
-                                  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-                                "
-                              />
-                              <div class="flex-grow-1">
-                                <div class="fw-semibold" style="font-size: 0.88rem">
-                                  {{ item.product?.productName }}
-                                </div>
-                                <div class="text-muted" style="font-size: 0.75rem">
-                                  NT$ {{ item.unitPrice.toLocaleString() }} x {{ item.quantity }}
-                                </div>
-                              </div>
+                          <div v-else class="expanded-items-list px-1">
+                            <div class="order-items-grid">
                               <div
-                                class="fw-bold"
-                                style="font-size: 0.88rem; color: var(--brand-dark)"
+                                v-for="item in orderItems[order.orderId]"
+                                :key="item.itemId"
+                                class="order-item-card"
                               >
-                                NT$ {{ (item.unitPrice * item.quantity).toLocaleString() }}
+                                <div class="item-img-wrap">
+                                  <img
+                                    :src="
+                                      item.product?.imageUrl?.startsWith('/')
+                                        ? item.product.imageUrl
+                                        : '/' + item.product.imageUrl
+                                    "
+                                    alt="product"
+                                  />
+                                </div>
+                                <div class="item-details">
+                                  <div class="item-name" :title="item.product?.productName">
+                                    {{ item.product?.productName }}
+                                  </div>
+                                  <div class="item-meta">
+                                    <span class="item-price">NT$ {{ item.unitPrice.toLocaleString() }}</span>
+                                    <span class="item-qty">x {{ item.quantity }}</span>
+                                  </div>
+                                  <div class="item-subtotal">
+                                    NT$ {{ (item.unitPrice * item.quantity).toLocaleString() }}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
 
-                          <!-- 發票資訊 -->
-                          <div v-if="order.invoiceType" class="mt-3 pt-3 border-top" style="border-color: rgba(94, 234, 212, 0.2) !important;">
-                            <div class="d-flex align-items-center gap-2 mb-1">
-                              <i class="bi bi-receipt" style="color: #0D9488;"></i>
-                              <span class="fw-semibold" style="font-size: 0.88rem; color: #334155;">發票資訊</span>
-                            </div>
-                            <div style="font-size: 0.85rem; color: #64748b; padding-left: 1.4rem;">
-                              <template v-if="order.invoiceType === 'INDIVIDUAL'">
-                                <span>個人電子發票</span>
-                                <span v-if="order.invoiceCarrier" class="text-muted ms-1">（載具：{{ order.invoiceCarrier }}）</span>
-                                <span v-else class="ms-1 fw-bold" style="color: #ea580c;">（現場取貨時隨貨交付）</span>
-                              </template>
-                              <template v-else-if="order.invoiceType === 'COMPANY'">
-                                <span>公司發票</span>
-                                <span class="text-muted ms-2">統編：{{ order.invoiceTaxId }}</span>
-                              </template>
-                              <template v-else-if="order.invoiceType === 'DONATION'">
-                                <span>發票捐贈</span>
-                                <span class="text-muted ms-2" v-if="getDonationUnit(order.invoiceCarrier)">
-                                  {{ getDonationUnit(order.invoiceCarrier) }} (捐贈碼：{{ order.invoiceCarrier }})
-                                </span>
-                                <span class="text-muted ms-2" v-else>
-                                  捐贈碼：{{ order.invoiceCarrier }}
-                                </span>
-                              </template>
-                            </div>
-                          </div>
+
                         </div>
                       </div>
                     </div>
@@ -1805,5 +1742,118 @@ async function handleAvatarUpload(event) {
     grid-template-columns: 1fr;
     gap: 0.65rem;
   }
+}
+
+/* ===== 展開商品卡片式排版 ===== */
+.expanded-items-list {
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+/* 現代精緻滾動條 */
+.expanded-items-list::-webkit-scrollbar {
+  width: 4px;
+}
+.expanded-items-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.expanded-items-list::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 99px;
+}
+.expanded-items-list::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+.order-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.order-item-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.order-item-card:hover {
+  border-color: #e2e8f0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.item-img-wrap {
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+  border-radius: 0.5rem;
+  border: 1px solid #f1f5f9;
+  background: #ffffff;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.item-img-wrap img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: scale-down;
+}
+
+.item-details {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.item-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.15rem;
+}
+
+.item-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.item-price {
+  font-weight: 500;
+}
+
+.item-qty {
+  background: #f1f5f9;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.68rem;
+  color: #475569;
+}
+
+.item-subtotal {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--brand-dark);
+  margin-top: 0.2rem;
+  text-align: right;
 }
 </style>
