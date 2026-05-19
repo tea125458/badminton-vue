@@ -249,9 +249,9 @@ body {
 
 /* ----- 頁尾 ----- */
 .front-footer {
-  background-color: white;
-  border-top: 1px solid #F1F5F9;
-  padding: 1.25rem 0;
+  background-color: transparent !important;
+  border-top: none;
+  padding: 0;
 }
 
 .front-footer a {

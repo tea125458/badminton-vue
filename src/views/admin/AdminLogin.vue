@@ -131,10 +131,10 @@ async function handleLogin() {
         <!-- 一鍵登入 -->
         <div class="demo-buttons">
           <button type="button" class="btn-demo" @click="quickFill('manager')">
-            <i class="bi bi-lightning-fill text-warning"></i> 主管測試
+            <i class="bi bi-lightning-fill text-warning"></i> 主管帳號
           </button>
           <button type="button" class="btn-demo" @click="quickFill('staff')">
-            <i class="bi bi-lightning-fill text-info"></i> 職員測試
+            <i class="bi bi-lightning-fill text-info"></i> 職員帳號
           </button>
         </div>
       </form>
@@ -168,13 +168,14 @@ async function handleLogin() {
 /* ----- 登入卡片 ----- */
 .login-card {
   width: 100%;
-  max-width: 380px;
+  max-width: 460px;
+  min-height: 580px;
   background: rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: 1.5rem;
-  padding: 2.5rem 2rem 2rem;
+  padding: 5rem 3rem 4.5rem;
   box-shadow:
     0 8px 32px rgba(31, 38, 135, 0.08),
     0 2px 8px rgba(0, 0, 0, 0.04);
@@ -202,21 +203,24 @@ async function handleLogin() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  font-size: 1.6rem;
+  color: #64748B;
 }
 
 .card-title {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   font-weight: 800;
   color: #0e73c5;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
   letter-spacing: 0.03em;
 }
 
 .card-desc {
   font-size: 0.82rem;
-  color: #94a3b8;
-  margin-bottom: 1.75rem;
+  color: #94A3B8;
+  margin-bottom: 2.5rem;
   font-weight: 500;
 }
 
@@ -252,7 +256,7 @@ async function handleLogin() {
 
 /* ----- 表單欄位 ----- */
 .form-group {
-  margin-bottom: 0.75rem;
+  margin-bottom: 1.2rem;
   text-align: left;
 }
 
@@ -355,12 +359,12 @@ async function handleLogin() {
 
 .btn-demo {
   flex: 1;
-  padding: 0.6rem 0.4rem;
-  border: 1.5px dashed #cbd5e1;
+  padding: 0.7rem 0.4rem;
+  border: 1.5px dashed #CBD5E1;
   border-radius: 0.65rem;
   background: transparent;
-  color: #64748b;
-  font-size: 0.75rem;
+  color: #64748B;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;

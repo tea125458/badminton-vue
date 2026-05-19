@@ -118,7 +118,7 @@ function getStepTime(order, step) {
 // 頁籤切換
 const activeTab = ref('profile')
 const menuItems = [
-  { id: 'profile', label: '會員帳號資料', icon: 'bi-person-gear' },
+  { id: 'profile', label: '會員個人資料', icon: 'bi-person-gear' },
   { id: 'bookings', label: '我的預約紀錄', icon: 'bi-calendar-check' },
   { id: 'orders', label: '歷史消費訂單', icon: 'bi-bag-check' },
 ]
@@ -281,8 +281,8 @@ async function handleChangePassword() {
     pwdErrorMsg.value = '兩次輸入的新密碼不一致'
     return
   }
-  if (newPassword.length < 6 || newPassword.length > 12) {
-    pwdErrorMsg.value = '新密碼長度必須為 6-12 碼'
+  if (newPassword.length < 6 || newPassword.length > 15) {
+    pwdErrorMsg.value = '新密碼長度必須為 6-15 碼'
     return
   }
 
@@ -457,7 +457,7 @@ async function handleAvatarUpload(event) {
                   >
                     <img
                       v-if="avatarUrl"
-                      :src="'http://localhost:8080' + avatarUrl"
+                      :src="avatarUrl.startsWith('http') ? avatarUrl : 'http://localhost:8080' + avatarUrl"
                       alt="頭像"
                       class="avatar-img"
                     />
@@ -631,7 +631,8 @@ async function handleAvatarUpload(event) {
                             v-model="pwdForm.newPassword"
                             :type="showNewPwd ? 'text' : 'password'"
                             class="form-control-styled"
-                            placeholder="6-12 碼英數字"
+                            placeholder="6-15 碼英數字"
+                            maxlength="15"
                           />
                           <button
                             type="button"
@@ -1175,12 +1176,38 @@ async function handleAvatarUpload(event) {
 
 <style scoped>
 .profile-page {
-  background-color: #f4f7f9;
-  min-height: calc(100vh - 120px);
+  min-height: 100vh;
+  position: relative;
+  background-image: url('@/assets/images/login-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+
+.profile-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.4);
+  z-index: 0;
+}
+
+.profile-page > * {
+  position: relative;
+  z-index: 1;
 }
 
 .profile-card-base {
   border-radius: 1rem;
+  background-color: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(27, 176, 193, 0.12) !important;
+  border: 1px solid rgba(84, 218, 213, 0.2) !important;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.profile-card-base:hover {
+  box-shadow: 0 12px 32px rgba(27, 176, 193, 0.18) !important;
+  transform: translateY(-2px);
 }
 
 /* 標題圖示藍綠色漸層圓圈 */
@@ -1329,6 +1356,13 @@ async function handleAvatarUpload(event) {
   min-height: 600px;
   display: flex;
   flex-direction: column;
+  background-color: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(27, 176, 193, 0.12) !important;
+  border: 1px solid rgba(84, 218, 213, 0.2) !important;
+  transition: box-shadow 0.3s ease;
+}
+.member-sidebar:hover {
+  box-shadow: 0 12px 32px rgba(27, 176, 193, 0.18) !important;
 }
 .sidebar-avatar {
   width: 80px;

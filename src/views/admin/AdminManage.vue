@@ -139,6 +139,20 @@ function openCreateModal() {
   showModal.value = true
 }
 
+// ===== 一鍵帶入測試資料 =====
+function fillDemoData() {
+  form.value = {
+    username: 'staff88',
+    password: 'pass123',
+    fullName: '王小明',
+    role: 'STAFF',
+    gender: '男',
+    birthday: '1996-03-12',
+    phone: '0912-888-999',
+    email: 'staff88@gmail.com',
+  }
+}
+
 // ===== 編輯 Modal =====
 async function openEditModal(id) {
   try {
@@ -455,21 +469,21 @@ function handleExport(format) {
             </td>
             <td>
               <div class="d-flex gap-1">
-                <button class="btn btn-sm action-btn action-btn-edit" title="編輯職員" @click="openEditModal(a.adminId)">
+                <button class="btn btn-sm action-btn action-btn-edit" data-tooltip="編輯" @click="openEditModal(a.adminId)">
                   <i class="bi bi-pencil"></i>
                 </button>
                 <button
                   class="btn btn-sm action-btn action-btn-note"
-                  title="備註"
+                  :data-tooltip="a.note || '備註'"
                   @click="openNoteModal(a.adminId, a.fullName || a.username, a.note)"
                 >
                   <i class="bi bi-sticky"></i>
                 </button>
                 <button
                   class="btn btn-sm action-btn action-btn-delete"
+                  data-tooltip="刪除"
                   :class="{ 'btn-disabled': isSelf(a.adminId) }"
                   :disabled="isSelf(a.adminId)"
-                  :title="isSelf(a.adminId) ? '不能刪除自己' : '刪除職員'"
                   @click="!isSelf(a.adminId) && deleteAdmin(a.adminId, a.username)"
                 >
                   <i class="bi bi-trash3"></i>
@@ -477,12 +491,14 @@ function handleExport(format) {
                 <div class="dropdown">
                   <button
                     class="btn btn-sm action-btn action-btn-status dropdown-toggle"
+                    type="button"
+                    data-bs-toggle="dropdown"
+                    data-tooltip="編輯狀態"
                     :class="{ 'btn-disabled': isSelf(a.adminId) }"
                     :disabled="isSelf(a.adminId)"
-                    data-bs-toggle="dropdown"
-                    title="變更狀態"
                   >
                     <i class="bi bi-arrow-repeat"></i>
+                    <i class="bi bi-caret-down-fill ms-1" style="font-size: 0.65rem;"></i>
                   </button>
                   <ul v-if="!isSelf(a.adminId)" class="dropdown-menu">
                     <li>
@@ -560,7 +576,7 @@ function handleExport(format) {
                 <input
                   v-model="form.username"
                   type="text"
-                  placeholder="登入帳號"
+                  placeholder="請輸入帳號6-15碼"
                   :disabled="!!editId"
                 />
               </div>
@@ -611,12 +627,23 @@ function handleExport(format) {
               <div class="form-col-third">
                 <label>Email</label>
                 <input v-model="form.email" type="email" placeholder="abc@mail.com" />
+                <!-- 一鍵帶入 (僅限新增職員) -->
+                <div v-if="!editId" class="text-end mt-1">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary px-2 py-0.5 small fw-bold"
+                    style="border-style: dashed; font-size: 0.72rem; border-color: #cbd5e1; color: #64748b;"
+                    @click="fillDemoData"
+                  >
+                    <i class="bi bi-lightning-fill text-warning me-1"></i>一鍵帶入
+                  </button>
+                </div>
               </div>
             </div>
           </div>
           <div class="modal-footer">
             <button class="btn-cancel" @click="showModal = false">取消</button>
-            <button class="btn-save" @click="saveAdmin"><i class="bi bi-check-lg"></i> 儲存</button>
+            <button class="btn-save" @click="saveAdmin">儲存</button>
           </div>
         </div>
       </div>
@@ -637,7 +664,7 @@ function handleExport(format) {
           </div>
           <div class="modal-footer">
             <button class="btn-cancel" @click="showNoteModal = false">取消</button>
-            <button class="btn-save" @click="saveNote"><i class="bi bi-check-lg"></i> 儲存</button>
+            <button class="btn-save" @click="saveNote">儲存</button>
           </div>
         </div>
       </div>
@@ -953,6 +980,59 @@ input[type="date"]::-webkit-datetime-edit-day-field {
   border-radius: 0.5rem;
   transition: all 0.2s ease;
   white-space: nowrap;
+  position: relative;
+}
+
+/* Custom Tooltip */
+.action-btn[data-tooltip]::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: -5px; /* 向右對齊，避免表格邊緣裁切 */
+  left: auto;
+  transform: scale(0.9);
+  transform-origin: bottom right;
+  background: rgba(15, 23, 42, 0.95);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: normal; /* 允許長備註換行 */
+  width: max-content;
+  max-width: 250px;
+  text-align: left;
+  line-height: 1.4;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 100;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.02em;
+}
+
+.action-btn[data-tooltip]::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  right: 12px; /* 箭頭對齊按鈕中心偏右 */
+  left: auto;
+  border-width: 5px 5px 0;
+  border-style: solid;
+  border-color: rgba(15, 23, 42, 0.95) transparent transparent transparent;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 100;
+}
+
+.action-btn[data-tooltip]:hover::before,
+.action-btn[data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
 }
 .action-btn-edit {
   background: #eef2ff;
@@ -1055,7 +1135,7 @@ input[type="date"]::-webkit-datetime-edit-day-field {
   color: #475569;
 }
 .modal-body {
-  padding: 1.5rem;
+  padding: 1.5rem 1.5rem 0.6rem;
 }
 .modal-footer {
   display: flex;
@@ -1069,6 +1149,9 @@ input[type="date"]::-webkit-datetime-edit-day-field {
   display: flex;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+.form-row:last-child {
+  margin-bottom: 0;
 }
 .form-col {
   flex: 1;
@@ -1186,5 +1269,9 @@ input[type="date"]::-webkit-datetime-edit-day-field {
   .search-box input {
     width: 150px;
   }
+}
+:deep(.dropdown-menu), :deep(.dropdown-item) {
+  font-family: 'Inter', 'Noto Sans TC', sans-serif !important;
+  font-size: 0.88rem !important;
 }
 </style>

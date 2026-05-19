@@ -135,7 +135,7 @@ async function handleLogout() {
                 @click.stop="toggleDropdown"
               >
                 <div class="avatar-circle">
-                  <img v-if="memberAvatar" :src="'http://localhost:8080' + memberAvatar" alt="頭像" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
+                  <img v-if="memberAvatar" :src="memberAvatar.startsWith('http') ? memberAvatar : 'http://localhost:8080' + memberAvatar" alt="頭像" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />
                   <i v-else class="bi bi-person-fill"></i>
                 </div>
                 <span class="text-dark fw-semibold d-none d-md-inline" style="font-size: 0.875rem;">
@@ -143,16 +143,26 @@ async function handleLogout() {
                 </span>
                 <i class="bi bi-chevron-down" style="font-size: 0.6rem; color: #64748B;"></i>
               </button>
-              <ul v-show="showDropdown" class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2 show" style="position: absolute; right: 0; top: 100%;">
+              <ul v-show="showDropdown" class="dropdown-menu shadow-sm border-0 mt-2 show" style="position: absolute; left: 50%; transform: translateX(-50%); top: 100%; min-width: 120px;">
                 <li>
-                  <RouterLink to="/profile" class="dropdown-item py-2" @click="showDropdown = false">
-                    <i class="bi bi-person-circle me-2"></i>會員中心
+                  <RouterLink to="/profile?tab=profile" class="dropdown-item py-2 text-center" @click="showDropdown = false">
+                    會員中心
+                  </RouterLink>
+                </li>
+                <li>
+                  <RouterLink to="/profile?tab=bookings" class="dropdown-item py-2 text-center" @click="showDropdown = false">
+                    預約紀錄
+                  </RouterLink>
+                </li>
+                <li>
+                  <RouterLink to="/profile?tab=orders" class="dropdown-item py-2 text-center" @click="showDropdown = false">
+                    歷史訂單
                   </RouterLink>
                 </li>
                 <li><hr class="dropdown-divider" /></li>
                 <li>
-                  <button class="dropdown-item py-2 text-danger" @click="handleLogout">
-                    <i class="bi bi-box-arrow-right me-2"></i>登出
+                  <button class="dropdown-item py-2 text-danger text-center" @click="handleLogout">
+                    登出
                   </button>
                 </li>
               </ul>
