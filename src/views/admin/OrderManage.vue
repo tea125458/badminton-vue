@@ -39,7 +39,7 @@ function getExportData() {
 
 function handleExport(format) {
   showExportMenu.value = false
-  exportData(getExportData(), format)
+  exportData(getExportData(), format, '訂單資料')
 }
 const filterStatus = ref('')
 
@@ -74,25 +74,48 @@ function clearSelection() {
 
 // 批次變更狀態
 const showBatchStatusMenu = ref(false)
-async function batchChangeStatus(newStatus) {
+
+// 批次狀態變更 — 使用置中 ConfirmDialog 取代瀏覽器原生 confirm()
+const showBatchStatusConfirm = ref(false)
+const pendingBatchStatus = ref('')
+const pendingBatchIds = ref([])
+const batchStatusConfirmMsg = ref('')
+
+function batchChangeStatus(newStatus) {
   showBatchStatusMenu.value = false
   const ids = [...selectedIds.value]
   if (ids.length === 0) return
   const label = statusMap[newStatus]?.label || newStatus
-  if (!confirm(`確定要將 ${ids.length} 筆訂單批次變更為「${label}」嗎？`)) return
+  pendingBatchStatus.value = newStatus
+  pendingBatchIds.value = ids
+  batchStatusConfirmMsg.value = `確定要將 ${ids.length} 筆訂單批次變更為「${label}」嗎？`
+  showBatchStatusConfirm.value = true
+}
+
+async function executeBatchStatusChange() {
+  showBatchStatusConfirm.value = false
+  const ids = pendingBatchIds.value
+  const label = statusMap[pendingBatchStatus.value]?.label || pendingBatchStatus.value
   try {
     for (const id of ids) {
-      await orderApi.updateStatus(id, newStatus)
+      await orderApi.updateStatus(id, pendingBatchStatus.value)
     }
     clearSelection()
     await loadOrders()
-    alert(`已成功將 ${ids.length} 筆訂單變更為「${label}」`)
+    // 使用結果提示 Dialog
+    batchResultMsg.value = `已成功將 ${ids.length} 筆訂單變更為「${label}」`
+    showBatchResult.value = true
   } catch (e) {
     console.error('批次狀態更新失敗', e)
-    alert('部分訂單狀態更新失敗，請重新整理頁面確認')
+    batchResultMsg.value = '部分訂單狀態更新失敗，請重新整理頁面確認'
+    showBatchResult.value = true
     await loadOrders()
   }
 }
+
+// 通用結果提示 Dialog（取代 alert）
+const showBatchResult = ref(false)
+const batchResultMsg = ref('')
 
 // 批次刪除
 const showBatchDeleteConfirm = ref(false)
@@ -105,10 +128,12 @@ async function handleBatchDelete() {
     }
     clearSelection()
     await loadOrders()
-    alert(`已成功刪除 ${ids.length} 筆訂單`)
+    batchResultMsg.value = `已成功刪除 ${ids.length} 筆訂單`
+    showBatchResult.value = true
   } catch (e) {
     console.error('批次刪除失敗', e)
-    alert('部分訂單刪除失敗，請重新整理頁面確認')
+    batchResultMsg.value = '部分訂單刪除失敗，請重新整理頁面確認'
+    showBatchResult.value = true
     await loadOrders()
   }
 }
@@ -127,7 +152,7 @@ function batchExport(format) {
     付款方式: paymentMap[o.paymentType] || o.paymentType || '',
     備註: o.note || '',
   }))
-  exportData(data, format)
+  exportData(data, format, '訂單資料')
 }
 
 // ===================== 分頁 =====================
@@ -361,9 +386,9 @@ const statusMap = {
 const statusOptions = Object.entries(statusMap)
 
 const paymentMap = {
-  CASH: '現金',
+  CASH: '現金支付',
   CREDIT_CARD: '信用卡',
-  TRANSFER: '轉帳',
+  TRANSFER: '銀行轉帳',
   LINE_PAY: 'LINE Pay',
 }
 
@@ -626,6 +651,47 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
+
+function getInvoiceTypeText(order) {
+  if (!order || !order.invoiceType) return '尚未設定'
+  
+  if (order.invoiceType === 'INDIVIDUAL') {
+    if (!order.invoiceCarrier) return '個人電子發票 (現場取貨時隨貨交付)'
+    if (order.invoiceCarrier.startsWith('/')) {
+      return `個人電子發票 (手機條碼：${order.invoiceCarrier})`
+    }
+    if (/^[A-Z]{2}\d{14}$/.test(order.invoiceCarrier)) {
+      return `個人電子發票 (自然人憑證：${order.invoiceCarrier})`
+    }
+    return `個人電子發票 (載具：${order.invoiceCarrier})`
+  }
+  
+  if (order.invoiceType === 'DONATION') {
+    const code = order.invoiceCarrier || ''
+    const unitMap = {
+      '919': '財團法人創世社會福利基金會',
+      '25885': '財團法人伊甸社會福利基金會',
+      '13579': '財團法人陽光社會福利基金會',
+      '5678': '財團法人台灣兒童暨家庭扶助基金會',
+      '520': '財團法人罕見疾病基金會',
+      '135': '財團法人董氏基金會',
+      '001': '財團法人羅慧夫顱顏基金會',
+      '888': '財團法人台灣癌症基金會',
+      '999': '財團法人喜憨兒社會福利基金會',
+      '111': '財團法人弘道老人福利基金會'
+    }
+    if (unitMap[code]) {
+      return `捐贈發票 (${unitMap[code]}，捐贈碼：${code})`
+    }
+    return `捐贈發票 (捐贈碼：${code || '未提供'})`
+  }
+  
+  if (order.invoiceType === 'COMPANY') {
+    return `公司發票 (統編：${order.invoiceTaxId || '未提供'})`
+  }
+  
+  return '尚未設定'
+}
 </script>
 
 <template>
@@ -730,7 +796,7 @@ onUnmounted(() => {
               >
                 <span
                   class="segment-label"
-                  v-if="(statusCounts[tab.key] / statusCounts['']) * 100 > 8"
+                  v-if="(statusCounts[tab.key] / statusCounts['']) * 100 > 4"
                 >
                   {{ tab.label }} {{ statusCounts[tab.key] }}
                 </span>
@@ -756,7 +822,7 @@ onUnmounted(() => {
             v-model="keyword"
             type="text"
             class="form-control border-start-0"
-            placeholder="搜尋訂單 (#編號可精確查詢)"
+            placeholder="搜尋編號、會員、訂購日期......"
           />
         </div>
       </div>
@@ -826,10 +892,10 @@ onUnmounted(() => {
             </div>
           </transition>
           <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle text-center mb-0">
               <thead>
                 <tr>
-                  <th style="width: 4%; text-align: center; padding-left: 0.75rem">
+                  <th style="width: 40px">
                     <input
                       type="checkbox"
                       class="form-check-input table-check"
@@ -838,12 +904,12 @@ onUnmounted(() => {
                       @click.stop
                     />
                   </th>
-                  <th style="width: 9%">編號</th>
-                  <th style="width: 20%">會員</th>
-                  <th style="width: 21%">訂購日期</th>
-                  <th style="width: 14%" class="text-end">金額</th>
-                  <th style="width: 16%" class="text-center">狀態</th>
-                  <th style="width: 16%" class="text-center">操作</th>
+                  <th>編號</th>
+                  <th>會員</th>
+                  <th>訂購日期</th>
+                  <th>金額</th>
+                  <th>狀態</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -855,7 +921,7 @@ onUnmounted(() => {
                   @click="selectOrder(order)"
                   style="cursor: pointer"
                 >
-                  <td style="text-align: center; padding-left: 0.75rem" @click.stop>
+                  <td @click.stop>
                     <input
                       type="checkbox"
                       class="form-check-input table-check"
@@ -877,12 +943,12 @@ onUnmounted(() => {
                     </div>
                   </td>
                   <td style="font-size: 0.82rem">{{ formatDate(order.orderDate) }}</td>
-                  <td class="text-end">
+                  <td>
                     <span class="fw-bold" style="color: var(--brand-teal)">{{
                       formatPrice(order.totalAmount)
                     }}</span>
                   </td>
-                  <td class="text-center">
+                  <td>
                     <span
                       class="badge"
                       :class="statusMap[order.status]?.badgeClass || 'badge-default'"
@@ -890,7 +956,7 @@ onUnmounted(() => {
                       >{{ statusMap[order.status]?.label }}</span
                     >
                   </td>
-                  <td class="text-center" @click.stop>
+                  <td @click.stop>
                     <div class="d-flex gap-1 justify-content-center">
                       <button
                         class="btn btn-sm action-btn action-btn-edit"
@@ -1040,6 +1106,27 @@ onUnmounted(() => {
                         <span class="badge" style="background: #f1f5f9; color: #475569">{{
                           paymentMap[selectedOrder.paymentType] || '未設定'
                         }}</span>
+                      </div>
+                    </div>
+                    <div class="col-12 border-top pt-2 mt-3">
+                      <div class="row g-3">
+                        <div class="col-6 border-end">
+                          <div class="info-label"><i class="bi bi-geo-alt me-1"></i>取貨資訊</div>
+                          <div class="info-value" style="font-size: 0.85rem; color: var(--brand-dark); font-weight: 600;">
+                            球館自取
+                          </div>
+                          <div class="text-muted mt-1" style="font-size: 0.7rem;">羽過天晴羽球館</div>
+                        </div>
+                        <div class="col-6">
+                          <div class="info-label"><i class="bi bi-receipt me-1"></i>發票號碼</div>
+                          <div class="info-value fw-bold mb-2" style="font-size: 0.85rem; color: var(--brand-teal);">
+                            XY-{{ String(selectedOrder?.orderId || '').padStart(8, '0') }}
+                          </div>
+                          <div class="info-label"><i class="bi bi-card-heading me-1"></i>發票形式</div>
+                          <div class="info-value" style="font-size: 0.85rem; color: var(--brand-dark); font-weight: 600;">
+                            {{ getInvoiceTypeText(selectedOrder) }}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1567,6 +1654,33 @@ onUnmounted(() => {
             {{ creating ? '建立中...' : '送出訂單' }}
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 批次狀態變更確認 Dialog（置中） ====== -->
+  <div v-if="showBatchStatusConfirm" class="confirm-overlay" @click.self="showBatchStatusConfirm = false">
+    <div class="confirm-dialog">
+      <div class="confirm-icon-wrap">
+        <i class="bi bi-exclamation-triangle-fill confirm-icon"></i>
+      </div>
+      <p class="confirm-message">{{ batchStatusConfirmMsg }}</p>
+      <div class="confirm-actions">
+        <button class="confirm-btn-cancel" @click="showBatchStatusConfirm = false">取消</button>
+        <button class="confirm-btn-ok" @click="executeBatchStatusChange">確定變更</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 操作結果通知 Dialog（置中，取代 alert） ====== -->
+  <div v-if="showBatchResult" class="confirm-overlay" @click.self="showBatchResult = false">
+    <div class="confirm-dialog">
+      <div class="confirm-icon-wrap">
+        <i class="bi bi-check-circle-fill confirm-icon" style="color: #10b981;"></i>
+      </div>
+      <p class="confirm-message">{{ batchResultMsg }}</p>
+      <div class="confirm-actions">
+        <button class="confirm-btn-ok" @click="showBatchResult = false">確認</button>
       </div>
     </div>
   </div>
@@ -2585,5 +2699,90 @@ table td {
 .batch-bar-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+/* ===== 置中確認 / 結果 Dialog ===== */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.15s ease;
+}
+
+.confirm-dialog {
+  background: white;
+  border-radius: 1rem;
+  padding: 2.5rem 2rem 1.75rem;
+  min-width: 380px;
+  max-width: 440px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  text-align: center;
+  animation: dialogBounce 0.3s ease-out;
+}
+
+@keyframes dialogBounce {
+  0% { opacity: 0; transform: scale(0.85) translateY(10px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.confirm-icon-wrap {
+  margin-bottom: 1rem;
+}
+
+.confirm-icon {
+  font-size: 3.2rem;
+  color: #f59e0b;
+}
+
+.confirm-message {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.confirm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.confirm-btn-cancel {
+  padding: 0.55rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-btn-cancel:hover {
+  background: #e2e8f0;
+}
+
+.confirm-btn-ok {
+  padding: 0.55rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  background: #f59e0b;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-btn-ok:hover {
+  background: #d97706;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
 }
 </style>

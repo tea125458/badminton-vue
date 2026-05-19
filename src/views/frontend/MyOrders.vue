@@ -24,7 +24,7 @@ const statusMap = {
 }
 
 const paymentMap = {
-  CASH: '現場現金支付', CREDIT_CARD: '信用卡', TRANSFER: '銀行轉帳', LINE_PAY: 'LINE Pay',
+  CASH: '現金支付', CREDIT_CARD: '信用卡', TRANSFER: '銀行轉帳', LINE_PAY: 'LINE Pay',
 }
 
 // 模擬發票號碼生成 (根據訂單 ID)
@@ -62,6 +62,65 @@ function formatDate(dateStr) {
     hour: '2-digit', minute: '2-digit'
   })
 }
+
+function getDonationUnit(code) {
+  if (!code) return ''
+  const unitMap = {
+    '919': '財團法人創世社會福利基金會',
+    '25885': '財團法人伊甸社會福利基金會',
+    '13579': '財團法人陽光社會福利基金會',
+    '5678': '財團法人台灣兒童暨家庭扶助基金會',
+    '520': '財團法人罕見疾病基金會',
+    '135': '財團法人董氏基金會',
+    '001': '財團法人羅慧夫顱顏基金會',
+    '888': '財團法人台灣癌症基金會',
+    '999': '財團法人喜憨兒社會福利基金會',
+    '111': '財團法人弘道老人福利基金會'
+  }
+  return unitMap[code] || ''
+}
+
+function getInvoiceTypeText(order) {
+  if (!order || !order.invoiceType) return '尚未設定'
+  
+  if (order.invoiceType === 'INDIVIDUAL') {
+    if (!order.invoiceCarrier) return '個人電子發票 (會員載具)'
+    if (order.invoiceCarrier.startsWith('/')) {
+      return `個人電子發票 (手機條碼：${order.invoiceCarrier})`
+    }
+    if (/^[A-Z]{2}\d{14}$/.test(order.invoiceCarrier)) {
+      return `個人電子發票 (自然人憑證：${order.invoiceCarrier})`
+    }
+    return `個人電子發票 (載具：${order.invoiceCarrier})`
+  }
+  
+  if (order.invoiceType === 'DONATION') {
+    const code = order.invoiceCarrier || ''
+    const unitMap = {
+      '919': '財團法人創世社會福利基金會',
+      '25885': '財團法人伊甸社會福利基金會',
+      '13579': '財團法人陽光社會福利基金會',
+      '5678': '財團法人台灣兒童暨家庭扶助基金會',
+      '520': '財團法人罕見疾病基金會',
+      '135': '財團法人董氏基金會',
+      '001': '財團法人羅慧夫顱顏基金會',
+      '888': '財團法人台灣癌症基金會',
+      '999': '財團法人喜憨兒社會福利基金會',
+      '111': '財團法人弘道老人福利基金會'
+    }
+    if (unitMap[code]) {
+      return `捐贈發票 (${unitMap[code]}，捐贈碼：${code})`
+    }
+    return `捐贈發票 (捐贈碼：${code || '未提供'})`
+  }
+  
+  if (order.invoiceType === 'COMPANY') {
+    return `公司發票 (統編：${order.invoiceTaxId || '未提供'})`
+  }
+  
+  return '尚未設定'
+}
+
 </script>
 
 <template>
@@ -71,11 +130,11 @@ function formatDate(dateStr) {
       <!-- 頁面標題 -->
       <div class="d-flex justify-content-between align-items-end mb-4">
         <div>
-          <h2 class="fw-800 mb-1" style="color: var(--brand-dark);">訂單詳情</h2>
+          <h2 class="fw-800 mb-1" style="color: var(--brand-dark);">我的訂單</h2>
           <p class="text-secondary small mb-0">感謝您的購買，以下為您的訂單完整資訊</p>
         </div>
-        <router-link to="/profile" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
-          查看歷史訂單 <i class="bi bi-arrow-right"></i>
+        <router-link to="/profile?tab=orders" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+          會員中心 <i class="bi bi-arrow-right"></i>
         </router-link>
       </div>
 
@@ -84,13 +143,31 @@ function formatDate(dateStr) {
         <div class="spinner-border text-teal" role="status"></div>
       </div>
 
-      <div v-else-if="order" class="order-detail-wrapper animate__animated animate__fadeIn">
+      <!-- 🎉 成功慶祝橫幅 (僅在剛下單 UNPAID 或 PAID 狀態下顯示) -->
+      <div v-if="!loading && order && (order.status === 'UNPAID' || order.status === 'PAID')" class="success-banner mb-4 animate__animated animate__fadeInDown">
+        <div class="success-banner-inner d-flex align-items-center gap-4">
+          <div class="success-icon-wrap">
+            <div class="success-icon-ring">
+              <i class="bi bi-check-lg"></i>
+            </div>
+          </div>
+          <div class="flex-grow-1">
+            <div class="success-title">🎉 感謝您的購買！</div>
+            <div class="success-subtitle">
+              您的訂單 <strong>#{{ order.orderId }}</strong> 已成功建立，我們將盡快為您進行理貨。<br>
+              請前往 <router-link to="/profile?tab=orders" class="success-link">「會員中心」</router-link> 隨時追蹤最新的訂單進度。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="!loading && order" class="order-detail-wrapper animate__animated animate__fadeIn">
         <div class="row g-4">
           <!-- 左側：訂單核心資訊 -->
           <div class="col-md-7">
             
-            <!-- 狀態卡片 -->
-            <div class="detail-card mb-4 status-highlight" :style="{ backgroundColor: statusMap[order.status].bg }">
+            <!-- 狀態卡片 (僅在非新訂單狀態如已出貨、已完成、已取消時顯示) -->
+            <div v-if="order.status !== 'UNPAID' && order.status !== 'PAID'" class="detail-card mb-4 status-highlight" :style="{ backgroundColor: statusMap[order.status].bg }">
               <div class="d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center gap-3">
                   <div class="status-icon-box" :style="{ backgroundColor: statusMap[order.status].color }">
@@ -142,7 +219,43 @@ function formatDate(dateStr) {
                 </div>
                 <div class="col-6 text-end">
                   <div class="info-label">發票形式</div>
-                  <div class="info-value">個人電子發票 (會員載具)</div>
+                  <div class="info-value text-end">
+                    <template v-if="order.invoiceType === 'INDIVIDUAL'">
+                      <div>個人電子發票</div>
+                      <div class="info-sub-value text-muted" v-if="order.invoiceCarrier">
+                        <span v-if="order.invoiceCarrier.startsWith('/')">（手機條碼：{{ order.invoiceCarrier }}）</span>
+                        <span v-else-if="/^[A-Z]{2}\d{14}$/.test(order.invoiceCarrier)">（自然人憑證：{{ order.invoiceCarrier }}）</span>
+                        <span v-else>（載具：{{ order.invoiceCarrier }}）</span>
+                      </div>
+                      <div class="info-sub-value text-end fw-bold" v-else style="color: #ea580c !important; font-size: 0.75rem;">
+                        （現場取貨時隨貨交付）
+                      </div>
+                    </template>
+                    <template v-else-if="order.invoiceType === 'DONATION'">
+                      <div>捐贈發票</div>
+                      <div class="info-sub-value text-muted">
+                        <template v-if="getDonationUnit(order.invoiceCarrier)">
+                          <div>{{ getDonationUnit(order.invoiceCarrier) }}</div>
+                          <div>(捐贈碼：{{ order.invoiceCarrier }})</div>
+                        </template>
+                        <template v-else>
+                          <div>(捐贈碼：{{ order.invoiceCarrier || '未提供' }})</div>
+                        </template>
+                      </div>
+                    </template>
+                    <template v-else-if="order.invoiceType === 'COMPANY'">
+                      <div>公司發票</div>
+                      <div class="info-sub-value text-muted text-end" v-if="order.invoiceTaxId">
+                        （統編：{{ order.invoiceTaxId }}）
+                      </div>
+                      <div class="info-sub-value text-muted text-end" v-else>
+                        （未提供統編）
+                      </div>
+                    </template>
+                    <template v-else>
+                      尚未設定
+                    </template>
+                  </div>
                 </div>
               </div>
             </div>
@@ -184,6 +297,36 @@ function formatDate(dateStr) {
                 <div class="small text-dark">{{ order.note }}</div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🚀 行動呼籲按鈕區 -->
+      <div v-if="!loading && order" class="cta-section mt-5 animate__animated animate__fadeInUp">
+        <div class="cta-divider mb-4">
+          <span class="cta-divider-text">接下來，您可以...</span>
+        </div>
+        <div class="row g-3 justify-content-center">
+          <div class="col-sm-4">
+            <router-link to="/products" class="cta-btn cta-btn-shop">
+              <i class="bi bi-bag-heart-fill cta-btn-icon"></i>
+              <div class="cta-btn-label">繼續逛逛商城</div>
+              <div class="cta-btn-desc">探索更多羽球好物</div>
+            </router-link>
+          </div>
+          <div class="col-sm-4">
+            <router-link to="/profile?tab=orders" class="cta-btn cta-btn-orders">
+              <i class="bi bi-person-lines-fill cta-btn-icon"></i>
+              <div class="cta-btn-label">前往會員中心</div>
+              <div class="cta-btn-desc">查看完整訂單進度</div>
+            </router-link>
+          </div>
+          <div class="col-sm-4">
+            <router-link to="/booking" class="cta-btn cta-btn-court">
+              <i class="bi bi-calendar-check-fill cta-btn-icon"></i>
+              <div class="cta-btn-label">去預約球場</div>
+              <div class="cta-btn-desc">開心打球，享受運動</div>
+            </router-link>
           </div>
         </div>
       </div>
@@ -270,11 +413,18 @@ function formatDate(dateStr) {
 }
 
 .prod-img {
-  width: 50px;
-  height: 50px;
+  width: 60px;
+  height: 60px;
   object-fit: cover;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  /* 強制瀏覽器使用高對比優化渲染，消除縮小產生的模糊感 */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  /* 啟用 GPU 硬體加速，提升縮放時的細節清晰度 */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .prod-info { flex: 1; }
@@ -304,5 +454,134 @@ function formatDate(dateStr) {
 
 .total-row {
   border-top: 2px dashed #E2E8F0;
+}
+
+/* ===== 成功橫幅 ===== */
+.success-banner {
+  background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+  border: 1.5px solid #5eead4;
+  border-radius: 1.25rem;
+  padding: 1.5rem 2rem;
+}
+
+.success-icon-ring {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #0d9488;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.75rem;
+  animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes popIn {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.success-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f766e;
+  margin-bottom: 0.35rem;
+}
+
+.success-subtitle {
+  font-size: 0.88rem;
+  color: #0d9488;
+  line-height: 1.6;
+}
+
+/* ===== CTA 按鈕區 ===== */
+.cta-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cta-divider::before,
+.cta-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.cta-divider-text {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.cta-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1.5rem 1rem;
+  border-radius: 1.25rem;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  color: var(--brand-dark);
+  text-decoration: none;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.cta-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+  border-color: transparent;
+  color: white;
+}
+
+.cta-btn-shop:hover { background: linear-gradient(135deg, #0d9488, #0891b2); }
+.cta-btn-orders:hover { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+.cta-btn-court:hover { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+
+.cta-btn-icon {
+  font-size: 2rem;
+  margin-bottom: 0.6rem;
+  color: #0d9488;
+  transition: color 0.25s;
+}
+
+.cta-btn:hover .cta-btn-icon { color: white; }
+
+.cta-btn-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.cta-btn-desc {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+/* ===== 發票子資訊雙行效果 ===== */
+.info-sub-value {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #64748B !important;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+/* ===== 慶祝橫幅會員中心連結樣式 ===== */
+.success-link {
+  color: #0f766e !important;
+  font-weight: 800;
+  text-decoration: underline !important;
+  transition: opacity 0.2s;
+  display: inline-block;
+}
+
+.success-link:hover {
+  opacity: 0.8;
 }
 </style>

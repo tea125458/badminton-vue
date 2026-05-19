@@ -42,7 +42,7 @@ const orderId = route.query.orderId || '—'
 
         <!-- 操作按鈕 -->
         <div class="d-grid gap-2">
-          <router-link to="/my-orders" class="btn btn-brand py-3">
+          <router-link :to="{ path: '/my-orders', query: { orderId: orderId } }" class="btn btn-brand py-3">
             <i class="bi bi-receipt me-2"></i>查看我的訂單
           </router-link>
           <router-link to="/products" class="btn btn-brand-outline py-3">

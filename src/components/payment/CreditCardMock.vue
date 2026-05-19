@@ -24,7 +24,7 @@ const isSuccess = ref(false)
 // 卡別選擇
 const cardType = ref('VISA')
 const cardTypes = [
-  { value: 'VISA',    label: 'VISA',             logo: 'https://img.icons8.com/color/96/visa.png' },
+  { value: 'VISA',    label: 'VISA',             logo: '/visa.svg' },
   { value: 'MASTER',  label: 'MasterCard',        logo: 'https://img.icons8.com/color/96/mastercard-logo.png' },
   { value: 'JCB',     label: 'JCB',               logo: 'https://img.icons8.com/color/96/jcb.png' },
   { value: 'AMEX',    label: 'American Express',   logo: 'https://img.icons8.com/color/96/amex.png' },
