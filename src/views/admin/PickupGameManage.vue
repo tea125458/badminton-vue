@@ -399,13 +399,13 @@ onMounted(() => {
     <!-- ============ 頂部工具列 ============ -->
     <!-- 第一行：標題 + 新增按鈕 -->
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h4 class="mb-0"><i class="bi bi-people-fill me-2"></i>揪團管理</h4>
+      <h4 class="page-title mb-0"><i class="bi bi-people-fill"></i> 揪團管理</h4>
       <button
-        class="btn btn-primary text-nowrap"
+        class="btn-add text-nowrap"
         data-bs-toggle="modal"
         data-bs-target="#addGameModal"
       >
-        <i class="bi bi-plus-circle-fill me-1"></i> 新增揪團
+        <i class="bi bi-plus-lg"></i> 新增揪團
       </button>
     </div>
     <!-- 第二行：搜尋框（加寬，內嵌搜尋圖示和清除按鈕） -->
@@ -858,24 +858,25 @@ onMounted(() => {
         共 {{ filteredGames.length }} 筆，第 {{ currentPage }} / {{ totalPages }} 頁
       </div>
       <!-- 中間：頁碼按鈕 -->
-      <nav>
-        <ul class="pagination pagination-sm mb-0">
-          <!-- 上一頁 -->
+      <nav v-if="totalPages > 1">
+        <ul class="pagination pagination-custom mb-0">
           <li class="page-item" :class="{ disabled: currentPage === 1 }">
-            <a class="page-link" href="#" @click.prevent="currentPage--">«</a>
+            <button class="page-link" @click="currentPage > 1 && currentPage--">
+              <i class="bi bi-chevron-left"></i>
+            </button>
           </li>
-          <!-- 頁碼數字按鈕：v-for 產生 1 到 totalPages -->
           <li
             v-for="page in totalPages"
             :key="page"
             class="page-item"
             :class="{ active: currentPage === page }"
           >
-            <a class="page-link" href="#" @click.prevent="currentPage = page">{{ page }}</a>
+            <button class="page-link" @click="currentPage = page">{{ page }}</button>
           </li>
-          <!-- 下一頁 -->
           <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-            <a class="page-link" href="#" @click.prevent="currentPage++">»</a>
+            <button class="page-link" @click="currentPage < totalPages && currentPage++">
+              <i class="bi bi-chevron-right"></i>
+            </button>
           </li>
         </ul>
       </nav>
@@ -1068,6 +1069,34 @@ onMounted(() => {
 </template>
 <!-- 🔧 加上 scoped 的 CSS，讓 icon-box 樣式只在這個元件內生效 -->
 <style scoped>
+/* ===== 頁面標題（與職員管理統一）===== */
+.page-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+.page-title i {
+  margin-right: 0.4rem;
+}
+
+/* ===== 新增按鈕（與職員管理統一）===== */
+.btn-add {
+  padding: 0.65rem 1.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: #00B4B4;
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-add:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+}
+
 /* 覆寫圓角 — 與 ProductManage 統一 */
 .card-rounded {
   border-radius: 0.75rem !important;
@@ -1297,5 +1326,29 @@ onMounted(() => {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ===== 自訂分頁（與 ProductManage 統一）===== */
+.pagination-custom .page-link {
+  border: none;
+  color: #64748B;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.5rem;
+  margin: 0 2px;
+  transition: all 0.2s ease;
+}
+.pagination-custom .page-link:hover {
+  background: #F0F9FF;
+  color: var(--brand-sky);
+}
+.pagination-custom .active .page-link {
+  background: var(--brand-sky);
+  color: white;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+}
+.pagination-custom .disabled .page-link {
+  color: #CBD5E1;
 }
 </style>

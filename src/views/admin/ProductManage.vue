@@ -268,9 +268,7 @@ function onImageError(e) {
   <div class="product-manage">
     <!-- ====== 頁面標題 ====== -->
     <div class="mb-4">
-      <h2 class="fw-bold mb-1" style="font-size: 1.5rem">
-        <i class="bi bi-box-seam me-2" style="color: var(--brand-sky)"></i>商品管理
-      </h2>
+      <h2 class="page-title"><i class="bi bi-box-seam"></i> 商品管理</h2>
       <p class="text-secondary mb-0" style="font-size: 1.1rem">
         管理 {{ filterSummary }}商品，共 {{ totalCount }} 件商品
         <span v-if="filteredCount !== totalCount">，篩選結果 {{ filteredCount }} 件</span>
@@ -368,8 +366,8 @@ function onImageError(e) {
                 </li>
               </ul>
             </div>
-            <button class="btn btn-brand btn-brand-admin w-auto text-nowrap flex-shrink-0" @click="openCreate">
-              <i class="bi bi-plus-lg me-1"></i>新增商品
+            <button class="btn-add text-nowrap flex-shrink-0" @click="openCreate">
+              <i class="bi bi-plus-lg"></i> 新增商品
             </button>
             </div>
           </div>
@@ -710,6 +708,35 @@ function onImageError(e) {
   --brand-card-radius: 0.5rem;
   --brand-card-radius-lg: 0.75rem;
 }
+
+/* ===== 頁面標題（與職員管理統一）===== */
+.page-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+.page-title i {
+  margin-right: 0.4rem;
+}
+
+/* ===== 新增按鈕（與職員管理統一）===== */
+.btn-add {
+  padding: 0.65rem 1.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: #00B4B4;
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-add:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+}
+
 .btn-brand-admin {
   border-radius: 0.5rem;
 }

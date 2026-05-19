@@ -219,7 +219,7 @@ function onImgZoomLeave() {
 
     <!-- ====== Hero ====== -->
     <div class="browse-hero">
-      <img src="/images/product/product_banner.png" alt="天晴商城 精選羽球商品" class="browse-hero-img" />
+      <img src="/banner/product_banner.png" alt="天晴商城 精選羽球商品" class="browse-hero-img" />
     </div>
 
     <!-- ====== 商品 Grid ====== -->

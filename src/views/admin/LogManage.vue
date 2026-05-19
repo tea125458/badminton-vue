@@ -357,8 +357,8 @@ onUnmounted(() => {
   <div class="log-manage">
     <!-- 頁面標題 -->
     <div class="mb-4">
-      <h2 class="fw-bold title-standard">
-        <i class="bi bi-clock-history me-2" style="color: var(--brand-sky)"></i>操作日誌
+      <h2 class="page-title">
+        <i class="bi bi-clock-history"></i> 操作日誌
       </h2>
     </div>
 
@@ -698,12 +698,15 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.title-standard {
+/* ===== 頁面標題（與職員管理統一）===== */
+.page-title {
+  margin: 0;
   font-size: 1.6rem;
   font-weight: 700;
   color: #1e293b;
-  font-family: 'Inter', 'Noto Sans TC', sans-serif;
-  margin: 0;
+}
+.page-title i {
+  margin-right: 0.4rem;
 }
 .log-row {
   transition: background-color 0.15s ease;

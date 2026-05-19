@@ -77,8 +77,8 @@ onMounted(() => {
   <div>
     <!-- 頁面標題 -->
     <div class="mb-4">
-      <h2 class="fw-bold mb-1" style="font-size: 1.5rem;">
-        <i class="bi bi-bar-chart-line me-2" style="color: var(--brand-sky);"></i>數據儀表板
+      <h2 style="margin: 0; font-size: 1.6rem; font-weight: 700; color: #1e293b;">
+        <i class="bi bi-bar-chart-line" style="margin-right: 0.4rem;"></i>數據儀表板
       </h2>
       <p class="text-secondary mb-0" style="font-size: 0.85rem;">
         系統運營數據總覽，資料每 5 分鐘自動更新

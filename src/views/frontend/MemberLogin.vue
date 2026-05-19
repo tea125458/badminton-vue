@@ -68,10 +68,10 @@ async function handleGoogleLogin(response) {
   try {
     isLoading.value = true
     errorMsg.value = ''
-    
+
     // 將 Google 提供的 credential 送到後端驗證並登入/註冊
     const res = await memberApi.googleLogin(response.credential)
-    
+
     localStorage.setItem('memberToken', res.token)
     localStorage.setItem('memberInfo', JSON.stringify(res.member))
     memberStore.login(res.token, res.member)
@@ -90,100 +90,122 @@ async function handleGoogleLogin(response) {
     <div class="container py-4 d-flex justify-content-center">
       <!-- 登入卡片 -->
       <div class="login-card card-rounded shadow-sm">
-            <!-- Header -->
-            <div class="text-center mb-2">
-              <div class="brand-icon-circle mx-auto mb-2">
-                <img src="@/assets/images/brand-logo.png" alt="Logo" style="width: 48px; height: 48px; object-fit: contain;" />
-              </div>
-              <h2 class="fw-bold text-gradient mb-1">會員登入</h2>
-              <p class="text-muted small tracking-wider mb-0">MEMBER LOGIN</p>
+        <!-- Header -->
+        <div class="text-center mb-2">
+          <div class="brand-icon-circle mx-auto mb-2">
+            <img
+              src="@/assets/images/brand-logo.png"
+              alt="Logo"
+              style="width: 60px; height: 60px; object-fit: contain"
+            />
+          </div>
+          <h2 class="fw-bold text-gradient mb-1">會員登入</h2>
+          <p class="text-muted small tracking-wider mb-0">MEMBER LOGIN</p>
+        </div>
+
+        <!-- Error Message -->
+        <div
+          v-if="errorMsg"
+          class="alert alert-danger d-flex align-items-center gap-2 py-2 px-3 rounded-3 mb-4"
+          role="alert"
+        >
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span class="small">{{ errorMsg }}</span>
+        </div>
+
+        <!-- Success Message -->
+        <div
+          v-if="successMsg"
+          class="alert alert-success d-flex align-items-center gap-2 py-2 px-3 rounded-3"
+          role="alert"
+          style="background-color: #ecfdf5; border-color: #a7f3d0; color: #059669"
+        >
+          <i class="bi bi-check-circle-fill"></i>
+          <span class="small fw-bold">{{ successMsg }}</span>
+        </div>
+
+        <!-- Login Form -->
+        <form @submit.prevent="handleLogin">
+          <!-- 帳號 -->
+          <div class="mb-3">
+            <div class="input-wrapper">
+              <i class="bi bi-person input-icon"></i>
+              <input
+                v-model="username"
+                type="text"
+                placeholder="帳號"
+                autocomplete="username"
+                autofocus
+              />
             </div>
+          </div>
 
-            <!-- Error Message -->
-            <div v-if="errorMsg" class="alert alert-danger d-flex align-items-center gap-2 py-2 px-3 rounded-3 mb-4" role="alert">
-              <i class="bi bi-exclamation-triangle-fill"></i>
-              <span class="small">{{ errorMsg }}</span>
-            </div>
-
-            <!-- Success Message -->
-            <div v-if="successMsg" class="alert alert-success d-flex align-items-center gap-2 py-2 px-3 rounded-3" role="alert" style="background-color: #ECFDF5; border-color: #A7F3D0; color: #059669;">
-              <i class="bi bi-check-circle-fill"></i>
-              <span class="small fw-bold">{{ successMsg }}</span>
-            </div>
-
-            <!-- Login Form -->
-            <form @submit.prevent="handleLogin">
-              <!-- 帳號 -->
-              <div class="mb-3">
-                <div class="input-wrapper">
-                  <i class="bi bi-person input-icon"></i>
-                  <input
-                    v-model="username"
-                    type="text"
-                    placeholder="帳號"
-                    autocomplete="username"
-                    autofocus
-                  />
-                </div>
-              </div>
-
-              <!-- 密碼 -->
-              <div class="mb-3">
-                <div class="input-wrapper">
-                  <i class="bi bi-lock input-icon"></i>
-                  <input
-                    v-model="password"
-                    :type="showPassword ? 'text' : 'password'"
-                    placeholder="密碼"
-                    autocomplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    class="toggle-pwd"
-                    @click="showPassword = !showPassword"
-                    tabindex="-1"
-                  >
-                    <i :class="showPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
-                  </button>
-                </div>
-              </div>
-
-              <button type="submit" class="btn btn-brand w-100 py-2 fw-bold mt-1" :disabled="isLoading">
-                <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status"></span>
-                <span v-if="isLoading">登入中...</span>
-                <span v-else><i class="bi bi-box-arrow-in-right me-2"></i>登入</span>
+          <!-- 密碼 -->
+          <div class="mb-3">
+            <div class="input-wrapper">
+              <i class="bi bi-lock input-icon"></i>
+              <input
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="密碼"
+                autocomplete="current-password"
+              />
+              <button
+                type="button"
+                class="toggle-pwd"
+                @click="showPassword = !showPassword"
+                tabindex="-1"
+              >
+                <i :class="showPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
               </button>
-
-              <button type="button" class="btn btn-outline-secondary w-100 py-1 fw-semibold border-dashed" @click="quickFill" style="margin-top: 6px;">
-                <i class="bi bi-lightning-fill text-warning me-1"></i>一鍵登入
-              </button>
-            </form>
-
-            <div class="d-flex align-items-center my-3">
-              <hr class="flex-grow-1 text-muted">
-              <span class="mx-2 text-muted small">或</span>
-              <hr class="flex-grow-1 text-muted">
             </div>
+          </div>
 
-            <!-- Google Login Button -->
-            <div class="d-flex justify-content-center mb-1">
-              <GoogleLogin :callback="handleGoogleLogin" prompt />
-            </div>
+          <button type="submit" class="btn btn-brand w-100 py-2 fw-bold mt-1" :disabled="isLoading">
+            <span
+              v-if="isLoading"
+              class="spinner-border spinner-border-sm me-2"
+              role="status"
+            ></span>
+            <span v-if="isLoading">登入中...</span>
+            <span v-else><i class="bi bi-box-arrow-in-right me-2"></i>登入</span>
+          </button>
 
-            <!-- 忘記密碼 -->
-            <div class="text-center mt-3" style="margin-top: 15px;">
-              <RouterLink to="/reset-password" class="forgot-link small text-decoration-none">
-                忘記密碼？
-              </RouterLink>
-            </div>
+          <button
+            type="button"
+            class="btn btn-outline-secondary w-100 py-1 fw-semibold border-dashed"
+            @click="quickFill"
+            style="margin-top: 6px"
+          >
+            <i class="bi bi-lightning-fill text-warning me-1"></i>一鍵登入
+          </button>
+        </form>
 
-            <!-- Footer -->
-            <div class="text-center mt-3 pt-2 border-top" style="margin-top: 15px !important;">
-              <span class="text-muted small">還不是會員？</span>
-              <RouterLink to="/register" class="register-link fw-bold small text-decoration-none ms-1">
-                立即註冊
-              </RouterLink>
-            </div>
+        <div class="d-flex align-items-center my-3">
+          <hr class="flex-grow-1 text-muted" />
+          <span class="mx-2 text-muted small">或</span>
+          <hr class="flex-grow-1 text-muted" />
+        </div>
+
+        <!-- Google Login Button -->
+        <div class="d-flex justify-content-center mb-1">
+          <GoogleLogin :callback="handleGoogleLogin" prompt />
+        </div>
+
+        <!-- 忘記密碼 -->
+        <div class="text-center mt-3" style="margin-top: 15px">
+          <RouterLink to="/reset-password" class="forgot-link small text-decoration-none">
+            忘記密碼？
+          </RouterLink>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-3 pt-2 border-top" style="margin-top: 15px !important">
+          <span class="text-muted small">還不是會員？</span>
+          <RouterLink to="/register" class="register-link fw-bold small text-decoration-none ms-1">
+            立即註冊
+          </RouterLink>
+        </div>
       </div>
     </div>
   </div>
@@ -223,8 +245,14 @@ async function handleGoogleLogin(response) {
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .brand-icon-circle {
@@ -250,28 +278,39 @@ async function handleGoogleLogin(response) {
 }
 
 .alert-danger {
-  background-color: #FEF2F2;
-  border: 1px solid #FECACA;
-  color: #DC2626;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
   animation: shake 0.4s ease-in-out;
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-6px); }
-  75% { transform: translateX(6px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-6px);
+  }
+  75% {
+    transform: translateX(6px);
+  }
 }
 
-.forgot-link, .register-link {
+.forgot-link,
+.register-link {
   color: #14b8a6; /* 帶有一點藍色調的活力湖水綠 */
-  transition: color 0.2s, opacity 0.2s;
+  transition:
+    color 0.2s,
+    opacity 0.2s;
 }
 
 .forgot-link {
   font-weight: 600;
 }
 
-.forgot-link:hover, .register-link:hover {
+.forgot-link:hover,
+.register-link:hover {
   opacity: 0.7;
   color: var(--brand-teal);
   text-decoration: none !important;
@@ -287,7 +326,7 @@ async function handleGoogleLogin(response) {
   left: 1.1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #94A3B8;
+  color: #94a3b8;
   font-size: 0.95rem;
   pointer-events: none;
   z-index: 5;
@@ -296,22 +335,22 @@ async function handleGoogleLogin(response) {
 .input-wrapper input {
   width: 100%;
   padding: 0.78rem 1rem 0.78rem 2.6rem;
-  border: 1px solid #E2E8F0;
+  border: 1px solid #e2e8f0;
   border-radius: 0.65rem;
   font-size: 0.92rem;
-  color: #1E293B;
-  background: #F1F5F9;
+  color: #1e293b;
+  background: #f1f5f9;
   transition: all 0.2s ease;
   outline: none;
 }
 
 .input-wrapper input::placeholder {
-  color: #94A3B8;
+  color: #94a3b8;
   font-weight: 500;
 }
 
 .input-wrapper input:focus {
-  border-color: #93C5FD;
+  border-color: #93c5fd;
   background: white;
   box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.18);
 }
@@ -323,7 +362,7 @@ async function handleGoogleLogin(response) {
   transform: translateY(-50%);
   border: none;
   background: none;
-  color: #94A3B8;
+  color: #94a3b8;
   cursor: pointer;
   padding: 0.25rem;
   font-size: 0.95rem;
@@ -332,6 +371,6 @@ async function handleGoogleLogin(response) {
 }
 
 .toggle-pwd:hover {
-  color: #64748B;
+  color: #64748b;
 }
 </style>

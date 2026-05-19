@@ -68,7 +68,7 @@ async function handleLogin() {
         <img
           src="@/assets/images/brand-logo.png"
           alt="Logo"
-          style="width: 55px; height: 55px; object-fit: contain"
+          style="width: 80px; height: 80px; object-fit: contain"
         />
       </div>
 
@@ -198,13 +198,12 @@ async function handleLogin() {
 
 /* ----- 頂部羽毛 Icon ----- */
 .card-icon {
-  width: 60px;
-  height: 60px;
+  width: 80px;
+  height: 80px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1.5rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
   font-size: 1.6rem;
   color: #64748B;
 }

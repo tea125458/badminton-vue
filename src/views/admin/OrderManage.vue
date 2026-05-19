@@ -723,13 +723,11 @@ function getInvoiceTypeText(order) {
     <!-- ====== 頁面標題 & 新增按鈕 ====== -->
     <div class="d-flex justify-content-between align-items-center mb-3">
       <div>
-        <h2 class="fw-bold mb-0" style="font-size: 1.5rem">
-          <i class="bi bi-receipt me-2" style="color: var(--brand-sky)"></i>訂單管理
-        </h2>
+        <h2 class="page-title"><i class="bi bi-receipt"></i> 訂單管理</h2>
       </div>
       <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-brand" @click="openCreateOrder">
-          <i class="bi bi-plus-lg me-1"></i>新增訂單
+        <button class="btn-add" @click="openCreateOrder">
+          <i class="bi bi-plus-lg"></i> 新增訂單
         </button>
         <!-- 匯出下拉選單 -->
         <div class="export-dropdown-wrap" style="position: relative">
@@ -1687,6 +1685,34 @@ function getInvoiceTypeText(order) {
 </template>
 
 <style scoped>
+/* ===== 頁面標題（與職員管理統一）===== */
+.page-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+.page-title i {
+  margin-right: 0.4rem;
+}
+
+/* ===== 新增按鈕（與職員管理統一）===== */
+.btn-add {
+  padding: 0.65rem 1.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: #00B4B4;
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-add:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+}
+
 /* 覆寫圓角 — 與 ProductManage 統一 */
 .card-rounded {
   border-radius: 0.75rem !important;

@@ -400,9 +400,7 @@ function handleExport(format) {
 <template>
   <!-- 頁面標題 + 搜尋列 + 新增按鈕 -->
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0" style="font-size: 1.5rem">
-      <i class="bi bi-calendar-check me-2" style="color: var(--brand-sky)"></i>預約管理
-    </h2>
+    <h2 class="page-title"><i class="bi bi-calendar-check"></i> 預約管理</h2>
     <div class="d-flex gap-2 align-items-center">
       <!-- 匯出按鈕 -->
       <div class="dropdown">
@@ -446,8 +444,8 @@ function handleExport(format) {
       <button class="btn btn-outline-danger" v-if="searchKeyword" @click="clearSearch">
         <i class="bi bi-x-lg"></i>
       </button>
-      <button class="btn btn-primary" @click="openCreateModal">
-        <i class="bi bi-plus-lg me-1"></i>新增預約
+      <button class="btn-add" @click="openCreateModal">
+        <i class="bi bi-plus-lg"></i> 新增預約
       </button>
     </div>
   </div>
@@ -593,19 +591,25 @@ function handleExport(format) {
   </div>
 
   <!-- 分頁 -->
-  <nav v-if="totalPages > 1" class="d-flex justify-content-center mt-3">
-    <ul class="pagination">
-      <!-- 上一頁 -->
+  <nav v-if="totalPages > 1" class="d-flex justify-content-center mt-4">
+    <ul class="pagination pagination-custom">
       <li class="page-item" :class="{ disabled: currentPage === 1 }">
-        <a class="page-link" href="#" @click.prevent="goToPage(currentPage - 1)">‹</a>
+        <button class="page-link" @click="goToPage(currentPage - 1)">
+          <i class="bi bi-chevron-left"></i>
+        </button>
       </li>
-      <!-- 頁碼 -->
-      <li class="page-item" v-for="p in totalPages" :key="p" :class="{ active: p === currentPage }">
-        <a class="page-link" href="#" @click.prevent="goToPage(p)">{{ p }}</a>
+      <li
+        v-for="p in totalPages"
+        :key="p"
+        class="page-item"
+        :class="{ active: p === currentPage }"
+      >
+        <button class="page-link" @click="goToPage(p)">{{ p }}</button>
       </li>
-      <!-- 下一頁 -->
       <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-        <a class="page-link" href="#" @click.prevent="goToPage(currentPage + 1)">›</a>
+        <button class="page-link" @click="goToPage(currentPage + 1)">
+          <i class="bi bi-chevron-right"></i>
+        </button>
       </li>
     </ul>
   </nav>
@@ -791,6 +795,34 @@ function handleExport(format) {
 </template>
 
 <style scoped>
+/* ===== 頁面標題（與職員管理統一）===== */
+.page-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+.page-title i {
+  margin-right: 0.4rem;
+}
+
+/* ===== 新增按鈕（與職員管理統一）===== */
+.btn-add {
+  padding: 0.65rem 1.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: #00B4B4;
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-add:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+}
+
 /* 覆寫圓角 — 與 ProductManage 統一 */
 .card-rounded {
   border-radius: 0.75rem !important;
@@ -886,5 +918,29 @@ function handleExport(format) {
   background: #ef4444;
   color: white;
   border-color: #ef4444;
+}
+
+/* ===== 自訂分頁（與 ProductManage 統一）===== */
+.pagination-custom .page-link {
+  border: none;
+  color: #64748B;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.5rem;
+  margin: 0 2px;
+  transition: all 0.2s ease;
+}
+.pagination-custom .page-link:hover {
+  background: #F0F9FF;
+  color: var(--brand-sky);
+}
+.pagination-custom .active .page-link {
+  background: var(--brand-sky);
+  color: white;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+}
+.pagination-custom .disabled .page-link {
+  color: #CBD5E1;
 }
 </style>
