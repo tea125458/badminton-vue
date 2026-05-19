@@ -134,8 +134,8 @@ const menuGroups = [
 }
 
 .brand-logo {
-  width: 36px;
-  height: 36px;
+  width: 25px;
+  height: 25px;
   object-fit: contain;
   flex-shrink: 0;
 }

@@ -5,13 +5,13 @@
  * smash2.jpg 全幅背景 + 暗色漸層遮罩 + 大字標題 + CTA
  * 底部帶有向下滾動提示動畫
  */
-const bgImg = '/images/index/smash2.jpg'
+const bgImg = '/images/index/HeroPicSunset4.png'
 
 function scrollToContent() {
   const hero = document.querySelector('.hero-section')
   if (hero) {
     window.scrollTo({
-      top: hero.offsetHeight - 64,   // 減去 navbar 高度
+      top: hero.offsetHeight - 64, // 減去 navbar 高度
       behavior: 'smooth',
     })
   }
@@ -23,23 +23,9 @@ function scrollToContent() {
     <!-- 背景圖 -->
     <img :src="bgImg" alt="羽球殺球" class="hero-bg" />
 
-    <!-- 漸層遮罩 -->
-    <div class="hero-overlay"></div>
-
-    <!-- 動態粒子裝飾（純 CSS） -->
-    <div class="hero-particles">
-      <span v-for="n in 6" :key="n" class="particle" :class="`p-${n}`"></span>
-    </div>
-
     <!-- 文字內容 -->
     <div class="hero-content">
-      <div class="hero-badge">
-        <i class="bi bi-feather me-1"></i>Clear Skies Badminton
-      </div>
-
-      <h1 class="hero-heading">
-        揮灑汗水，盡享羽球<span class="hero-accent">樂趣</span>
-      </h1>
+      <h1 class="hero-heading">揮灑汗水，盡享羽球<span class="hero-accent">樂趣</span></h1>
 
       <p class="hero-subtitle">
         專業場地、優質設備、熱情球友，讓每一次揮拍都成為美好回憶。<br />
@@ -108,51 +94,49 @@ function scrollToContent() {
 }
 
 @keyframes heroZoom {
-  0%   { transform: scale(1);    }
-  100% { transform: scale(1.08); }
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.08);
+  }
 }
 
-/* 漸層遮罩：左側深色確保文字可讀 */
-.hero-overlay {
+/* ===== 左側漸層遮罩 ===== */
+.hero-section::before {
+  content: '';
   position: absolute;
   inset: 0;
   z-index: 1;
+  /* 多層漸層疊加：深邃藍黑 → 透明，營造電影感 */
   background:
+    /* 左側主遮罩：從深色到透明 */
     linear-gradient(
-      135deg,
-      rgba(0, 0, 0, 0.7) 0%,
-      rgba(0, 0, 0, 0.55) 30%,
-      rgba(0, 0, 0, 0.3) 55%,
-      rgba(0, 0, 0, 0.15) 75%,
-      transparent 100%
-    );
-}
-
-/* 裝飾粒子 */
-.hero-particles {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
+      to right,
+      rgba(8, 20, 36, 0.68) 0%,
+      rgba(10, 25, 47, 0.55) 18%,
+      rgba(12, 30, 55, 0.38) 35%,
+      rgba(15, 38, 65, 0.18) 52%,
+      rgba(20, 45, 75, 0.05) 68%,
+      transparent 82%
+    ),
+    /* 底部微暗，讓滾動提示更清晰 */
+    linear-gradient(to top, rgba(5, 12, 24, 0.35) 0%, rgba(5, 12, 24, 0.1) 12%, transparent 30%),
+    /* 頂部微暗，與 navbar 銜接 */
+    linear-gradient(to bottom, rgba(5, 12, 24, 0.25) 0%, transparent 15%);
   pointer-events: none;
 }
 
-.particle {
+/* 微噪點紋理增加質感 */
+.hero-section::after {
+  content: '';
   position: absolute;
-  border-radius: 50%;
-  background: rgba(94, 234, 212, 0.15);
-  animation: float 12s ease-in-out infinite;
-}
-
-.p-1 { width: 300px; height: 300px; top: -50px;  right: -80px;  animation-delay: 0s; }
-.p-2 { width: 200px; height: 200px; bottom: 10%; left: 60%;     animation-delay: 3s; }
-.p-3 { width: 120px; height: 120px; top: 30%;    right: 15%;    animation-delay: 6s; background: rgba(56, 189, 248, 0.1); }
-.p-4 { width: 80px;  height: 80px;  bottom: 25%; right: 35%;    animation-delay: 2s; }
-.p-5 { width: 150px; height: 150px; top: 60%;    right: 5%;     animation-delay: 8s; background: rgba(56, 189, 248, 0.08); }
-.p-6 { width: 60px;  height: 60px;  top: 15%;    left: 45%;     animation-delay: 4s; }
-
-@keyframes float {
-  0%, 100% { transform: translateY(0) scale(1);   opacity: 0.6; }
-  50%      { transform: translateY(-30px) scale(1.1); opacity: 1;   }
+  inset: 0;
+  z-index: 1;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  pointer-events: none;
 }
 
 /* ===== 文字內容 ===== */
@@ -170,8 +154,14 @@ function scrollToContent() {
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(40px); }
-  to   { opacity: 1; transform: translateY(0);    }
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 品牌標籤 */
@@ -194,7 +184,7 @@ function scrollToContent() {
 
 /* 標題 */
 .hero-heading {
-  font-size: 4rem;
+  font-size: 4.5rem;
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: 0.02em;
@@ -203,7 +193,7 @@ function scrollToContent() {
 }
 
 .hero-accent {
-  background: linear-gradient(135deg, #5EEAD4, #38BDF8);
+  background: linear-gradient(135deg, #5eead4, #38bdf8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -213,7 +203,7 @@ function scrollToContent() {
 .hero-subtitle {
   color: rgba(255, 255, 255, 0.75);
   line-height: 2;
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   margin-bottom: 2rem;
 }
 
@@ -232,9 +222,9 @@ function scrollToContent() {
 }
 
 .stat-number {
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #5EEAD4, #38BDF8);
+  background: linear-gradient(135deg, #5eead4, #38bdf8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -242,7 +232,7 @@ function scrollToContent() {
 }
 
 .stat-label {
-  font-size: 0.85rem;
+  font-size: 1.2rem;
   color: rgba(255, 255, 255, 0.5);
   margin-top: 0.25rem;
 }
@@ -268,7 +258,7 @@ function scrollToContent() {
   font-size: 1.1rem;
   font-weight: 700;
   color: #0f172a;
-  background: linear-gradient(135deg, #5EEAD4, #38BDF8);
+  background: linear-gradient(135deg, #5eead4, #38bdf8);
   border: none;
   border-radius: 0.85rem;
   text-decoration: none;
@@ -306,6 +296,34 @@ function scrollToContent() {
   color: white;
 }
 
+/* ===== 右下角人物插圖 ===== */
+.hero-characters {
+  position: absolute;
+  right: 2%;
+  bottom: 0;
+  z-index: 2;
+  width: 38%;
+  max-width: 580px;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4));
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  animation: slideInRight 1.2s ease 0.5s both;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(60px) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
+}
+
 /* ===== 底部滾動提示 ===== */
 .scroll-hint {
   position: absolute;
@@ -341,15 +359,20 @@ function scrollToContent() {
 }
 
 @keyframes bounce {
-  0%, 100% { transform: translateY(0);   }
-  50%      { transform: translateY(8px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(8px);
+  }
 }
 
 /* ===== 響應式 ===== */
 @media (max-width: 991.98px) {
   .hero-content {
     padding: 0 2.5rem 0 5%;
-    max-width: 75%;
+    max-width: 65%;
   }
 
   .hero-heading {
@@ -366,6 +389,21 @@ function scrollToContent() {
 
   .hero-stats {
     gap: 1.5rem;
+  }
+
+  .hero-characters {
+    width: 38%;
+    bottom: 3rem;
+    right: 1%;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .hero-characters {
+    width: 50%;
+    bottom: 1rem;
+    right: 0;
+    opacity: 0.25;
   }
 }
 
@@ -407,6 +445,11 @@ function scrollToContent() {
 
   .stat-number {
     font-size: 1.4rem;
+  }
+
+  .hero-characters {
+    width: 55%;
+    opacity: 0.2;
   }
 
   .hero-particles {

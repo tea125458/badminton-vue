@@ -14,6 +14,29 @@ const memberStore = useMemberStore()
 const { requestPayment } = useLinePay()
 const showAuthModal = ref(false)
 
+// 自訂提示 Modal
+const modalVisible = ref(false)
+const modalType = ref('success') // 'success' | 'error' | 'warning'
+const modalTitle = ref('')
+const modalMessage = ref('')
+const modalCallback = ref(null)
+
+function showModal(type, title, message, callback = null) {
+  modalType.value = type
+  modalTitle.value = title
+  modalMessage.value = message
+  modalCallback.value = callback
+  modalVisible.value = true
+}
+
+function closeModal() {
+  modalVisible.value = false
+  if (modalCallback.value) {
+    modalCallback.value()
+    modalCallback.value = null
+  }
+}
+
 const currentStep = ref(1) // 目前步驟 (1/2/3)
 
 // 步驟定義
@@ -72,6 +95,17 @@ function slotEndTime(slot) {
   return h.toString().padStart(2, '0') + ':00'
 }
 
+// 判斷時段是否已過（今天的已過時段不可選）
+function isPastSlot(slot) {
+  if (!selectedDate.value) return false
+  const today = new Date()
+  const dateStr = today.toISOString().slice(0, 10) // 'YYYY-MM-DD'
+  if (selectedDate.value !== dateStr) return false // 不是今天→不算過期
+  const slotHour = parseInt(slot)
+  const currentHour = today.getHours()
+  return slotHour <= currentHour // 當前小時以前的時段都算已過
+}
+
 // 篩選出「選中場館」底下的 ACTIVE 球場
 const filteredCourts = computed(() => {
   if (!selectedVenue.value) return []
@@ -105,14 +139,32 @@ async function loadBookedSlots() {
   selectedSlots.value = []
 }
 
-// 點擊時段格子：切換選取/取消
+// 點擊時段格子：切換選取/取消（強制連續時段）
 function toggleSlot(slot) {
   if (bookedSlots.value.includes(slot)) return // 已預約的不能選
+  if (isPastSlot(slot)) return // 已過時段不能選
   const idx = selectedSlots.value.indexOf(slot)
   if (idx >= 0) {
-    selectedSlots.value.splice(idx, 1) // 已選 → 取消
+    // 取消選取：只能取消頭尾，避免中間挖空
+    const sorted = [...selectedSlots.value].sort()
+    if (slot !== sorted[0] && slot !== sorted[sorted.length - 1]) {
+      showModal('warning', '提示', '只能取消首尾時段，不能取消中間的時段')
+      return
+    }
+    selectedSlots.value.splice(idx, 1)
   } else {
-    selectedSlots.value.push(slot) // 未選 → 選取
+    // 新增選取：必須與現有選取區段相鄰
+    if (selectedSlots.value.length > 0) {
+      const sorted = [...selectedSlots.value].sort()
+      const firstH = parseInt(sorted[0])
+      const lastH = parseInt(sorted[sorted.length - 1])
+      const newH = parseInt(slot)
+      if (newH !== firstH - 1 && newH !== lastH + 1) {
+        showModal('warning', '提示', '請選擇連續的時段（不可跳格選取）')
+        return
+      }
+    }
+    selectedSlots.value.push(slot)
   }
   selectedSlots.value.sort() // 保持時間順序
 }
@@ -133,15 +185,15 @@ function onDateChange() {
 // Step 2 → Step 3：驗證後才前進
 function goToConfirm() {
   if (!selectedCourt.value) {
-    alert('請先選擇球場')
+    showModal('warning', '提示', '請先選擇球場')
     return
   }
   if (!selectedDate.value) {
-    alert('請先選擇日期')
+    showModal('warning', '提示', '請先選擇日期')
     return
   }
   if (selectedSlots.value.length === 0) {
-    alert('請至少選擇一個時段')
+    showModal('warning', '提示', '請至少選擇一個時段')
     return
   }
   // 檢查是否已登入，未登入則彈出 AuthModal
@@ -216,7 +268,7 @@ async function processBooking() {
   isSubmitting.value = true
   const payload = {
     court: { courtId: selectedCourt.value.courtId },
-    member: { memberId: memberStore.memberId },
+    // member 由後端從 JWT Token 自動設定，不需前端傳遞
     bookingDate: selectedDate.value,
     startTime: startTime.value,
     endTime: endTime.value,
@@ -235,12 +287,23 @@ async function processBooking() {
       })
     } else {
       // 現金 / 轉帳 / 信用卡(已模擬) → 顯示成功
-      alert('預約成功！🎉')
-      resetBookingState()
-      router.push({ path: '/profile', query: { tab: 'bookings' } })
+      showModal('success', '預約成功！', '請準時前往場館報到！', () => {
+        resetBookingState()
+        router.push({ path: '/profile', query: { tab: 'bookings' } })
+      })
     }
   } catch (error) {
-    alert('預約失敗：' + (error.response?.data || error.message))
+    // 從後端回應中提取可讀錯誤訊息
+    const data = error.response?.data
+    let msg = '系統忙碌中，請稍後再試'
+    if (typeof data === 'string') {
+      msg = data
+    } else if (data?.message) {
+      msg = data.message
+    } else if (error.message) {
+      msg = error.message
+    }
+    showModal('error', '預約失敗', msg)
   } finally {
     isSubmitting.value = false
   }
@@ -385,6 +448,9 @@ function resetBookingState() {
                 <li>營業時間：10:00 ~ 22:00</li>
                 <li>每小時場地費 NT$300</li>
                 <li>提供球拍租借服務（另計費用）</li>
+                <li style="color: #DC2626;">
+                  <i class="bi bi-exclamation-circle me-1"></i>如需取消預約，請於預約日前一天 23:59 前操作，當天恕無法取消
+                </li>
                 <li>
                   <i class="bi bi-geo-alt me-1"></i>{{ selectedVenue?.address }}
                 </li>
@@ -423,7 +489,7 @@ function resetBookingState() {
             </span>
           </label>
           <p v-if="selectedDate && selectedCourt" class="text-secondary" style="font-size: 0.95rem">
-            🟢 可選 / ⬜ 已預約 / 🔵 已選取 ・每小時 NT$300
+            🟢 可選 / ⬜ 已預約 / 🔵 已選取 / ⚫ 已過時段 ・每小時 NT$300
           </p>
           <div v-if="selectedDate && selectedCourt" class="d-flex flex-wrap gap-2">
             <button
@@ -431,11 +497,12 @@ function resetBookingState() {
               :key="slot"
               class="btn slot-btn"
               :class="{
-                'slot-booked': bookedSlots.includes(slot),
-                'slot-selected': selectedSlots.includes(slot),
-                'slot-available': !bookedSlots.includes(slot) && !selectedSlots.includes(slot),
+                'slot-past': isPastSlot(slot),
+                'slot-booked': !isPastSlot(slot) && bookedSlots.includes(slot),
+                'slot-selected': !isPastSlot(slot) && selectedSlots.includes(slot),
+                'slot-available': !isPastSlot(slot) && !bookedSlots.includes(slot) && !selectedSlots.includes(slot),
               }"
-              :disabled="bookedSlots.includes(slot)"
+              :disabled="bookedSlots.includes(slot) || isPastSlot(slot)"
               @click="toggleSlot(slot)"
             >
               {{ slot }}~{{ slotEndTime(slot) }}
@@ -545,7 +612,9 @@ function resetBookingState() {
               </p>
               <ul class="mb-0 text-secondary" style="font-size: 1rem; padding-left: 1.2rem; line-height: 1.8;">
                 <li>請於預約時段前 10 分鐘抵達場館</li>
-                <li>如需取消，請於預約日前一天通知</li>
+                <li style="color: #DC2626;">
+                  <i class="bi bi-exclamation-circle me-1"></i>如需取消預約，請於預約日前一天 23:59 前操作，當天恕無法取消
+                </li>
                 <li>場館提供球拍租借服務（另計費用）</li>
               </ul>
             </div>
@@ -609,6 +678,28 @@ function resetBookingState() {
       @close="showCreditCardModal = false"
       @payment-success="() => { showCreditCardModal = false; processBooking() }"
     />
+    <!-- 自訂提示 Modal -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="modalVisible" class="custom-modal-overlay" @click.self="closeModal">
+          <div class="custom-modal-card">
+            <!-- Icon -->
+            <div class="modal-icon" :class="modalType">
+              <i v-if="modalType === 'success'" class="bi bi-check-lg"></i>
+              <i v-else-if="modalType === 'error'" class="bi bi-x-lg"></i>
+              <i v-else class="bi bi-exclamation-lg"></i>
+            </div>
+            <!-- 文字 -->
+            <h4 class="modal-title">{{ modalTitle }}</h4>
+            <p class="modal-message">{{ modalMessage }}</p>
+            <!-- 按鈕 -->
+            <button class="btn-modal-confirm" :class="modalType" @click="closeModal">
+              {{ modalType === 'success' ? '太棒了' : '我知道了' }}
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -690,6 +781,15 @@ function resetBookingState() {
   border: 2px solid #e2e8f0;
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.slot-past {
+  background-color: #e2e8f0;
+  color: #94a3b8;
+  border: 2px solid #cbd5e1;
+  cursor: not-allowed;
+  opacity: 0.5;
+  text-decoration: line-through;
 }
 
 /* ----- 付款方式 ----- */
@@ -786,5 +886,121 @@ function resetBookingState() {
   color: #94a3b8;
   font-size: 0.78rem;
   margin: 0 1px;
+}
+
+/* ===== 自訂提示 Modal ===== */
+.custom-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-modal-card {
+  background: white;
+  border-radius: 1.25rem;
+  padding: 2.5rem 2rem 2rem;
+  text-align: center;
+  width: 90%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  animation: modalBounceIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalBounceIn {
+  from { opacity: 0; transform: scale(0.85) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+  font-size: 2rem;
+}
+
+.modal-icon.success {
+  background: #ECFDF5;
+  color: #10B981;
+  border: 3px solid #A7F3D0;
+}
+
+.modal-icon.error {
+  background: #FEF2F2;
+  color: #EF4444;
+  border: 3px solid #FECACA;
+}
+
+.modal-icon.warning {
+  background: #FFFBEB;
+  color: #F59E0B;
+  border: 3px solid #FDE68A;
+}
+
+.modal-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1E293B;
+  margin-bottom: 0.5rem;
+}
+
+.modal-message {
+  font-size: 0.95rem;
+  color: #64748B;
+  margin-bottom: 1.75rem;
+  line-height: 1.6;
+}
+
+.btn-modal-confirm {
+  display: inline-block;
+  padding: 0.65rem 2.5rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.03em;
+}
+
+.btn-modal-confirm.success {
+  background: linear-gradient(135deg, #10B981, #34D399);
+  color: white;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+}
+
+.btn-modal-confirm.error {
+  background: linear-gradient(135deg, #EF4444, #F87171);
+  color: white;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+}
+
+.btn-modal-confirm.warning {
+  background: linear-gradient(135deg, var(--brand-teal), var(--brand-sky));
+  color: white;
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3);
+}
+
+.btn-modal-confirm:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+
+/* Transition */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
 }
 </style>

@@ -3,7 +3,7 @@
  * 操作日誌管理頁面
  * 顯示系統操作紀錄，支援篩選（操作類型、日期）和關鍵字搜尋
  */
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { systemLogApi } from '@/api/systemLog'
 import { useExport } from '@/composables/useExport'
 import { Bar, Pie } from 'vue-chartjs'
@@ -66,6 +66,7 @@ const filterStartDate = ref('')
 const filterEndDate = ref('')
 const searchKeyword = ref('')
 const showStats = ref(false)
+const showExportMenu = ref(false)
 
 // ===== 分頁狀態 =====
 const currentPage = ref(1)
@@ -102,17 +103,29 @@ function getNormalizedAction(log) {
   }
   
   // 3. 新增
-  if (action === 'CREATE') {
+  if (action === 'ADD_ADMIN' || action === 'ADD_MEMBER') {
+    return action
+  }
+  if (action === 'CREATE') { // 兼容舊資料
     return target === 'ADMIN' ? 'ADD_ADMIN' : 'ADD_MEMBER'
   }
   
-  // 4. 修改 (包含 UPDATE_ 開頭的子動作)
-  if (action === 'UPDATE' || action.startsWith('UPDATE_') || action === 'UPDATE_PROFILE') {
+  // 4. 修改 (包含 UPDATE_PROFILE)
+  if (action === 'UPDATE_ADMIN' || action === 'UPDATE_MEMBER') {
+    return action
+  }
+  if (action === 'UPDATE_PROFILE') {
+    return 'UPDATE_ADMIN'
+  }
+  if (action === 'UPDATE' || action.startsWith('UPDATE_')) { // 兼容舊資料
     return target === 'ADMIN' ? 'UPDATE_ADMIN' : 'UPDATE_MEMBER'
   }
   
   // 5. 刪除
-  if (action === 'DELETE') {
+  if (action === 'DELETE_ADMIN' || action === 'DELETE_MEMBER') {
+    return action
+  }
+  if (action === 'DELETE') { // 兼容舊資料
     return target === 'ADMIN' ? 'DELETE_ADMIN' : 'DELETE_MEMBER'
   }
   
@@ -149,7 +162,11 @@ const chartData = computed(() => {
       const d = new Date(log.createdAt)
       const day = d.getDay()
       const diff = d.getDate() - day + (day === 0 ? -6 : 1) // 調整到週一
-      const monday = new Date(d.setDate(diff)).toISOString().split('T')[0]
+      d.setDate(diff)
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const date = String(d.getDate()).padStart(2, '0')
+      const monday = `${year}-${month}-${date}`
       regByWeek[monday] = (regByWeek[monday] || 0) + 1
 
       // 來源統計
@@ -163,7 +180,7 @@ const chartData = computed(() => {
 
   // 排序週數據 (取最近 8 週)
   const sortedWeeks = Object.keys(regByWeek).sort().slice(-8)
-  const actionLabels_sorted = Object.keys(actionCounts).sort((a, b) => actionCounts[b] - actionCounts[a])
+  const actionLabels_sorted = Object.keys(actionCounts).sort((a, b) => actionCounts[a] - actionCounts[b])
 
   return {
     // 各類型操作 (長條圖)
@@ -178,7 +195,10 @@ const chartData = computed(() => {
     },
     // 每週新增會員 (趨勢圖)
     weeklyReg: {
-      labels: sortedWeeks.map(w => w.slice(5) + ' 週'),
+      labels: sortedWeeks.map(w => {
+        const [m, d] = w.slice(5).split('-')
+        return `${parseInt(m)}/${parseInt(d)} 當週`
+      }),
       datasets: [{
         label: '註冊人數',
         data: sortedWeeks.map(w => regByWeek[w]),
@@ -223,19 +243,29 @@ async function loadLogs() {
   try {
     loading.value = true
     const params = {}
-    if (filterAction.value) params.action = filterAction.value
+    // 不在呼叫後端時過濾操作類型，因為後端無法單憑字串區分 Google 註冊，且 UPDATE_ADMIN 也包含 UPDATE_PROFILE
+    // 統一交由下方的 rawLogs.filter 進行前端精確過濾
+
     if (filterStartDate.value) params.startDate = filterStartDate.value
     if (filterEndDate.value) params.endDate = filterEndDate.value
 
+    let rawLogs = []
     if (searchKeyword.value.trim()) {
-      logs.value = await systemLogApi.searchLogs(searchKeyword.value.trim())
+      rawLogs = await systemLogApi.searchLogs(searchKeyword.value.trim())
     } else {
-      logs.value = await systemLogApi.getLogs(params)
+      rawLogs = await systemLogApi.getLogs(params)
     }
     
-    // 隱藏舊的「查詢」紀錄，不顯示在畫面上
+    // 隱藏舊的「查詢」紀錄
     const hiddenActions = ['READ_LIST', 'READ_DETAIL', 'SEARCH']
-    logs.value = logs.value.filter(log => !hiddenActions.includes(log.action))
+    rawLogs = rawLogs.filter(log => !hiddenActions.includes(log.action))
+    
+    // 如果有選擇特定操作類型，進行前端二次精確過濾 (區分 Admin / Member)
+    if (filterAction.value) {
+      logs.value = rawLogs.filter(log => getNormalizedAction(log) === filterAction.value)
+    } else {
+      logs.value = rawLogs
+    }
     
   } catch (error) {
     console.error('載入日誌失敗:', error)
@@ -309,8 +339,17 @@ function handleExport(format) {
   exportData(getExportData(), format, '操作日誌')
 }
 
+function closeExportMenu() {
+  showExportMenu.value = false
+}
+
 onMounted(() => {
   loadLogs()
+  document.addEventListener('click', closeExportMenu)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeExportMenu)
 })
 </script>
 
@@ -324,7 +363,7 @@ onMounted(() => {
     </div>
 
     <!-- 搜尋與篩選工具列 -->
-    <div class="card card-rounded shadow-sm border-0 mb-4">
+    <div class="card card-rounded shadow-sm border-0 mb-4" style="overflow: visible;">
       <div class="card-body p-3">
         <div class="row g-3 align-items-end">
           <!-- 關鍵字搜尋 (自動加寬) -->
@@ -399,7 +438,7 @@ onMounted(() => {
             <!-- 匯出 (下拉選單) -->
             <div class="dropdown">
               <button
-                class="btn-soft btn-soft-sky px-2 dropdown-toggle hide-caret"
+                class="btn btn-soft btn-soft-sky px-2 dropdown-toggle hide-caret"
                 type="button"
                 data-bs-toggle="dropdown"
                 aria-expanded="false"
@@ -409,7 +448,7 @@ onMounted(() => {
                 <span>匯出</span>
                 <i class="bi bi-chevron-down small ms-1" style="font-size: 0.65rem;"></i>
               </button>
-              <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2 p-2" style="border-radius: 12px;">
+              <ul class="dropdown-menu shadow-sm border-0 mt-2 p-2" style="border-radius: 12px;">
                 <li>
                   <button class="dropdown-item d-flex align-items-center gap-2 rounded-2 py-2" @click="handleExport('EXCEL')">
                     <i class="bi bi-file-earmark-excel text-success"></i> 匯出 Excel
@@ -905,3 +944,4 @@ input[type="date"]::-webkit-datetime-edit-day-field {
   }
 }
 </style>
+
