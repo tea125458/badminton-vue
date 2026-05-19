@@ -95,6 +95,17 @@ function slotEndTime(slot) {
   return h.toString().padStart(2, '0') + ':00'
 }
 
+// 判斷時段是否已過（今天的已過時段不可選）
+function isPastSlot(slot) {
+  if (!selectedDate.value) return false
+  const today = new Date()
+  const dateStr = today.toISOString().slice(0, 10) // 'YYYY-MM-DD'
+  if (selectedDate.value !== dateStr) return false // 不是今天→不算過期
+  const slotHour = parseInt(slot)
+  const currentHour = today.getHours()
+  return slotHour <= currentHour // 當前小時以前的時段都算已過
+}
+
 // 篩選出「選中場館」底下的 ACTIVE 球場
 const filteredCourts = computed(() => {
   if (!selectedVenue.value) return []
@@ -128,14 +139,32 @@ async function loadBookedSlots() {
   selectedSlots.value = []
 }
 
-// 點擊時段格子：切換選取/取消
+// 點擊時段格子：切換選取/取消（強制連續時段）
 function toggleSlot(slot) {
   if (bookedSlots.value.includes(slot)) return // 已預約的不能選
+  if (isPastSlot(slot)) return // 已過時段不能選
   const idx = selectedSlots.value.indexOf(slot)
   if (idx >= 0) {
-    selectedSlots.value.splice(idx, 1) // 已選 → 取消
+    // 取消選取：只能取消頭尾，避免中間挖空
+    const sorted = [...selectedSlots.value].sort()
+    if (slot !== sorted[0] && slot !== sorted[sorted.length - 1]) {
+      showModal('warning', '提示', '只能取消首尾時段，不能取消中間的時段')
+      return
+    }
+    selectedSlots.value.splice(idx, 1)
   } else {
-    selectedSlots.value.push(slot) // 未選 → 選取
+    // 新增選取：必須與現有選取區段相鄰
+    if (selectedSlots.value.length > 0) {
+      const sorted = [...selectedSlots.value].sort()
+      const firstH = parseInt(sorted[0])
+      const lastH = parseInt(sorted[sorted.length - 1])
+      const newH = parseInt(slot)
+      if (newH !== firstH - 1 && newH !== lastH + 1) {
+        showModal('warning', '提示', '請選擇連續的時段（不可跳格選取）')
+        return
+      }
+    }
+    selectedSlots.value.push(slot)
   }
   selectedSlots.value.sort() // 保持時間順序
 }
@@ -239,7 +268,7 @@ async function processBooking() {
   isSubmitting.value = true
   const payload = {
     court: { courtId: selectedCourt.value.courtId },
-    member: { memberId: memberStore.memberId },
+    // member 由後端從 JWT Token 自動設定，不需前端傳遞
     bookingDate: selectedDate.value,
     startTime: startTime.value,
     endTime: endTime.value,
@@ -419,6 +448,9 @@ function resetBookingState() {
                 <li>營業時間：10:00 ~ 22:00</li>
                 <li>每小時場地費 NT$300</li>
                 <li>提供球拍租借服務（另計費用）</li>
+                <li style="color: #DC2626;">
+                  <i class="bi bi-exclamation-circle me-1"></i>如需取消預約，請於預約日前一天 23:59 前操作，當天恕無法取消
+                </li>
                 <li>
                   <i class="bi bi-geo-alt me-1"></i>{{ selectedVenue?.address }}
                 </li>
@@ -457,7 +489,7 @@ function resetBookingState() {
             </span>
           </label>
           <p v-if="selectedDate && selectedCourt" class="text-secondary" style="font-size: 0.95rem">
-            🟢 可選 / ⬜ 已預約 / 🔵 已選取 ・每小時 NT$300
+            🟢 可選 / ⬜ 已預約 / 🔵 已選取 / ⚫ 已過時段 ・每小時 NT$300
           </p>
           <div v-if="selectedDate && selectedCourt" class="d-flex flex-wrap gap-2">
             <button
@@ -465,11 +497,12 @@ function resetBookingState() {
               :key="slot"
               class="btn slot-btn"
               :class="{
-                'slot-booked': bookedSlots.includes(slot),
-                'slot-selected': selectedSlots.includes(slot),
-                'slot-available': !bookedSlots.includes(slot) && !selectedSlots.includes(slot),
+                'slot-past': isPastSlot(slot),
+                'slot-booked': !isPastSlot(slot) && bookedSlots.includes(slot),
+                'slot-selected': !isPastSlot(slot) && selectedSlots.includes(slot),
+                'slot-available': !isPastSlot(slot) && !bookedSlots.includes(slot) && !selectedSlots.includes(slot),
               }"
-              :disabled="bookedSlots.includes(slot)"
+              :disabled="bookedSlots.includes(slot) || isPastSlot(slot)"
               @click="toggleSlot(slot)"
             >
               {{ slot }}~{{ slotEndTime(slot) }}
@@ -579,7 +612,9 @@ function resetBookingState() {
               </p>
               <ul class="mb-0 text-secondary" style="font-size: 1rem; padding-left: 1.2rem; line-height: 1.8;">
                 <li>請於預約時段前 10 分鐘抵達場館</li>
-                <li>如需取消，請於預約日前一天通知</li>
+                <li style="color: #DC2626;">
+                  <i class="bi bi-exclamation-circle me-1"></i>如需取消預約，請於預約日前一天 23:59 前操作，當天恕無法取消
+                </li>
                 <li>場館提供球拍租借服務（另計費用）</li>
               </ul>
             </div>
@@ -746,6 +781,15 @@ function resetBookingState() {
   border: 2px solid #e2e8f0;
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.slot-past {
+  background-color: #e2e8f0;
+  color: #94a3b8;
+  border: 2px solid #cbd5e1;
+  cursor: not-allowed;
+  opacity: 0.5;
+  text-decoration: line-through;
 }
 
 /* ----- 付款方式 ----- */

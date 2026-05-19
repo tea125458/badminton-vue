@@ -382,7 +382,7 @@ async function cancelBooking(booking) {
       showModal('success', '已取消', '預約已成功取消！')
       loadBookings()
     } catch (err) {
-      showModal('error', '取消失敗', err.response?.data || err.message)
+      showModal('error', '取消失敗', err.response?.data?.message || err.response?.data || err.message)
     }
   })
 }

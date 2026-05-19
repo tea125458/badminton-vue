@@ -8,7 +8,9 @@ export const bookingApi = {
   findAll: () => api.get('/bookings'),
   findById: (id) => api.get(`/bookings/${id}`),
   create: (booking) => api.post('/bookings', booking),
+  update: (id, booking) => api.put(`/bookings/${id}`, booking),
   updateStatus: (id, status) => api.patch(`/bookings/${id}/status`, { status }),
+  delete: (id) => api.delete(`/bookings/${id}`),
   search: (keyword) => api.get('/bookings/search', { params: { keyword } }),
   // GET /api/bookings/court/5/date/2026-05-15 — 查詢某球場某天的預約
   findByCourtAndDate: (courtId, date) => api.get(`/bookings/court/${courtId}/date/${date}`),
