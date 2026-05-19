@@ -95,7 +95,7 @@ async function handleGoogleLogin(response) {
             <!-- Header -->
             <div class="text-center mb-2">
               <div class="brand-icon-circle mx-auto mb-2">
-                <i class="bi bi-feather"></i>
+                <img src="@/assets/images/brand-logo.png" alt="Logo" style="width: 48px; height: 48px; object-fit: contain;" />
               </div>
               <h2 class="fw-bold text-gradient mb-1">會員登入</h2>
               <p class="text-muted small tracking-wider mb-0">BADMINTON MEMBER LOGIN</p>
@@ -217,13 +217,9 @@ async function handleGoogleLogin(response) {
 .brand-icon-circle {
   width: 56px;
   height: 56px;
-  border-radius: 1rem;
-  background: linear-gradient(135deg, var(--brand-sky), var(--brand-teal));
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 1.5rem;
 }
 
 .form-control:focus {

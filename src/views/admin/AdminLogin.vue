@@ -65,7 +65,11 @@ async function handleLogin() {
     <div class="login-card">
       <!-- 羽毛 icon -->
       <div class="card-icon">
-        <i class="bi bi-feather"></i>
+        <img
+          src="@/assets/images/brand-logo.png"
+          alt="Logo"
+          style="width: 55px; height: 55px; object-fit: contain"
+        />
       </div>
 
       <h1 class="card-title">管理員登入</h1>
@@ -154,7 +158,9 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(rgba(255,255,255,0.45), rgba(255,255,255,0.45)), url('/images/sky-bg.png') center / cover no-repeat fixed;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.45)),
+    url('/static/sky-bg.png') center / cover no-repeat fixed;
   position: relative;
   padding: 1rem;
 }
@@ -179,23 +185,24 @@ async function handleLogin() {
 }
 
 @keyframes cardIn {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ----- 頂部羽毛 Icon ----- */
 .card-icon {
   width: 60px;
   height: 60px;
-  border-radius: 1rem;
-  background: white;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1.25rem;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-  font-size: 1.6rem;
-  color: #64748B;
 }
 
 .card-title {
@@ -208,7 +215,7 @@ async function handleLogin() {
 
 .card-desc {
   font-size: 0.82rem;
-  color: #94A3B8;
+  color: #94a3b8;
   margin-bottom: 1.75rem;
   font-weight: 500;
 }
@@ -221,19 +228,26 @@ async function handleLogin() {
   gap: 0.4rem;
   padding: 0.6rem 1rem;
   border-radius: 0.65rem;
-  background: #FEF2F2;
-  color: #EF4444;
+  background: #fef2f2;
+  color: #ef4444;
   font-size: 0.82rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  border: 1px solid #FEE2E2;
+  border: 1px solid #fee2e2;
   animation: shake 0.4s ease;
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
 }
 
 /* ----- 表單欄位 ----- */
@@ -251,7 +265,7 @@ async function handleLogin() {
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #94A3B8;
+  color: #94a3b8;
   font-size: 0.9rem;
   pointer-events: none;
 }
@@ -259,22 +273,22 @@ async function handleLogin() {
 .input-wrapper input {
   width: 100%;
   padding: 0.78rem 1rem 0.78rem 2.6rem;
-  border: 1px solid #E2E8F0;
+  border: 1px solid #e2e8f0;
   border-radius: 0.65rem;
   font-size: 0.9rem;
-  color: #1E293B;
-  background: #F1F5F9;
+  color: #1e293b;
+  background: #f1f5f9;
   transition: all 0.2s ease;
   outline: none;
 }
 
 .input-wrapper input::placeholder {
-  color: #94A3B8;
+  color: #94a3b8;
   font-weight: 500;
 }
 
 .input-wrapper input:focus {
-  border-color: #93C5FD;
+  border-color: #93c5fd;
   background: white;
   box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.18);
 }
@@ -290,7 +304,7 @@ async function handleLogin() {
   transform: translateY(-50%);
   border: none;
   background: none;
-  color: #94A3B8;
+  color: #94a3b8;
   cursor: pointer;
   padding: 0.25rem;
   font-size: 0.95rem;
@@ -298,7 +312,7 @@ async function handleLogin() {
 }
 
 .toggle-pwd:hover {
-  color: #64748B;
+  color: #64748b;
 }
 
 /* ----- 登入按鈕 ----- */
@@ -342,10 +356,10 @@ async function handleLogin() {
 .btn-demo {
   flex: 1;
   padding: 0.6rem 0.4rem;
-  border: 1.5px dashed #CBD5E1;
+  border: 1.5px dashed #cbd5e1;
   border-radius: 0.65rem;
   background: transparent;
-  color: #64748B;
+  color: #64748b;
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
@@ -355,12 +369,16 @@ async function handleLogin() {
 
 .btn-demo:hover {
   background: rgba(241, 245, 249, 0.7);
-  color: #1E293B;
-  border-color: #94A3B8;
+  color: #1e293b;
+  border-color: #94a3b8;
 }
 
-.text-warning { color: #FBBF24 !important; }
-.text-info { color: #0EA5E9 !important; }
+.text-warning {
+  color: #fbbf24 !important;
+}
+.text-info {
+  color: #0ea5e9 !important;
+}
 
 /* ----- Loading Spinner ----- */
 .spinner {
@@ -374,7 +392,9 @@ async function handleLogin() {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ----- 底部連結 ----- */
@@ -384,7 +404,7 @@ async function handleLogin() {
 }
 
 .back-link {
-  color: #94A3B8;
+  color: #94a3b8;
   text-decoration: none;
   font-size: 0.82rem;
   font-weight: 600;

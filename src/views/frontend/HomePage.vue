@@ -24,19 +24,27 @@ import HomeCta from '@/components/frontend/HomeCta.vue'
   <div class="home-page">
     <!-- Hero 滿版：不受 container 限制 -->
     <HomeHero />
-    <!-- 公告 + 場館資訊：寬版佈局 -->
-    <div class="news-section py-5">
-      <HomeNewsVideo />
-    </div>
-    <div class="container py-4">
-      <HomeEnvironment />
-      <HomeGuide />
-      <HomeCta />
+    <!-- Hero 以下的主要內容區 — 全寬漸層背景 -->
+    <div class="main-content">
+      <!-- 公告 + 場館資訊：寬版佈局 -->
+      <div class="news-section py-5">
+        <HomeNewsVideo />
+      </div>
+      <div class="container py-4">
+        <HomeEnvironment />
+        <HomeGuide />
+        <HomeCta />
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* ===== Hero 以下的漸層背景帶 ===== */
+.main-content {
+  background: linear-gradient(180deg, #f8fffe 0%, #f0fdfa 15%, #f0f9ff 50%, #faf5ff 85%, #ffffff 100%);
+}
+
 .news-section {
   padding-left: 15%;
   padding-right: 15%;

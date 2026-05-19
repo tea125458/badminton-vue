@@ -91,6 +91,18 @@ function statusClass(status) {
   return map[status] || 'badge-default'
 }
 
+// ========== 日期格式 ==========
+function formatDate(dateStr) {
+  if (!dateStr) return '-'
+  const d = new Date(dateStr)
+  const yyyy = d.getFullYear()
+  const MM = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const HH = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${yyyy}/${MM}/${dd} ${HH}:${mm}`
+}
+
 // ========== 刪除公告 ==========
 async function deleteAnnouncement(item) {
   if (!confirm(`確定要刪除「${item.title}」嗎？`)) return
@@ -118,6 +130,11 @@ async function changeStatus(id, newStatus) {
 const showModal = ref(false)
 const modalTitle = ref('')
 const editId = ref(null)
+const saving = ref(false)
+
+// 圖片上傳狀態
+const imageFile = ref(null)
+const imagePreview = ref('')
 
 //表單欄位
 const form = ref({
@@ -126,7 +143,23 @@ const form = ref({
   category: '',
   status: 'DRAFT',
   isPinned: false,
+  imageUrl: '',
 })
+
+// 圖片選取
+function onImageChange(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  imageFile.value = file
+  imagePreview.value = URL.createObjectURL(file)
+}
+
+// 移除圖片
+function removeImage() {
+  imageFile.value = null
+  imagePreview.value = ''
+  form.value.imageUrl = ''
+}
 
 // 打開新增 Modal
 function openCreateModal() {
@@ -138,7 +171,10 @@ function openCreateModal() {
     category: '',
     status: 'DRAFT',
     isPinned: false,
+    imageUrl: '',
   }
+  imageFile.value = null
+  imagePreview.value = ''
   showModal.value = true
 }
 
@@ -152,7 +188,11 @@ function openEditModal(item) {
     category: item.category || '',
     status: item.status || 'DRAFT',
     isPinned: item.isPinned || false,
+    imageUrl: item.imageUrl || '',
   }
+  imageFile.value = null
+  // 編輯時顯示現有圖片
+  imagePreview.value = item.imageUrl || ''
   showModal.value = true
 }
 
@@ -167,7 +207,13 @@ async function saveAnnouncement() {
     return
   }
 
+  saving.value = true
   try {
+    // 如果有選擇新圖片，先上傳（並刪除舊圖）
+    if (imageFile.value) {
+      const res = await announcementApi.uploadImage(imageFile.value, form.value.imageUrl)
+      form.value.imageUrl = res.imageUrl
+    }
     if (editId.value) {
       await announcementApi.update(editId.value, form.value)
     } else {
@@ -178,6 +224,8 @@ async function saveAnnouncement() {
     loadData()
   } catch (error) {
     alert('操作失敗:' + error.message)
+  } finally {
+    saving.value = false
   }
 }
 </script>
@@ -217,19 +265,21 @@ async function saveAnnouncement() {
         <thead>
           <tr>
             <th class="ps-4">編號</th>
+            <th>圖片</th>
             <th>標題</th>
             <th>發布者</th>
             <th>分類</th>
             <th>置頂</th>
             <th>瀏覽數</th>
             <th>狀態</th>
+            <th>建立時間</th>
             <th style="width: 200px">操作</th>
           </tr>
         </thead>
         <tbody>
           <!-- 載入中 -->
           <tr v-if="loading">
-            <td colspan="8" class="text-center py-4">
+            <td colspan="10" class="text-center py-4">
               <div class="spinner-border spinner-border-sm text-primary me-2"></div>
               載入中...
             </td>
@@ -237,7 +287,7 @@ async function saveAnnouncement() {
 
           <!-- 載入錯誤 -->
           <tr v-else-if="errorMsg">
-            <td colspan="8" class="text-center text-danger py-4">
+            <td colspan="9" class="text-center text-danger py-4">
               <i class="bi bi-exclamation-triangle me-1"></i>{{ errorMsg }}
               <br />
               <button class="btn btn-sm btn-outline-primary mt-2" @click="loadData">重試</button>
@@ -246,7 +296,7 @@ async function saveAnnouncement() {
 
           <!-- 無資料 -->
           <tr v-else-if="filteredAnnouncements.length === 0">
-            <td colspan="8" class="text-center text-muted py-4">
+            <td colspan="9" class="text-center text-muted py-4">
               目前沒有公告資料，請點擊「新增公告」按鈕
             </td>
           </tr>
@@ -254,6 +304,25 @@ async function saveAnnouncement() {
           <!-- 正常渲染資料（注意用 pagedAnnouncements） -->
           <tr v-for="item in pagedAnnouncements" :key="item.announcementId" v-else>
             <td class="ps-4">{{ item.announcementId }}</td>
+            <td>
+              <img
+                v-if="item.imageUrl"
+                :src="
+                  item.imageUrl.startsWith('/') || item.imageUrl.startsWith('http')
+                    ? item.imageUrl
+                    : '/' + item.imageUrl
+                "
+                :alt="item.title"
+                style="
+                  width: 56px;
+                  height: 40px;
+                  object-fit: cover;
+                  border-radius: 0.5rem;
+                  border: 1px solid #e2e8f0;
+                "
+              />
+              <span v-else class="text-muted" style="font-size: 0.8rem">無圖片</span>
+            </td>
             <td>
               <strong>{{ item.title }}</strong>
             </td>
@@ -268,6 +337,9 @@ async function saveAnnouncement() {
               <span class="badge" :class="statusClass(item.status)">
                 {{ statusText(item.status) }}
               </span>
+            </td>
+            <td style="font-size: 0.85rem; white-space: nowrap; color: #64748b;">
+              {{ formatDate(item.createdAt) }}
             </td>
             <td>
               <div class="d-flex gap-1">
@@ -401,11 +473,50 @@ async function saveAnnouncement() {
               </div>
             </div>
           </div>
+          <div class="mb-3">
+            <label class="form-label">公告圖片</label>
+            <div class="announce-upload-area" @click="$refs.announceFileInput.click()">
+              <img
+                v-if="imagePreview"
+                :src="
+                  imagePreview.startsWith('blob:') ||
+                  imagePreview.startsWith('/') ||
+                  imagePreview.startsWith('http')
+                    ? imagePreview
+                    : '/' + imagePreview
+                "
+                class="announce-upload-preview"
+              />
+              <div v-else class="announce-upload-placeholder">
+                <i
+                  class="bi bi-cloud-arrow-up"
+                  style="font-size: 2rem; color: var(--brand-sky)"
+                ></i>
+                <p class="text-secondary mt-1 mb-0" style="font-size: 0.85rem">點擊上傳公告圖片（建議 16:9 比例）</p>
+              </div>
+            </div>
+            <input
+              ref="announceFileInput"
+              type="file"
+              accept="image/*"
+              class="d-none"
+              @change="onImageChange"
+            />
+            <button
+              v-if="imagePreview"
+              type="button"
+              class="btn btn-sm btn-outline-danger mt-2"
+              @click.stop="removeImage"
+            >
+              <i class="bi bi-trash3 me-1"></i>移除圖片
+            </button>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" @click="showModal = false">取消</button>
-          <button type="button" class="btn btn-primary" @click="saveAnnouncement">
-            <i class="bi bi-check-lg me-1"></i>儲存
+          <button type="button" class="btn btn-primary" :disabled="saving" @click="saveAnnouncement">
+            <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+            {{ saving ? '儲存中...' : '儲存' }}
           </button>
         </div>
       </div>
@@ -493,6 +604,37 @@ async function saveAnnouncement() {
 .action-btn-status:hover {
   background: var(--brand-sky, #0ea5e9);
   color: white;
-  border-color: var(--brand-sky, #0ea5e9);
+}
+
+/* ===== 圖片上傳區 ===== */
+.announce-upload-area {
+  border: 2px dashed #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.announce-upload-area:hover {
+  border-color: var(--brand-sky);
+  background: #f0f9ff;
+}
+
+.announce-upload-preview {
+  max-height: 160px;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 0.75rem;
+}
+
+.announce-upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 </style>

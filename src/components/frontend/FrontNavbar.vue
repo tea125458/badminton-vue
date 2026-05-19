@@ -79,7 +79,7 @@ async function handleLogout() {
     <div class="container-fluid px-lg-4">
       <!-- 品牌名稱 -->
       <RouterLink to="/" class="navbar-brand text-gradient">
-        <i class="bi bi-feather me-2"></i>羽過天晴
+        <img src="@/assets/images/brand-logo.png" alt="Logo" class="navbar-brand-logo" />羽過天晴
       </RouterLink>
 
       <!-- 漢堡選單按鈕 (RWD) -->
@@ -178,6 +178,14 @@ async function handleLogout() {
 </template>
 
 <style scoped>
+.navbar-brand-logo {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+
 .dropdown-toggle::after {
   margin-left: 0.25rem;
   font-size: 0.65rem;
