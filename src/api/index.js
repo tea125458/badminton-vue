@@ -41,10 +41,16 @@ api.interceptors.request.use(
     // 自動附加 JWT Token（根據路徑判斷用管理員或會員 Token）
     const url = config.url || ''
     const isAdminApi = url.startsWith('/admins') || url.includes('/api/admins')
+    const isAdminPage = window.location.pathname.startsWith('/admin')
     
-    const token = isAdminApi
-      ? localStorage.getItem('adminToken')
-      : (localStorage.getItem('memberToken') || localStorage.getItem('adminToken'))
+    let token
+    if (isAdminApi || isAdminPage) {
+      // 後台頁面 或 管理員 API → 優先用 adminToken
+      token = localStorage.getItem('adminToken')
+    } else {
+      // 前台頁面 → 優先用 memberToken，沒有的話 fallback 到 adminToken
+      token = localStorage.getItem('memberToken') || localStorage.getItem('adminToken')
+    }
       
     if (token) {
       config.headers.Authorization = `Bearer ${token}`

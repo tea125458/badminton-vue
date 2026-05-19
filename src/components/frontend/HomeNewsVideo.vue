@@ -14,10 +14,9 @@ const loading = ref(true)
 onMounted(async () => {
   try {
     const { data } = await axios.get(`${API}/api/announcements`)
-    // 只取已發布的公告，最新 5 筆
+    // 只取已發布的公告，最新 5 筆（後端已按 置頂優先 → 時間降冪 排序）
     const published = (data.data || data)
       .filter(a => a.status === 'PUBLISHED')
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 5)
     announcements.value = published
   } catch (e) {
@@ -93,8 +92,11 @@ function excerpt(text) {
                 :class="{ active: index === 0 }"
               >
                 <div class="carousel-card position-relative">
-                  <!-- 漸層背景替代圖片 -->
-                  <div class="carousel-bg" :class="`carousel-bg-${index % 3}`"></div>
+                  <!-- 有圖片時顯示實際圖片 -->
+                  <div v-if="item.imageUrl" class="carousel-bg"
+                       :style="{ backgroundImage: `url(${item.imageUrl})` }"></div>
+                  <!-- 無圖片時使用漸層 fallback -->
+                  <div v-else class="carousel-bg" :class="`carousel-bg-${index % 3}`"></div>
                   <!-- 文字覆蓋 -->
                   <div class="carousel-text-overlay">
                     <span class="badge mb-2" :class="badgeClass(item.category)">
@@ -168,6 +170,7 @@ function excerpt(text) {
                 <div class="info-value">
                   <span class="pay-tag">現金</span>
                   <span class="pay-tag">信用卡</span>
+                  <span class="pay-tag">轉帳</span>
                   <span class="pay-tag">LINE Pay</span>
                 </div>
               </div>
