@@ -20,6 +20,47 @@ const manageModalRef = ref(null)
 const managedGame = ref(null)
 const loggedInMemberId = ref(null)
 
+// 🪶 羽毛背景隨機資料（格線分區，確保均勻分散）
+const cols = 4
+const rows = 4
+// 🪶 羽毛背景（固定位置，看起來自然分散）
+const feathers = [
+  { x: 3,  y: 2,  size: 200, opacity: 0.30, rotate: 25  },
+  { x: 28, y: 8,  size: 170, opacity: 0.30, rotate: 140 },
+  { x: 55, y: 5,  size: 190, opacity: 0.30, rotate: 200 },
+  { x: 80, y: 3,  size: 160, opacity: 0.30, rotate: 310 },
+  { x: 8,  y: 25, size: 180, opacity: 0.30, rotate: 75  },
+  { x: 42, y: 22, size: 220, opacity: 0.30, rotate: 160 },
+  { x: 70, y: 28, size: 190, opacity: 0.30, rotate: 240 },
+  { x: 88, y: 24, size: 160, opacity: 0.30, rotate: 50  },
+  { x: 15, y: 55, size: 200, opacity: 0.30, rotate: 120 },
+  { x: 50, y: 60, size: 175, opacity: 0.30, rotate: 280 },
+  { x: 75, y: 65, size: 210, opacity: 0.30, rotate: 15  },
+  { x: 92, y: 70, size: 165, opacity: 0.30, rotate: 190 },
+  { x: 5,  y: 75, size: 195, opacity: 0.30, rotate: 55  },
+  { x: 35, y: 80, size: 180, opacity: 0.30, rotate: 170 },
+  { x: 62, y: 78, size: 205, opacity: 0.30, rotate: 320 },
+  { x: 85, y: 85, size: 170, opacity: 0.30, rotate: 95  },
+  // 🌟 補中間區域
+  { x: 30, y: 42, size: 185, opacity: 0.30, rotate: 210 },
+  { x: 55, y: 48, size: 195, opacity: 0.30, rotate: 330 },
+  { x: 45, y: 68, size: 175, opacity: 0.30, rotate: 80  },
+  { x: 68, y: 50, size: 200, opacity: 0.30, rotate: 145 },
+]
+
+
+for (let row = 0; row < rows; row++) {
+  for (let col = 0; col < cols; col++) {
+    feathers.push({
+      x: (col / cols) * 95 + Math.random() * (95 / cols),
+      y: (row / rows) * 60 + Math.random() * (60 / rows),  // 限制在前60%高度
+      size: 70 + Math.random() * 70,
+      opacity: 0.08 + Math.random() * 0.05,
+      rotate: Math.random() * 360
+    })
+  }
+}
+
 // 進階篩選變數
 const advancedFilters = ref({
   levels: [], // 'BEGINNER', 'INTERMEDIATE', 'ADVANCED'
@@ -82,8 +123,11 @@ const availableGames = computed(() => {
   })
 
   // 🌟 1. 快速日期篩選
-  if (selectedDateFilter.value === '我的開團' && loggedInMemberId.value) {
+if (selectedDateFilter.value === '我的開團' && loggedInMemberId.value) {
     result = result.filter(g => String(g.host?.memberId) === String(loggedInMemberId.value))
+  } else if (selectedDateFilter.value === '我的報名' && loggedInMemberId.value) {
+    // 👉 新增：利用已經存在的 myRegisteredGameIds 陣列來過濾
+    result = result.filter(g => myRegisteredGameIds.value.includes(g.gameId))
   } else if (selectedDateFilter.value === '今天') {
     result = result.filter(g => g.gameDate === getTodayStr())
   } else if (selectedDateFilter.value === '明天') {
@@ -194,6 +238,31 @@ const qvSkillLabel = computed(() => {
   if (!quickViewGame.value) return '不限'
   return skillMap[quickViewGame.value.skillLevel] || '不限'
 })
+// Quick View 專用：動態計算單人費用
+// const qvCalculatedFee = computed(() => {
+//   if (!quickViewGame.value || !quickViewGame.value.startTime || !quickViewGame.value.endTime) return 0
+
+//   const parseTime = (timeStr) => {
+//     const [hours, minutes] = timeStr.split(':').map(Number)
+//     return hours + (minutes / 60)
+//   }
+
+//   const startHours = parseTime(quickViewGame.value.startTime)
+//   const endHours = parseTime(quickViewGame.value.endTime)
+//   const duration = Math.max(0, endHours - startHours)
+
+//   const totalCost = duration * 300
+
+//   // 判斷當前使用者是否已經報名
+//   const isJoined = isQuickViewRegistered.value
+//   // 如果還沒報名，就算入他自己 (分母 +1)；如果已經報名，就直接用當前人數
+//   const divisor = isJoined
+//     ? (quickViewGame.value.currentPlayers || 1)
+//     : (quickViewGame.value.currentPlayers + 1)
+
+//   return Math.ceil(totalCost / divisor)
+// })
+
 const qvGenderBadge = computed(() => {
   if (!quickViewGame.value) return null
   const g = quickViewGame.value.requiredGender || 'ALL'
@@ -379,135 +448,103 @@ const handleManageGame = (game) => {
 <template>
   <div class="container py-5 mt-5">
 
-    <!-- 標題區 -->
-    <div class="mb-5">
-      <h2 class="fw-bold text-dark">羽球臨打活動</h2>
-      <p class="text-secondary">尋找適合你的場次，隨時加入熱血對決</p>
-    </div>
-    <!-- 頂部膠囊型搜尋列 -->
-    <div class="d-flex align-items-center gap-3 mb-5 mt-3">
+  <!-- 🪶 羽毛背景層 -->
+  <div class="feather-bg" aria-hidden="true">
+    <img
+      v-for="(f, i) in feathers"
+      :key="i"
+      src="@/assets/images/feathers_watermark.png"
+      class="feather-item"
+      :style="{
+        left: f.x + '%',
+        top: f.y + '%',
+        width: f.size + 'px',
+        opacity: f.opacity,
+        transform: `rotate(${f.rotate}deg)`
+      }"
+    />
+  </div>
 
-      <!-- 1. 快速日期選擇 -->
-      <div class="bg-light rounded-pill p-1 d-flex align-items-center flex-nowrap overflow-hidden" style="border: 1px solid #e2e8f0; white-space: nowrap;">
-        <button
-          class="btn btn-sm rounded-pill px-4 border-0 transition-all"
-          :class="selectedDateFilter === '全部' ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'"
-          @click="selectedDateFilter = '全部'"
-        >全部</button>
-        <button
-          class="btn btn-sm rounded-pill px-4 border-0 transition-all"
-          :class="selectedDateFilter === '今天' ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'"
-          @click="selectedDateFilter = '今天'"
-        >今天</button>
-        <button
-          class="btn btn-sm rounded-pill px-4 border-0 transition-all"
-          :class="selectedDateFilter === '明天' ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'"
-          @click="selectedDateFilter = '明天'"
-        >明天</button>
-        <button
-          class="btn btn-sm rounded-pill px-4 border-0 transition-all"
-          :class="selectedDateFilter === '本週末' ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'"
-          @click="selectedDateFilter = '本週末'"
-        >本週末</button>
+  <div class="mb-5">
+    <h2 class="fw-bold text-dark mb-2">羽球臨打活動</h2>
+    <p class="text-secondary mb-0">尋找適合你的場次，隨時加入熱血對決</p>
+  </div>
 
-        <button
-          v-if="loggedInMemberId"
-          class="btn btn-sm rounded-pill px-4 border-0 transition-all d-flex align-items-center gap-1"
-          :class="selectedDateFilter === '我的開團' ? 'bg-white shadow-sm fw-bold text-sky-blue' : 'text-secondary opacity-75'"
-          @click="selectedDateFilter = '我的開團'"
-        >
+
+ <div class="d-flex align-items-center gap-3 mb-5 mt-3">
+
+      <div class="bg-light rounded-pill p-1 d-flex align-items-center flex-nowrap overflow-auto shadow-sm hide-scrollbar" style="white-space: nowrap;">
+        <button class="btn btn-sm rounded-pill px-4 border-0 transition-all flex-shrink-0" :class="selectedDateFilter === '全部' ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'" @click="selectedDateFilter = '全部'">全部</button>
+        <button class="btn btn-sm rounded-pill px-4 border-0 transition-all flex-shrink-0" :class="selectedDateFilter === '今天' ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'" @click="selectedDateFilter = '今天'">今天</button>
+        <button class="btn btn-sm rounded-pill px-4 border-0 transition-all flex-shrink-0" :class="selectedDateFilter === '明天' ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'" @click="selectedDateFilter = '明天'">明天</button>
+        <button class="btn btn-sm rounded-pill px-4 border-0 transition-all flex-shrink-0" :class="selectedDateFilter === '本週末' ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'" @click="selectedDateFilter = '本週末'">本週末</button>
+
+        <button v-if="loggedInMemberId" class="btn btn-sm rounded-pill px-4 border-0 transition-all d-flex align-items-center gap-1 flex-shrink-0" :class="selectedDateFilter === '我的開團' ? 'bg-white shadow-sm fw-bold text-mori-teal' : 'text-secondary opacity-75'" @click="selectedDateFilter = '我的開團'">
           <i class="bi bi-person-fill"></i> 我的開團
         </button>
 
-        <div class="text-secondary opacity-25 mx-1">|</div>
+        <button v-if="loggedInMemberId" class="btn btn-sm rounded-pill px-4 border-0 transition-all d-flex align-items-center gap-1 flex-shrink-0" :class="selectedDateFilter === '我的報名' ? 'bg-white shadow-sm fw-bold text-mori-success' : 'text-secondary opacity-75'" @click="selectedDateFilter = '我的報名'">
+          <i class="bi bi-check2-circle"></i> 我的報名
+        </button>
 
-        <!-- 選擇日期 (自訂) -->
-        <div
-          class="btn btn-sm rounded-pill px-3 border-0 transition-all position-relative overflow-hidden mb-0 d-flex align-items-center"
-          :class="!['全部','今天','明天','本週末','我的開團'].includes(selectedDateFilter) ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'"
-          style="cursor: pointer;"
-        >
+        <div class="text-secondary opacity-25 mx-1 flex-shrink-0">|</div>
+
+        <div class="btn btn-sm rounded-pill px-3 border-0 transition-all position-relative overflow-hidden mb-0 d-flex align-items-center flex-shrink-0" :class="!['全部','今天','明天','本週末','我的開團','我的報名'].includes(selectedDateFilter) ? 'bg-white shadow-sm fw-bold text-dark' : 'text-secondary'" style="cursor: pointer;">
           <i class="bi bi-calendar3 me-2" style="color: #65a30d;"></i>
-          <span>{{ !['全部','今天','明天','本週末','我的開團'].includes(selectedDateFilter) ? '📅 ' + selectedDateFilter : '選擇日期' }}</span>
-          <input
-            type="date"
-            class="position-absolute top-0 start-0 opacity-0 w-100 h-100 date-input-overlay"
-            v-model="selectedDateFilter"
-            @click="$event.target.showPicker?.()"
-          />
+          <span>{{ !['全部','今天','明天','本週末','我的開團','我的報名'].includes(selectedDateFilter) ? '📅 ' + selectedDateFilter : '選擇日期' }}</span>
+          <input type="date" class="position-absolute top-0 start-0 opacity-0 w-100 h-100 date-input-overlay" v-model="selectedDateFilter" @click="$event.target.showPicker?.()" />
         </div>
       </div>
 
-      <!-- 2. 主搜尋框 -->
-      <div class="flex-grow-1 bg-light rounded-pill d-flex align-items-center px-4 py-2" style="border: 1px solid #e2e8f0;">
-        <i class="bi bi-geo-alt fs-5 text-secondary me-3"></i>
-        <input type="text" v-model="searchQuery" class="form-control bg-transparent border-0 shadow-none p-0 text-dark" placeholder="搜尋場館、城市或球場...">
+      <div class="flex-grow-1 bg-white shadow-sm rounded-pill d-flex align-items-center px-4 py-2 min-w-0">
+        <i class="bi bi-geo-alt fs-5 text-secondary me-3 flex-shrink-0"></i>
+        <input type="text" v-model="searchQuery" class="form-control bg-transparent border-0 shadow-none p-0 text-dark w-100" placeholder="搜尋場館、城市...">
       </div>
 
-      <!-- 🌟 發起揪團按鈕 -->
-      <button
-        class="btn rounded-pill px-4 text-white fw-bold shadow-sm flex-shrink-0"
-        style="background-color: #0ea5e9;"
-        @click="createModalRef.showModal()"
-      >
+      <button class="btn rounded-pill px-4 text-white fw-bold shadow-sm flex-shrink-0" style="background-color: #457B9D; border: none;" @click="createModalRef.showModal()">
         <i class="bi bi-plus-lg me-1"></i> 發起揪團
       </button>
 
-      <!-- 3. 進階篩選 (觸發 Offcanvas) -->
-      <button
-        class="btn rounded-pill px-4 bg-white hover-bg-light flex-shrink-0 position-relative"
-        style="border: 1px solid #e2e8f0;"
-        data-bs-toggle="offcanvas"
-        data-bs-target="#advancedFilterOffcanvas"
-      >
+      <button class="btn rounded-pill px-4 bg-white hover-bg-light flex-shrink-0 position-relative shadow-sm" style="border: none;" data-bs-toggle="offcanvas" data-bs-target="#advancedFilterOffcanvas">
         <i class="bi bi-sliders me-2 text-dark"></i>
         <span class="text-dark fw-medium">進階篩選</span>
-        <!-- 有套用進階篩選時的提示小紅點 -->
-        <span v-if="advancedFilters.levels.length || advancedFilters.hasAvailableSlotsOnly || advancedFilters.timeOfDay"
-              class="position-absolute top-0 start-100 translate-middle p-2 bg-danger border border-light rounded-circle">
+        <span v-if="advancedFilters.levels.length || advancedFilters.hasAvailableSlotsOnly || advancedFilters.timeOfDay" class="position-absolute top-0 start-100 translate-middle p-2 bg-danger border border-light rounded-circle">
           <span class="visually-hidden">Active filters</span>
         </span>
       </button>
+
     </div>
 
-    <!-- 列表資料區 (List Container) -->
     <div class="mt-4">
 
-
-      <!-- 🌟 自動印出當前頁面的真實資料 -->
       <PickupGameRow
         v-for="game in paginatedGames"
         :key="game.gameId"
         :game="game"
+        class="pickup-card mb-3"
         :is-registered="myRegisteredGameIds.includes(game.gameId)"
         @open-quick-view="handleOpenQuickView"
         @view-details="handleViewDetails"
         @manage-game="handleManageGame"
       />
-      <!-- 如果沒有場次的時候顯示 -->
       <div v-if="availableGames.length === 0" class="text-center py-5 text-secondary">
         目前沒有符合條件的臨打場次喔！
       </div>
 
-      <!-- 🌟 分頁導覽列 (Pagination) 包含資訊列與選擇器 -->
-      <div v-if="availableGames.length > 0" class="d-flex justify-content-between align-items-center mt-5 bg-white p-3 rounded-pill shadow-sm" style="border: 1px solid #e2e8f0;">
+      <div v-if="availableGames.length > 0" class="d-flex justify-content-between align-items-center mt-5 bg-white p-3 rounded-pill shadow-sm">
 
-        <!-- 左側：資料筆數資訊 -->
         <div class="text-secondary fw-medium ps-3" style="font-size: 0.95rem;">
           共 {{ availableGames.length }} 筆 · 第 {{ currentPage }} / {{ totalPages }} 頁
         </div>
 
-        <!-- 中間：頁碼按鈕 -->
         <nav aria-label="Page navigation" v-if="totalPages > 1">
           <ul class="pagination pagination-sm mb-0">
-            <!-- 上一頁 -->
             <li class="page-item" :class="{ disabled: currentPage === 1 }">
               <button class="page-link border-0 text-secondary" @click="changePage(currentPage - 1)">
                 <i class="bi bi-chevron-left"></i>
               </button>
             </li>
 
-            <!-- 頁碼數字 -->
             <li
               v-for="page in totalPages"
               :key="page"
@@ -515,14 +552,13 @@ const handleManageGame = (game) => {
             >
               <button
                 class="page-link border-0 fw-bold mx-1 rounded"
-                :class="page === currentPage ? 'bg-primary text-white' : 'text-secondary'"
+                :class="page === currentPage ? 'bg-mori-teal text-white' : 'text-secondary'"
                 @click="changePage(page)"
               >
                 {{ page }}
               </button>
             </li>
 
-            <!-- 下一頁 -->
             <li class="page-item" :class="{ disabled: currentPage === totalPages }">
               <button class="page-link border-0 text-secondary" @click="changePage(currentPage + 1)">
                 <i class="bi bi-chevron-right"></i>
@@ -530,13 +566,10 @@ const handleManageGame = (game) => {
             </li>
           </ul>
         </nav>
-        <div v-else></div> <!-- 佔位符，讓 flex-between 正常排版 -->
-
-        <!-- 右側：每頁筆數下拉選單 -->
-        <div class="d-flex align-items-center pe-3">
+        <div v-else></div> <div class="d-flex align-items-center pe-3">
           <span class="text-secondary me-2" style="font-size: 0.95rem;">每頁</span>
           <select
-            class="form-select form-select-sm border-0 shadow-none bg-light text-primary fw-bold cursor-pointer"
+            class="form-select form-select-sm border-0 shadow-none bg-light fw-bold cursor-pointer text-mori-teal"
             style="width: 70px;"
             :value="itemsPerPage"
             @change="changePageSize"
@@ -552,10 +585,8 @@ const handleManageGame = (game) => {
 
     </div>
 
-    <!-- 🌟 掛載發起揪團 Modal -->
     <CreateGameModal ref="createModalRef" @refresh-list="fetchGames" />
 
-    <!-- 🌟 進階篩選 Offcanvas -->
     <div class="offcanvas offcanvas-end" tabindex="-1" id="advancedFilterOffcanvas" aria-labelledby="advancedFilterOffcanvasLabel">
       <div class="offcanvas-header border-bottom">
         <h5 class="offcanvas-title fw-bold" id="advancedFilterOffcanvasLabel">⚙️ 進階篩選</h5>
@@ -563,7 +594,6 @@ const handleManageGame = (game) => {
       </div>
       <div class="offcanvas-body">
 
-        <!-- 程度 -->
         <div class="mb-4">
           <h6 class="fw-bold mb-3">打球程度</h6>
           <div class="form-check mb-2">
@@ -582,7 +612,6 @@ const handleManageGame = (game) => {
 
         <hr class="text-secondary opacity-25">
 
-        <!-- 狀態 -->
         <div class="mb-4">
           <h6 class="fw-bold mb-3">名額狀態</h6>
           <div class="form-check form-switch">
@@ -593,7 +622,6 @@ const handleManageGame = (game) => {
 
         <hr class="text-secondary opacity-25">
 
-        <!-- 時段 -->
         <div class="mb-4">
           <h6 class="fw-bold mb-3">時段選擇</h6>
           <div class="form-check mb-2">
@@ -614,7 +642,6 @@ const handleManageGame = (game) => {
           </div>
         </div>
 
-        <!-- 性別限制 -->
         <div class="mb-4">
           <label class="fw-bold mb-2">性別限制</label>
           <div class="d-flex flex-column gap-2">
@@ -634,39 +661,33 @@ const handleManageGame = (game) => {
         </div>
       </div>
 
-      <!-- 底部按鈕 -->
       <div class="offcanvas-footer border-top p-3 d-flex gap-2 bg-light">
         <button class="btn btn-light border flex-grow-1 fw-bold" @click="clearAdvancedFilters">清除條件</button>
-        <button class="btn btn-primary flex-grow-1 fw-bold text-white shadow-sm" style="background-color: #0ea5e9; border: none;" @click="applyAdvancedFilters">套用篩選</button>
+        <button class="btn text-white shadow-sm flex-grow-1 fw-bold" style="background-color: #457B9D; border: none;" @click="applyAdvancedFilters">套用篩選</button>
       </div>
     </div>
 
-    <!-- 🌟 快速查看 Modal (Quick View) — 漸進式揭露設計 -->
     <div class="modal fade" id="quickViewModal" tabindex="-1" aria-labelledby="quickViewModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 rounded-4 shadow-lg">
 
-          <!-- ▌Header -->
           <div class="modal-header border-bottom-0 pb-0 pt-3 px-4">
             <h5 class="modal-title fw-bold d-flex align-items-center" id="quickViewModalLabel">
-              <i class="bi bi-lightning-charge-fill me-2" style="color: #0ea5e9;"></i> 快速報名
+              <i class="bi bi-lightning-charge-fill me-2 text-mori-teal"></i> 快速報名
             </h5>
             <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
 
           <div class="modal-body px-4 pt-3 pb-2" v-if="quickViewGame">
 
-            <!-- 🌟 頂部狀態列：已報名提示 -->
             <div v-if="isQuickViewRegistered" class="alert alert-success d-flex align-items-center mb-3 py-2 px-3 fw-bold" role="alert">
               <i class="bi bi-check-circle-fill me-2 fs-5"></i>
               <div>🎉 報名成功！您已在參與名單中。</div>
             </div>
 
-            <!-- ▌1. 賽事核心資訊卡 -->
-            <div class="qv-info-card rounded-3 p-3 mb-3">
+            <div class="qv-info-card mb-3">
               <div class="d-flex justify-content-between align-items-start mb-2">
                 <div class="fw-bold fs-5 text-dark">{{ quickViewGame.court?.venue?.venueName || '未指定場館' }} 臨打團</div>
-                <!-- 程度 + 性別 徽章 -->
                 <div class="d-flex gap-1 flex-shrink-0">
                   <span class="badge rounded-pill qv-badge-level px-2 py-1">{{ qvSkillLabel }}</span>
                   <span v-if="qvGenderBadge" class="badge rounded-pill px-2 py-1" :class="qvGenderBadge.class">
@@ -675,21 +696,19 @@ const handleManageGame = (game) => {
                 </div>
               </div>
               <div class="d-flex flex-column gap-1 text-secondary small">
-                <div><i class="bi bi-calendar-event me-2" style="color: #0ea5e9;"></i>{{ quickViewGame.gameDate }} ({{ qvDayOfWeek }}) {{ quickViewGame.startTime }} - {{ quickViewGame.endTime }}</div>
-                <div><i class="bi bi-geo-alt-fill me-2" style="color: #0ea5e9;"></i>{{ quickViewGame.court?.venue?.venueName || '未指定場館' }} · {{ quickViewGame.court?.courtName || '未指定場地' }}</div>
+                <div><i class="bi bi-calendar-event me-2 text-mori-teal"></i>{{ quickViewGame.gameDate }} ({{ qvDayOfWeek }}) {{ quickViewGame.startTime }} - {{ quickViewGame.endTime }}</div>
+                <div><i class="bi bi-geo-alt-fill me-2 text-mori-teal"></i>{{ quickViewGame.court?.venue?.venueName || '未指定場館' }} · {{ quickViewGame.court?.courtName || '未指定場地' }}</div>
               </div>
             </div>
 
-            <!-- ▌2. 主揪資訊 -->
-            <div class="d-flex align-items-center gap-3 mb-3 p-3 bg-white rounded-3 border" style="border-color: #e2e8f0 !important;">
-              <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0 shadow-sm"
-                   style="width: 44px; height: 44px; font-size: 1.1rem; background-color: #0ea5e9;">
+            <div class="d-flex align-items-center gap-3 mb-3 p-3 bg-white rounded-3 shadow-sm border-0">
+              <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0 shadow-sm bg-mori-teal"
+                   style="width: 44px; height: 44px; font-size: 1.1rem;">
                 {{ quickViewGame.host?.fullName?.charAt(0) || '?' }}
               </div>
               <div class="flex-grow-1">
                 <div class="fw-bold text-dark d-flex align-items-center" style="font-size: 0.95rem;">
                   {{ quickViewGame.host?.fullName || '揪團主' }}
-                  <!-- 已報名則顯示電話 -->
                   <a v-if="isQuickViewRegistered && quickViewGame.host?.phone" :href="`tel:${quickViewGame.host.phone}`" class="ms-2 badge bg-success text-white text-decoration-none px-2 py-1">
                     <i class="bi bi-telephone-fill me-1"></i>{{ quickViewGame.host.phone }}
                   </a>
@@ -701,12 +720,11 @@ const handleManageGame = (game) => {
               </div>
             </div>
 
-            <!-- ▌3. 報名進度 -->
             <div class="mb-3">
               <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="fw-bold small text-dark"><i class="bi bi-people-fill me-1" style="color: #0ea5e9;"></i>報名進度</span>
+                <span class="fw-bold small text-dark"><i class="bi bi-people-fill me-1 text-mori-teal"></i>報名進度</span>
                 <span class="fw-bold" style="font-size: 0.9rem;">
-                  <span style="color: #0ea5e9;">{{ quickViewGame.currentPlayers }}</span>
+                  <span class="text-mori-teal">{{ quickViewGame.currentPlayers }}</span>
                   <span class="text-muted"> / {{ quickViewGame.maxPlayers }} 人</span>
                 </span>
               </div>
@@ -721,15 +739,11 @@ const handleManageGame = (game) => {
               </div>
             </div>
 
-            <!-- ▌4. 費用 -->
-            <div class="d-flex align-items-baseline gap-1 mb-3 pb-3" style="border-bottom: 1px solid #f1f5f9;">
-              <span class="fw-bold fs-5" style="color: #0ea5e9;">NT$ {{ quickViewGame.feePerPerson || 0 }}</span>
-              <span class="text-secondary small">/ 人</span>
-              <span class="text-muted small ms-1">(預估費用，依現場人數微調)</span>
+            <div class="text-secondary mb-3 pb-3" style="font-size: 0.85rem; border-bottom: 1px solid #f1f5f9;">
+              <i class="bi bi-wallet2 me-1"></i> 本場次費用與付款方式，請於現場依主揪指示結算。
             </div>
 
             <template v-if="!isQuickViewRegistered">
-              <!-- ▌5. 程度選擇區塊 (未報名時顯示) -->
               <h6 class="fw-bold mb-2 small text-secondary"><i class="bi bi-bar-chart-fill me-1"></i>選擇您的程度</h6>
               <div class="d-flex gap-2 mb-3">
                 <label class="qv-level-option flex-grow-1 text-center" :class="{ active: selectedLevel === 'BEGINNER' }">
@@ -746,7 +760,6 @@ const handleManageGame = (game) => {
                 </label>
               </div>
 
-              <!-- ▌6. 同意規範 (未報名時顯示) -->
               <div class="form-check mb-1">
                 <input class="form-check-input cursor-pointer shadow-sm" type="checkbox" id="quickViewAgree" v-model="isAgreed" style="border-color: #cbd5e1;">
                 <label class="form-check-label cursor-pointer text-muted small" for="quickViewAgree" style="line-height: 1.5;">
@@ -756,9 +769,8 @@ const handleManageGame = (game) => {
             </template>
 
             <template v-else>
-              <!-- 🌟 已報名的行前資訊與管理 (已報名時顯示) -->
               <div class="p-3 bg-light rounded-3 border mb-1">
-                <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle-fill me-1 text-primary"></i>行前提醒</h6>
+                <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle-fill me-1 text-mori-teal"></i>行前提醒</h6>
                 <ul class="text-secondary small mb-0 ps-3" style="line-height: 1.6;">
                   <li>請提早 10 分鐘抵達球場熱身。</li>
                   <li>若因故無法出席，請務必提早取消，以免影響主揪權益。</li>
@@ -768,7 +780,6 @@ const handleManageGame = (game) => {
             </template>
           </div>
 
-          <!-- ▌Footer -->
           <div class="modal-footer border-top-0 px-4 pb-4 pt-2 d-flex gap-2">
             <button type="button" class="btn btn-light fw-bold flex-grow-1 border rounded-pill" @click="goToDetails">
               <i class="bi bi-arrow-right-circle me-1"></i>查看完整詳情
@@ -793,10 +804,40 @@ const handleManageGame = (game) => {
     </div>
   </div>
 
-  <!-- 🌟 管理揪團 Modal -->
   <ManageMatchModal ref="manageModalRef" :game="managedGame" @refresh-list="fetchGames" />
 </template>
 <style scoped>
+
+/* ============================================================
+   🎨 森系清新風 (Mori-kei Fresh Style) 核心樣式
+   ============================================================ */
+
+/* 輔助類別，用於替換原本的 text-sky-blue 等 */
+.text-mori-teal {
+  color: #457B9D !important;
+}
+.bg-mori-teal {
+  background-color: #457B9D !important;
+}
+/* 🌟 漏掉的森系成功綠色補這裡 */
+.text-mori-success {
+  color: #2A9D8F !important;
+}
+
+/* 列表中的卡片樣式 (讓資料列獨立浮起，不被背景干擾) */
+.pickup-card {
+  background-color: white;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 16px rgba(69, 123, 157, 0.05);
+  border: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.pickup-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(69, 123, 157, 0.1);
+}
+
 /* 日期選擇器觸發範圍放大 */
 .date-input-overlay {
   cursor: pointer;
@@ -811,40 +852,87 @@ const handleManageGame = (game) => {
   cursor: pointer;
 }
 
+/* 輕微懸停背景：使用森系米白 */
 .hover-bg-light:hover {
-  background-color: #f8fafc !important;
+  background-color: #F1FAEE !important;
 }
 input:focus {
   outline: none;
   box-shadow: none;
 }
 
+/* ============================================================
+   🍃 森系清新風 - 全景背景羽毛編織壓紋
+   ============================================================ */
+
+
+.container {
+  position: relative;
+  overflow: hidden;     /* 1：裁切掉超出邊界的羽毛，絕對不讓它蓋到 Footer */
+  min-height: 85vh;     /* 2：給頁面基本高度 (畫面高度的 85%)，把 Footer 往下推 */
+}
+
+
+.feather-bg {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.feather-item {
+  position: absolute;
+  user-select: none;
+
+}
+
+
+
+
+/* 3. 確保主要元件在背景紋理之上 */
+.pickup-card,
+.rounded-pill.p-1.bg-light,
+.bg-white.shadow-sm,
+button,
+nav {
+  position: relative;
+  z-index: 1;                  /* 確保在紋理上面 */
+}
+
+
 /* ============================
    🌟 Quick View Modal 樣式
    ============================ */
 
-/* 資訊卡背景 */
+/* 資訊卡背景 - 改用純白背景配細微發光陰影，提升高級感 */
 .qv-info-card {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e8f4fd 100%);
-  border: 1px solid #bae6fd;
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(69, 123, 157, 0.05);
+  border: none;
 }
 
-/* 程度徽章 */
+/* 程度徽章 - 使用更柔和的淺灰色 */
 .qv-badge-level {
-  background-color: #f1f5f9;
-  color: #475569;
+  background-color: #F8FAFC;
+  color: #64748B;
   font-size: 0.72rem;
   font-weight: 600;
-  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 3px 8px;
+  border: none;
 }
 
-/* 性別徽章 */
+/* 性別徽章 - 保持溫和 */
 .qv-badge-female {
   background-color: #fce4ec !important;
   color: #d81b60 !important;
   font-size: 0.72rem;
   font-weight: 600;
   border: 1px solid #f48fb1 !important;
+  border-radius: 4px;
+  padding: 3px 8px;
 }
 .qv-badge-male {
   background-color: #e3f2fd !important;
@@ -852,6 +940,8 @@ input:focus {
   font-size: 0.72rem;
   font-weight: 600;
   border: 1px solid #90caf9 !important;
+  border-radius: 4px;
+  padding: 3px 8px;
 }
 .qv-badge-all {
   background-color: #f1f5f9 !important;
@@ -859,57 +949,76 @@ input:focus {
   font-size: 0.72rem;
   font-weight: 600;
   border: 1px solid #e2e8f0 !important;
+  border-radius: 4px;
+  padding: 3px 8px;
 }
 
-/* 揪團標籤 */
+/* 揪團標籤 - 使用森系溫和米綠色 */
 .qv-tag {
-  background-color: #f0f9ff;
-  color: #0284c7;
+  background-color: #F1FAEE;
+  color: #457B9D;
   font-size: 0.68rem;
   font-weight: 600;
-  border: 1px solid #bae6fd;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 6px;
 }
 
-/* 進度條品牌色 */
+/* 進度條品牌色 - 使用森之藍綠 */
 .bg-sky-blue-bar {
-  background-color: #0ea5e9;
+  background-color: #457B9D !important;
 }
 
 /* 程度選擇器 (橫排按鈕) */
 .qv-level-option {
   cursor: pointer;
-  border: 2px solid #e2e8f0;
+  border: 1px solid #E2E8F0;
   border-radius: 12px;
-  padding: 10px 8px;
+  padding: 12px 10px;
   font-size: 0.85rem;
-  color: #64748b;
+  color: #64748B;
   background-color: #fff;
-  transition: all 0.2s ease;
-}
-.qv-level-option:hover {
-  border-color: #0ea5e9;
-  color: #0ea5e9;
-  background-color: #f0f9ff;
-}
-.qv-level-option.active {
-  border-color: #0ea5e9;
-  background-color: #0ea5e9;
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
 }
 
-/* 確認報名按鈕 */
+/* 懸停：使用森系米綠色強調 */
+.qv-level-option:hover {
+  border-color: #457B9D;
+  color: #457B9D;
+  background-color: #F1FAEE;
+}
+
+/* 激活：使用森系藍綠色實心填充，白色文字 */
+.qv-level-option.active {
+  border-color: #457B9D;
+  background-color: #457B9D;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(69, 123, 157, 0.2);
+}
+
+/* 確認報名按鈕 - 實心森之藍綠 */
 .qv-btn-submit {
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  background-color: #457B9D;
+  color: #fff;
   border: none;
-  transition: all 0.2s;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-weight: 600;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
+
+/* 按鈕懸停：添加上升感和發光效果 */
 .qv-btn-submit:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(69, 123, 157, 0.3);
 }
+
+/* 按鈕禁用狀態 */
 .qv-btn-submit:disabled {
-  background: #94a3b8;
+  background-color: #CBD5E1;
+  color: #fff;
   opacity: 0.7;
+  transform: none;
+  box-shadow: none;
 }
 </style>

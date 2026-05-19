@@ -62,13 +62,35 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="mb-5">
-    <h2 class="section-title">場館環境</h2>
+  <section class="mb-5 env-section">
+    <h2 class="section-title"><i class="bi bi-bank me-2"></i>場館環境</h2>
 
-    <div class="row g-4 align-items-center">
-      <!-- 左側：輪播 -->
-      <div class="col-lg-6">
-        <div class="venue-carousel card-rounded-lg shadow-sm overflow-hidden">
+    <div class="env-row">
+      <!-- 左側：設施特色 -->
+      <div class="env-col-left">
+        <div class="row g-4 h-100">
+          <div v-for="feature in features" :key="feature.title" class="col-6">
+            <div
+              class="card card-rounded shadow-sm border-0 p-4 h-100 hover-lift text-center d-flex flex-column justify-content-center"
+            >
+              <div
+                class="quick-action-icon mx-auto mb-3"
+                style="width: 60px; height: 60px; font-size: 1.5rem"
+              >
+                <i :class="['bi', feature.icon]" style="font-size: 1.8rem"></i>
+              </div>
+              <h6 class="fw-bold mb-2" style="font-size: 1.15rem">{{ feature.title }}</h6>
+              <p class="text-secondary mb-0" style="font-size: 0.95rem; line-height: 1.6">
+                {{ feature.desc }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右側：輪播 -->
+      <div class="env-col-right">
+        <div class="venue-carousel card-rounded-lg shadow-sm overflow-hidden h-100">
           <!-- 圖片容器 -->
           <div class="carousel-track">
             <div
@@ -99,27 +121,18 @@ onUnmounted(() => {
           </div>
 
           <!-- 左右箭頭 -->
-          <button class="carousel-arrow carousel-arrow--prev" @click="goToSlide((currentSlide - 1 + slides.length) % slides.length)">
+          <button
+            class="carousel-arrow carousel-arrow--prev"
+            @click="goToSlide((currentSlide - 1 + slides.length) % slides.length)"
+          >
             <i class="bi bi-chevron-left"></i>
           </button>
-          <button class="carousel-arrow carousel-arrow--next" @click="goToSlide((currentSlide + 1) % slides.length)">
+          <button
+            class="carousel-arrow carousel-arrow--next"
+            @click="goToSlide((currentSlide + 1) % slides.length)"
+          >
             <i class="bi bi-chevron-right"></i>
           </button>
-        </div>
-      </div>
-
-      <!-- 右側：設施特色 -->
-      <div class="col-lg-6">
-        <div class="row g-3">
-          <div v-for="feature in features" :key="feature.title" class="col-6">
-            <div class="card card-rounded shadow-sm border-0 p-4 h-100 hover-lift text-center">
-              <div class="quick-action-icon mx-auto mb-3">
-                <i :class="['bi', feature.icon]" style="font-size: 1.6rem;"></i>
-              </div>
-              <h6 class="fw-bold mb-2" style="font-size: 1.05rem;">{{ feature.title }}</h6>
-              <p class="text-secondary mb-0" style="font-size: 0.88rem; line-height: 1.5;">{{ feature.desc }}</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -127,10 +140,42 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* ===== 整體偏移 ===== */
+.env-section {
+  margin-left: -11rem;
+}
+
+/* ===== Flexbox 佈局（不受 12 欄限制） ===== */
+.env-row {
+  display: flex;
+  gap: 6rem;
+  align-items: stretch;
+}
+
+.env-col-left {
+  flex: 0 0 45%; /* ← 改這裡調整左側寬度 */
+}
+
+.env-col-right {
+  flex: 0 0 60%; /* 右側自動填滿剩餘空間 */
+}
+
+/* 手機版改為上下排列 */
+@media (max-width: 991.98px) {
+  .env-row {
+    flex-direction: column;
+    gap: 2rem;
+  }
+  .env-col-left {
+    flex: none;
+    width: 100%;
+  }
+}
+
 /* 輪播容器 */
 .venue-carousel {
   position: relative;
-  height: 400px;
+  min-height: 600px;
   background: #0f172a;
 }
 
@@ -236,6 +281,10 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.35);
 }
 
-.carousel-arrow--prev { left: 0.75rem; }
-.carousel-arrow--next { right: 0.75rem; }
+.carousel-arrow--prev {
+  left: 0.75rem;
+}
+.carousel-arrow--next {
+  right: 0.75rem;
+}
 </style>

@@ -200,7 +200,6 @@ async function handleSave() {
                 <div class="d-flex justify-content-end gap-3 mt-4 pt-4 border-top">
                   <button type="submit" class="btn-save-styled" :disabled="isLoading">
                     <span v-if="isLoading" class="spinner-border spinner-border-sm me-2"></span>
-                    <i v-else class="bi bi-download me-2"></i>
                     儲存變更
                   </button>
                 </div>

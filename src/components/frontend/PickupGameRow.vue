@@ -26,7 +26,6 @@ const isHost = computed(() => {
          currentUser.value.memberId === props.game.host.memberId
 })
 
-
 // 🌟 1. 程度翻譯對照表
 const levelMap = {
   'BEGINNER': '初級',
@@ -44,7 +43,7 @@ const genderBadge = computed(() => {
   const g = props.game.requiredGender || props.game.genderLimit || 'ALL'
   if (g === 'FEMALE') return { label: '限女', class: 'badge-female' }
   if (g === 'MALE') return { label: '限男', class: 'badge-male' }
-  return null // ALL → 不顯示
+  return null 
 })
 
 // 🌟 3. 日期處理
@@ -80,19 +79,19 @@ const isTomorrow = (dateStr) => {
   return dateStr === tomorrowStr
 }
 
-// 🌟 4. 報名進度
+// 🌟 4. 報名進度 (更換為森系自訂顏色)
 const isFull = computed(() => props.game.currentPlayers >= props.game.maxPlayers)
 const progressPercent = computed(() => {
   if (!props.game.maxPlayers) return 0
   return Math.round((props.game.currentPlayers / props.game.maxPlayers) * 100)
 })
 const progressColor = computed(() => {
-  if (isFull.value) return 'bg-danger'
-  if (progressPercent.value >= 75) return 'bg-warning'
-  return 'bg-primary'
+  if (isFull.value) return 'bg-mori-coral'   // 柔和珊瑚紅 (滿團)
+  if (progressPercent.value >= 75) return 'bg-mori-warning' // 溫暖橘黃 (快滿)
+  return 'bg-mori-teal'                      // 主題藍綠色 (正常)
 })
 
-// 🌟 5. 卡片主標題 (組合星期 + 時段描述)
+// 🌟 5. 卡片主標題 
 const cardTitle = computed(() => {
   const dow = dateDow.value
   const st = props.game.startTime
@@ -104,7 +103,7 @@ const cardTitle = computed(() => {
   return `${dow}${period}場`
 })
 
-// 🌟 6. 點擊卡片：團主 → 管理揪團 / 非團主 → 快速報名
+// 🌟 6. 點擊卡片
 const handleCardClick = () => {
   if (isHost.value) {
     emit('manage-game', props.game)
@@ -113,38 +112,34 @@ const handleCardClick = () => {
   }
 }
 </script>
+
 <template>
   <div class="card rounded-4 mb-3 game-card-hover col-12 col-lg-10 col-xl-8 mx-auto"
-       :class="isHost ? 'bg-primary bg-opacity-10 border border-primary' : 'border-0 shadow-sm'"
+       :class="isHost ? 'host-card' : 'border-0 shadow-sm'"
        @click="handleCardClick">
     <div class="card-body d-flex flex-row p-4 gap-4">
 
-      <!-- ▌第 1 欄：左側日曆卡片 -->
       <div class="date-square flex-shrink-0">
         <span class="date-month">{{ dateMonth }}</span>
         <span class="date-day">{{ dateDay }}</span>
         <span class="date-dow">{{ dateDow }}</span>
-        <!-- 今天/明天小標籤 -->
         <span v-if="isToday(game.gameDate)" class="date-tag date-tag-today">TODAY</span>
         <span v-else-if="isTomorrow(game.gameDate)" class="date-tag date-tag-tomorrow">明天</span>
       </div>
 
-      <!-- ▌第 2 欄：中間核心資訊 -->
       <div class="flex-grow-1 d-flex flex-column">
-        <!-- 主標題 -->
         <h6 class="fw-bold text-dark mb-2 card-title-line">
           {{ cardTitle }}
-          <span v-if="isHost" class="badge bg-warning text-dark ms-2" style="font-size: 0.75rem;">👑 我的開團</span>
+          <span v-if="isHost" class="badge bg-mori-light text-mori-teal ms-2" style="font-size: 0.75rem;">👑 我的開團</span>
           <span v-if="game.description" class="text-muted fw-normal ms-2" style="font-size: 0.78rem;">
             · {{ game.description }}
           </span>
         </h6>
 
-        <!-- 時間 + 地點 -->
         <div class="d-flex flex-wrap align-items-center gap-3 text-muted small mb-3">
-          <span><i class="bi bi-clock me-1"></i>{{ game.startTime }} - {{ game.endTime }}</span>
+          <span><i class="bi bi-clock me-1 text-mori-teal"></i>{{ game.startTime }} - {{ game.endTime }}</span>
           <span>
-            <i class="bi bi-geo-alt me-1"></i>
+            <i class="bi bi-geo-alt me-1 text-mori-teal"></i>
             <template v-if="game.court">
               {{ game.court.venue?.venueName || '未指定場館' }} · {{ game.court.courtName || '未指定場地' }}
             </template>
@@ -152,7 +147,6 @@ const handleCardClick = () => {
           </span>
         </div>
 
-        <!-- 底部：主揪 (mt-auto 推到底) -->
         <div class="d-flex align-items-center mt-auto">
           <img :src="game.host?.photoUrl || `https://i.pravatar.cc/150?u=${game.host?.memberId}`"
                class="rounded-circle me-2 host-avatar" width="32" height="32" alt="avatar">
@@ -160,47 +154,44 @@ const handleCardClick = () => {
         </div>
       </div>
 
-      <!-- ▌第 3 欄：右側行動與狀態區 -->
       <div class="d-flex flex-column align-items-end justify-content-between right-panel">
-        <!-- 右上角：標籤群 -->
         <div class="d-flex flex-wrap gap-1 justify-content-end">
-          <span class="badge bg-light text-secondary border rounded-pill px-2 py-1 small">{{ displayLevel }}</span>
+          <span class="badge level-badge rounded-pill px-2 py-1 small">{{ displayLevel }}</span>
           <span v-if="genderBadge" class="badge rounded-pill px-2 py-1 small" :class="genderBadge.class">
             {{ genderBadge.label }}
           </span>
         </div>
 
-        <!-- 右下角：報名進度 + 按鈕 -->
         <div class="w-100 mt-auto">
           <div class="d-flex justify-content-between align-items-center mb-1">
             <span class="text-muted" style="font-size: 0.72rem;">報名進度</span>
-            <span class="fw-bold small">{{ game.currentPlayers }} / {{ game.maxPlayers }} 人</span>
+            <span class="fw-bold small" :class="isFull ? 'text-mori-coral' : 'text-dark'">
+              {{ game.currentPlayers }} / {{ game.maxPlayers }} 人
+            </span>
           </div>
           <div class="progress" style="height: 4px;">
             <div class="progress-bar rounded-pill" :class="progressColor"
                  role="progressbar" :style="{ width: progressPercent + '%' }"></div>
           </div>
           
-          <!-- 底部按鈕切換 (v-if / v-else) -->
           <template v-if="isHost">
-            <button class="btn btn-outline-dark btn-sm mt-2 w-100 rounded-pill fw-bold"
+            <button class="btn btn-outline-mori btn-sm mt-2 w-100 rounded-pill fw-bold"
                     @click.stop="$emit('manage-game', game)">
               <i class="bi bi-gear-fill me-1"></i>管理揪團
             </button>
           </template>
           <template v-else-if="isRegistered">
-            <!-- 已報名的狀態 -->
-            <button class="btn btn-outline-success btn-sm mt-2 w-100 rounded-pill fw-bold"
+            <button class="btn btn-outline-mori-success btn-sm mt-2 w-100 rounded-pill fw-bold"
                     @click.stop="$emit('open-quick-view', game)">
-              ✅ 查看報名資訊
+              <i class="bi bi-check2-circle me-1"></i>報名資訊
             </button>
           </template>
           <template v-else>
-            <button v-if="!isFull" class="btn btn-primary btn-sm mt-2 w-100 rounded-pill fw-bold btn-join"
+            <button v-if="!isFull" class="btn btn-sm mt-2 w-100 rounded-pill fw-bold btn-mori-join"
                     @click.stop="$emit('open-quick-view', game)">
               立即報名
             </button>
-            <button v-else class="btn btn-outline-secondary btn-sm mt-2 w-100 rounded-pill fw-bold" disabled>
+            <button v-else class="btn btn-mori-disabled btn-sm mt-2 w-100 rounded-pill fw-bold" disabled>
               已滿團
             </button>
           </template>
@@ -210,14 +201,27 @@ const handleCardClick = () => {
     </div>
   </div>
 </template>
+
 <style scoped>
+/* ============================
+   🎨 森系色彩定義 (輔助類)
+   ============================ */
+.text-mori-teal { color: #457B9D !important; }
+.text-mori-coral { color: #E07A5F !important; }
+
+.bg-mori-teal { background-color: #457B9D !important; }
+.bg-mori-coral { background-color: #E07A5F !important; }
+.bg-mori-warning { background-color: #F4A261 !important; }
+.bg-mori-light { background-color: #F1FAEE !important; }
+
 /* ============================
    🎯 日曆卡片 (Date Square)
    ============================ */
 .date-square {
   width: 64px;
   min-height: 72px;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e8f4fd 100%);
+  background-color: #F8FAFC; /* 更乾淨的淺灰白底 */
+  border: 1px solid #E2E8F0; /* 極淡的邊框 */
   border-radius: 14px;
   display: flex;
   flex-direction: column;
@@ -236,7 +240,7 @@ const handleCardClick = () => {
 .date-day {
   font-size: 1.6rem;
   font-weight: 800;
-  color: #0c4a6e;
+  color: #457B9D; /* 森系藍綠 */
   line-height: 1.1;
 }
 .date-dow {
@@ -251,78 +255,101 @@ const handleCardClick = () => {
   right: -10px;
   font-size: 0.55rem;
   font-weight: 700;
-  padding: 1px 6px;
+  padding: 2px 6px;
   border-radius: 6px;
   letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 .date-tag-today {
-  background: #ef4444;
+  background: #E07A5F; /* 柔和珊瑚紅 */
   color: #fff;
 }
 .date-tag-tomorrow {
-  background: #f59e0b;
+  background: #F4A261; /* 柔和橘黃 */
   color: #fff;
 }
 
 /* ============================
-   🎯 中間核心資訊
+   🎯 主揪專屬卡片樣式 (一眼看出差別的淺藍底色版)
    ============================ */
-.card-title-line {
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-
-.host-avatar {
-  border: 2px solid #e2e8f0;
-  object-fit: cover;
+.host-card {
+  background-color: #F0F9FF !important; /* 乾淨清爽的極淺晴空藍 */
+  border: 1px solid #BAE6FD !important; /* 邊框配合淡淡的水藍色 */
+  border-left: 5px solid #457B9D !important; /* 🌟 保留左側森藍綠粗線，穩住視覺重量 */
+  box-shadow: 0 4px 16px rgba(69, 123, 157, 0.08); /* 稍微加深一點點專屬陰影 */
 }
 
 /* ============================
-   🎯 右側行動區
+   🎯 按鈕樣式
    ============================ */
-.right-panel {
-  min-width: 140px;
-  max-width: 160px;
-}
-
-.btn-join {
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+.btn-mori-join {
+  background-color: #457B9D;
+  color: white;
   border: none;
   font-size: 0.8rem;
   padding: 6px 0;
   transition: all 0.2s;
 }
-.btn-join:hover {
+.btn-mori-join:hover {
+  background-color: #386785;
+  color: white;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35);
+  box-shadow: 0 4px 12px rgba(69, 123, 157, 0.3);
+}
+
+.btn-outline-mori {
+  color: #457B9D;
+  border: 1px solid #457B9D;
+  background: transparent;
+}
+.btn-outline-mori:hover {
+  background-color: #F1FAEE;
+  color: #457B9D;
+}
+
+.btn-outline-mori-success {
+  color: #2A9D8F;
+  border: 1px solid #2A9D8F;
+  background: transparent;
+}
+.btn-outline-mori-success:hover {
+  background-color: #E6F5F3;
+  color: #2A9D8F;
+}
+
+.btn-mori-disabled {
+  background-color: #F1F5F9;
+  color: #94A3B8;
+  border: none;
 }
 
 /* ============================
-   🎯 性別徽章
+   🎯 徽章樣式
    ============================ */
+.level-badge {
+  background-color: #F8FAFC; 
+  color: #64748B;
+  border: 1px solid #E2E8F0;
+}
 .badge-male {
-  background-color: #e3f2fd !important;
-  color: #1976d2 !important;
-  border: 1px solid #90caf9 !important;
+  background-color: #F0F9FF !important;
+  color: #0284C7 !important;
+  border: 1px solid #BAE6FD !important;
 }
 .badge-female {
-  background-color: #fce4ec !important;
-  color: #d81b60 !important;
-  border: 1px solid #f48fb1 !important;
+  background-color: #FFF1F2 !important;
+  color: #E11D48 !important;
+  border: 1px solid #FECDD3 !important;
 }
 
 /* ============================
-   🎯 進度條
+   🎯 卡片互動與其他
    ============================ */
-.progress {
-  background-color: #e9ecef;
-  border-radius: 4px;
-  overflow: hidden;
-}
+.card-title-line { font-size: 0.95rem; line-height: 1.4; }
+.host-avatar { border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); object-fit: cover; }
+.right-panel { min-width: 140px; max-width: 160px; }
+.progress { background-color: #F1F5F9; border-radius: 4px; overflow: hidden; }
 
-/* ============================
-   🎯 卡片互動
-   ============================ */
 .game-card-hover {
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -330,8 +357,9 @@ const handleCardClick = () => {
 }
 .game-card-hover:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 30px rgba(14, 165, 233, 0.12) !important;
-  border-color: rgba(14, 165, 233, 0.2) !important;
+  /* 使用藍綠色調的發光陰影 */
+  box-shadow: 0 12px 30px rgba(69, 123, 157, 0.12) !important; 
+  border-color: rgba(69, 123, 157, 0.15) !important;
 }
 
 /* ============================

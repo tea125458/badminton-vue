@@ -40,26 +40,48 @@ function statusClass(status) {
   return map[status] || 'badge-default'
 }
 
-// ========== 刪除場館 ==========
-async function deleteVenue(venue) {
-  if (!confirm(`確定要刪除「${venue.venueName}」嗎？`)) return
+// ========== 通知彈窗 ==========
+const notifyVisible = ref(false)
+const notifyType = ref('success')
+const notifyTitle = ref('')
+const notifyMessage = ref('')
 
+function showNotify(type, title, message) {
+  notifyType.value = type
+  notifyTitle.value = title
+  notifyMessage.value = message
+  notifyVisible.value = true
+}
+
+// ========== 確認刪除彈窗 ==========
+const confirmDeleteVisible = ref(false)
+const pendingDeleteVenue = ref(null)
+
+function requestDelete(venue) {
+  pendingDeleteVenue.value = venue
+  confirmDeleteVisible.value = true
+}
+
+async function confirmDelete() {
+  confirmDeleteVisible.value = false
+  if (!pendingDeleteVenue.value) return
   try {
-    await venueApi.delete(venue.venueId)
-    alert('刪除成功')
-    loadData() //重新載入
+    await venueApi.delete(pendingDeleteVenue.value.venueId)
+    showNotify('success', '刪除成功', `「${pendingDeleteVenue.value.venueName}」已刪除`)
+    loadData()
   } catch (error) {
-    alert('刪除失敗:' + error.message)
+    showNotify('error', '刪除失敗', error.response?.data?.message || error.message)
   }
+  pendingDeleteVenue.value = null
 }
 
 // ========== 變更狀態 ==========
 async function changeStatus(id, newStatus) {
   try {
     await venueApi.updateStatus(id, newStatus)
-    loadData() //重新載入
+    loadData()
   } catch (error) {
-    alert('狀態更新失敗:' + error.message)
+    showNotify('error', '狀態更新失敗', error.response?.data?.message || error.message)
   }
 }
 
@@ -118,7 +140,7 @@ function openEditModal(venue) {
 // 儲存（根據有無 editId 判斷新增或更新）
 async function saveVenue() {
   if (!form.value.venueName.trim()) {
-    alert('請輸入場館名稱!')
+    showNotify('warning', '提示', '請輸入場館名稱!')
     return
   }
 
@@ -135,10 +157,10 @@ async function saveVenue() {
       await venueApi.create(form.value)
     }
     showModal.value = false
-    alert(editId.value ? '更新成功!' : '新增成功!')
+    showNotify('success', editId.value ? '更新成功' : '新增成功', editId.value ? '場館資料已更新！' : '場館已成功建立！')
     loadData()
   } catch (error) {
-    alert('操作失敗：' + error.message)
+    showNotify('error', '操作失敗', error.response?.data?.message || error.message)
   } finally {
     saving.value = false
   }
@@ -233,7 +255,7 @@ async function saveVenue() {
                 <button class="btn btn-sm action-btn action-btn-edit" title="編輯" @click="openEditModal(venue)">
                   <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-sm action-btn action-btn-delete" title="刪除" @click="deleteVenue(venue)">
+                <button class="btn btn-sm action-btn action-btn-delete" title="刪除" @click="requestDelete(venue)">
                   <i class="bi bi-trash3"></i>
                 </button>
                 <div class="dropdown">
@@ -355,6 +377,51 @@ async function saveVenue() {
             <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
             {{ saving ? '儲存中...' : '儲存' }}
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 通知彈窗 -->
+  <div v-if="notifyVisible" class="modal-backdrop fade show" style="z-index: 1060" @click="notifyVisible = false"></div>
+  <div v-if="notifyVisible" class="modal fade show d-block" tabindex="-1" style="z-index: 1070">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem">
+        <div class="modal-body text-center py-4 px-4">
+          <div v-if="notifyType === 'success'" class="mb-3">
+            <i class="bi bi-check-circle-fill" style="font-size: 3rem; color: #10B981"></i>
+          </div>
+          <div v-else-if="notifyType === 'error'" class="mb-3">
+            <i class="bi bi-x-circle-fill" style="font-size: 3rem; color: #EF4444"></i>
+          </div>
+          <div v-else class="mb-3">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; color: #F59E0B"></i>
+          </div>
+          <h5 class="fw-bold mb-2">{{ notifyTitle }}</h5>
+          <p class="text-secondary mb-3" style="font-size: 0.95rem">{{ notifyMessage }}</p>
+          <button class="btn btn-primary px-4 rounded-pill" @click="notifyVisible = false">我知道了</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 確認刪除彈窗 -->
+  <div v-if="confirmDeleteVisible" class="modal-backdrop fade show" style="z-index: 1060"></div>
+  <div v-if="confirmDeleteVisible" class="modal fade show d-block" tabindex="-1" style="z-index: 1070">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem">
+        <div class="modal-body text-center py-4 px-4">
+          <div class="mb-3">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; color: #EF4444"></i>
+          </div>
+          <h5 class="fw-bold mb-2">確認刪除</h5>
+          <p class="text-secondary mb-3" style="font-size: 0.95rem">
+            確定要刪除「{{ pendingDeleteVenue?.venueName }}」嗎？<br/>此操作無法復原。
+          </p>
+          <div class="d-flex gap-2 justify-content-center">
+            <button class="btn btn-secondary px-3 rounded-pill" @click="confirmDeleteVisible = false">取消</button>
+            <button class="btn btn-danger px-3 rounded-pill" @click="confirmDelete">確認刪除</button>
+          </div>
         </div>
       </div>
     </div>

@@ -15,7 +15,13 @@ export const memberApi = {
   login: (username, password) => api.post('/members/login', { username, password }),
 
   // POST /api/members/register — 會員註冊
-  register: (member) => api.post('/members/register', member),
+  register: (member, code) => {
+    let url = '/members/register';
+    if (code) {
+      url += `?code=${code}`;
+    }
+    return api.post(url, member);
+  },
 
   // GET /api/members/search?keyword=xxx — 搜尋會員
   search: (keyword) => api.get('/members/search', { params: { keyword } }),
@@ -38,6 +44,9 @@ export const memberApi = {
   // POST /api/members/send-verification-code — 發送驗證碼
   sendVerificationCode: (username, email) => api.post('/members/send-verification-code', { username, email }),
 
+  // POST /api/members/send-register-code — 發送註冊驗證碼
+  sendRegisterCode: (email, username) => api.post('/members/send-register-code', { email, username }),
+
   // POST /api/members/google-login — Google 第三方登入
   googleLogin: (credential) => api.post('/members/google-login', { credential }),
 
@@ -46,7 +55,7 @@ export const memberApi = {
     const formData = new FormData()
     formData.append('file', file)
     return api.post('/members/upload-avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { ...authHeader(), 'Content-Type': 'multipart/form-data' }
     })
   },
 }

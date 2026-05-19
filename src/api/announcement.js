@@ -14,4 +14,16 @@ export const announcementApi = {
 
   // PATCH /api/announcements/:id/view → 瀏覽次數 +1
   incrementView: (id) => api.patch(`/announcements/${id}/view`),
+
+  // POST /api/announcements/upload — 上傳公告圖片（可帶 oldImageUrl 自動刪除舊圖）
+  uploadImage: (file, oldImageUrl) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    if (oldImageUrl) {
+      formData.append('oldImageUrl', oldImageUrl)
+    }
+    return api.post('/announcements/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }

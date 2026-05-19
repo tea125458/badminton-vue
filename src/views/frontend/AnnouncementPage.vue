@@ -204,6 +204,14 @@ async function toggleExpand(announcement) {
         <transition name="slide-down">
           <div v-if="expandedId === a.announcementId" class="card-body-area px-4 pb-4">
             <hr class="mt-0 mb-3" style="border-color: #e2e8f0" />
+            <!-- 公告圖片 -->
+            <div v-if="a.imageUrl" class="mb-3">
+              <img
+                :src="a.imageUrl.startsWith('/') || a.imageUrl.startsWith('http') ? a.imageUrl : '/' + a.imageUrl"
+                :alt="a.title"
+                class="announcement-image"
+              />
+            </div>
             <div class="announcement-content" v-html="formatContent(a.content)"></div>
             <div
               class="d-flex align-items-center gap-3 mt-3 pt-2"
@@ -419,6 +427,14 @@ async function toggleExpand(announcement) {
   font-size: 1rem;
   line-height: 1.85;
   color: #475569;
+}
+
+.announcement-image {
+  width: 100%;
+  max-height: 400px;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
 }
 
 .slide-down-enter-active {

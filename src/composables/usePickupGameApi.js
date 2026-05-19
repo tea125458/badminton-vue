@@ -442,10 +442,11 @@ export function usePickupGameApi() {
       selectedSignupMember.value = null
     } catch (error) {
       console.error('報名失敗', error)
+      const errorMsg = error.response?.data?.message || error.response?.data || '該會員可能已經報名過了';
       Swal.fire({
         icon: 'error',
         title: '報名失敗',
-        text: '該會員可能已經報名過了',
+        text: typeof errorMsg === 'string' ? errorMsg : '系統發生錯誤，請稍後再試',
         confirmButtonText: '我知道了',
       })
     }
@@ -474,10 +475,11 @@ export function usePickupGameApi() {
 
     } catch (error) {
       console.error('前台報名失敗', error)
+      const errorMsg = error.response?.data?.message || error.response?.data || '您可能已經報名過了，或是名額剛剛被搶光囉！';
       Swal.fire({
         icon: 'error',
         title: '報名失敗',
-        text: '您可能已經報名過了，或是名額剛剛被搶光囉！',
+        text: typeof errorMsg === 'string' ? errorMsg : '系統發生錯誤，請稍後再試',
         confirmButtonText: '我知道了'
       })
     }
