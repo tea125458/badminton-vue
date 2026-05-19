@@ -180,9 +180,8 @@ async function processOrder() {
         productName: `羽過天晴商品訂單 #${newOrder.orderId}`
       })
     } else {
-      // 現金、轉帳、信用卡(已模擬成功) → 刻意製造 1.2 秒的「訂單處理中」視覺停留時間，讓使用者感受更真實、安心的交易體驗
+      // 現金、轉帳、信用卡(已模擬成功) → 立刻跳轉
       cart.clear()
-      await new Promise(resolve => setTimeout(resolve, 1200))
       router.push({
         path: '/order-success',
         query: { orderId: newOrder.orderId }

@@ -39,7 +39,7 @@ function getExportData() {
 
 function handleExport(format) {
   showExportMenu.value = false
-  exportData(getExportData(), format)
+  exportData(getExportData(), format, '訂單資料')
 }
 const filterStatus = ref('')
 
@@ -152,7 +152,7 @@ function batchExport(format) {
     付款方式: paymentMap[o.paymentType] || o.paymentType || '',
     備註: o.note || '',
   }))
-  exportData(data, format)
+  exportData(data, format, '訂單資料')
 }
 
 // ===================== 分頁 =====================
@@ -892,10 +892,10 @@ function getInvoiceTypeText(order) {
             </div>
           </transition>
           <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-hover align-middle text-center mb-0">
               <thead>
                 <tr>
-                  <th style="width: 4%; text-align: center; padding-left: 0.75rem">
+                  <th style="width: 40px">
                     <input
                       type="checkbox"
                       class="form-check-input table-check"
@@ -904,12 +904,12 @@ function getInvoiceTypeText(order) {
                       @click.stop
                     />
                   </th>
-                  <th style="width: 9%">編號</th>
-                  <th style="width: 20%">會員</th>
-                  <th style="width: 21%">訂購日期</th>
-                  <th style="width: 14%" class="text-end">金額</th>
-                  <th style="width: 16%" class="text-center">狀態</th>
-                  <th style="width: 16%" class="text-center">操作</th>
+                  <th>編號</th>
+                  <th>會員</th>
+                  <th>訂購日期</th>
+                  <th>金額</th>
+                  <th>狀態</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -921,7 +921,7 @@ function getInvoiceTypeText(order) {
                   @click="selectOrder(order)"
                   style="cursor: pointer"
                 >
-                  <td style="text-align: center; padding-left: 0.75rem" @click.stop>
+                  <td @click.stop>
                     <input
                       type="checkbox"
                       class="form-check-input table-check"
@@ -943,12 +943,12 @@ function getInvoiceTypeText(order) {
                     </div>
                   </td>
                   <td style="font-size: 0.82rem">{{ formatDate(order.orderDate) }}</td>
-                  <td class="text-end">
+                  <td>
                     <span class="fw-bold" style="color: var(--brand-teal)">{{
                       formatPrice(order.totalAmount)
                     }}</span>
                   </td>
-                  <td class="text-center">
+                  <td>
                     <span
                       class="badge"
                       :class="statusMap[order.status]?.badgeClass || 'badge-default'"
@@ -956,7 +956,7 @@ function getInvoiceTypeText(order) {
                       >{{ statusMap[order.status]?.label }}</span
                     >
                   </td>
-                  <td class="text-center" @click.stop>
+                  <td @click.stop>
                     <div class="d-flex gap-1 justify-content-center">
                       <button
                         class="btn btn-sm action-btn action-btn-edit"
