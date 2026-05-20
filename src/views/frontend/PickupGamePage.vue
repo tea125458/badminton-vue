@@ -8,17 +8,25 @@ import PickupGameRow from '@/components/frontend/PickupGameRow.vue'
 import CreateGameModal from '@/components/frontend/CreateGameModal.vue'
 import ManageMatchModal from '@/components/frontend/ManageMatchModal.vue'
 import { usePickupGameApi } from '@/composables/usePickupGameApi'
+import { useTimeConflict } from '@/composables/useTimeConflict'
+import { useMemberStore } from '@/stores/member'
+import AuthModal from '@/components/frontend/AuthModal.vue'
 
 const router = useRouter()
 const route = useRoute()
 const { pickupGames, fetchGames, joinPickupGame, myRegisteredGameIds, fetchMyRegisteredGames } = usePickupGameApi()
+const memberStore = useMemberStore()
+const showAuthModal = ref(false)
+const pendingAction = ref(null)
+const { checkTimeConflict } = useTimeConflict()
+
 // 搜尋與篩選變數
 const searchQuery = ref('')
 const selectedDateFilter = ref('全部') // 記錄目前點了哪個日期，可能是 '全部', '今天', '明天', '本週末', 或是自訂的 'YYYY-MM-DD'
 const createModalRef = ref(null)
 const manageModalRef = ref(null)
 const managedGame = ref(null)
-const loggedInMemberId = ref(null)
+const loggedInMemberId = computed(() => memberStore.memberId)
 
 // 🪶 羽毛背景隨機資料（格線分區，確保均勻分散）
 const cols = 4
@@ -322,13 +330,22 @@ const goToDetails = () => {
 }
 
 const confirmSignup = async () => {
+  if (!memberStore.isLoggedIn) {
+    if (quickViewModalInstance) {
+      quickViewModalInstance.hide()
+    }
+    pendingAction.value = 'quickView'
+    showAuthModal.value = true
+    return
+  }
+
   if (!selectedLevel.value) {
     alert('請先選擇報名程度')
     return
   }
 
   // 🌟 性別防呆檢查
-  const memberInfo = JSON.parse(localStorage.getItem('memberInfo')) || {}
+  const memberInfo = memberStore.memberInfo || {}
   const reqGender = quickViewGame.value.requiredGender || quickViewGame.value.genderLimit
 
   if (reqGender === 'FEMALE' && memberInfo.gender !== 'FEMALE' && memberInfo.gender !== '女') {
@@ -369,7 +386,27 @@ const confirmSignup = async () => {
   }
 
 
-  const currentMemberId = memberInfo.memberId || 1 // 假資料：目前登入的會員 ID
+  const currentMemberId = memberStore.memberId
+
+  // 🕐 時間衝突檢查：確認該時段沒有其他預約或臨打
+  const { hasConflict, conflictMessage } = await checkTimeConflict(
+    currentMemberId,
+    quickViewGame.value.gameDate,
+    quickViewGame.value.startTime,
+    quickViewGame.value.endTime,
+    { excludeGameId: quickViewGame.value.gameId }
+  )
+  if (hasConflict) {
+    Swal.fire({
+      icon: 'warning',
+      title: '⚠️ 時間衝突',
+      text: conflictMessage,
+      confirmButtonColor: '#dc3545',
+      confirmButtonText: '我知道了'
+    })
+    return
+  }
+
   await joinPickupGame(quickViewGame.value.gameId, currentMemberId)
 
   if (quickViewModalInstance) {
@@ -393,8 +430,7 @@ const cancelMySignup = async () => {
 
   if (result.isConfirmed) {
     try {
-      const memberInfo = JSON.parse(localStorage.getItem('memberInfo')) || {}
-      const currentMemberId = memberInfo.memberId
+      const currentMemberId = memberStore.memberId
       if (!currentMemberId) return
 
       // 我們透過後端新增加的 API：DELETE /api/pickup-game-signups/member/{memberId}/game/{gameId} 來取消報名
@@ -428,13 +464,37 @@ const cancelMySignup = async () => {
   }
 }
 
+function handleCreateGameClick() {
+  if (!memberStore.isLoggedIn) {
+    pendingAction.value = 'create'
+    showAuthModal.value = true
+    return
+  }
+  createModalRef.value.showModal()
+}
+
+function onAuthSuccess() {
+  showAuthModal.value = false
+  if (pendingAction.value === 'quickView') {
+    const modalEl = document.getElementById('quickViewModal')
+    if (modalEl) {
+      quickViewModalInstance = Modal.getInstance(modalEl) || new Modal(modalEl)
+      quickViewModalInstance.show()
+    }
+  } else if (pendingAction.value === 'create') {
+    createModalRef.value.showModal()
+  }
+  pendingAction.value = null
+}
+
+watch(loggedInMemberId, async (newVal) => {
+  if (newVal) {
+    await fetchMyRegisteredGames(newVal)
+  }
+}, { immediate: true })
+
 onMounted(async () => {
   await fetchGames()
-  const memberInfo = JSON.parse(localStorage.getItem('memberInfo')) || {}
-  if (memberInfo.memberId) {
-    loggedInMemberId.value = memberInfo.memberId
-    await fetchMyRegisteredGames(memberInfo.memberId)
-  }
 })
 
 // 🌟 管理揪團 Modal
@@ -501,7 +561,7 @@ const handleManageGame = (game) => {
         <input type="text" v-model="searchQuery" class="form-control bg-transparent border-0 shadow-none p-0 text-dark w-100" placeholder="搜尋場館、城市...">
       </div>
 
-      <button class="btn rounded-pill px-4 text-white fw-bold shadow-sm flex-shrink-0" style="background-color: #457B9D; border: none;" @click="createModalRef.showModal()">
+      <button class="btn rounded-pill px-4 text-white fw-bold shadow-sm flex-shrink-0" style="background-color: #457B9D; border: none;" @click="handleCreateGameClick">
         <i class="bi bi-plus-lg me-1"></i> 發起揪團
       </button>
 
@@ -805,6 +865,7 @@ const handleManageGame = (game) => {
   </div>
 
   <ManageMatchModal ref="manageModalRef" :game="managedGame" @refresh-list="fetchGames" />
+  <AuthModal v-model="showAuthModal" @login-success="onAuthSuccess" />
 </template>
 <style scoped>
 

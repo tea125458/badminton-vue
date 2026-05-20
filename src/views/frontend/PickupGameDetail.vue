@@ -2,15 +2,21 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePickupGameApi } from '@/composables/usePickupGameApi'
+import { useTimeConflict } from '@/composables/useTimeConflict'
 import SignupPanel from '@/components/frontend/SignupPanel.vue'
 import GoogleMap from '@/components/common/GoogleMap.vue'
 import Swal from 'sweetalert2'
+import { useMemberStore } from '@/stores/member'
+import AuthModal from '@/components/frontend/AuthModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const gameId = route.params.id
 
 const { pickupGames, fetchGames, signupsMap, fetchSignups, joinPickupGame, removeSignup } = usePickupGameApi()
+const memberStore = useMemberStore()
+const showAuthModal = ref(false)
+const { checkTimeConflict } = useTimeConflict()
 
 const isLoaded = ref(false)
 const isJoining = ref(false)
@@ -80,16 +86,16 @@ const signups = computed(() => {
 // ============================
 // 🎯 核心商業邏輯：報名權限判定
 // ============================
-const currentMemberId = JSON.parse(localStorage.getItem('memberInfo'))?.memberId // 假資料：目前登入的會員 ID
+const currentMemberId = computed(() => memberStore.memberId)
 
 const isCurrentUserHost = computed(() => {
   if (!game.value || !game.value.host) return false
-  return String(game.value.host?.memberId) === String(currentMemberId)
+  return String(game.value.host?.memberId) === String(currentMemberId.value)
 })
 
 const mySignupCount = computed(() => {
   if (!signups.value) return 0
-  return signups.value.filter(s => String(s.member?.memberId) === String(currentMemberId)).length
+  return signups.value.filter(s => String(s.member?.memberId) === String(currentMemberId.value)).length
 })
 
 const signupButtonText = computed(() => {
@@ -113,7 +119,7 @@ const isAlreadyJoined = computed(() => {
 // 2. 新增退出揪團的方法
 const onCancelGame = async () => {
   // 從名單中找出自己的報名紀錄 ID
-  const mySignup = signups.value.find(s => String(s.member?.memberId) === String(currentMemberId))
+  const mySignup = signups.value.find(s => String(s.member?.memberId) === String(currentMemberId.value))
   if (!mySignup) return
 
   // 彈出 SweetAlert 再次確認，避免誤點
@@ -241,9 +247,14 @@ const displaySignups = computed(() => {
  */
 
  const onJoinGame = async (payload) => {
+  if (!memberStore.isLoggedIn) {
+    showAuthModal.value = true
+    return
+  }
+
   if (isButtonDisabled.value) return
 
-  const memberInfo = JSON.parse(localStorage.getItem('memberInfo')) || {}
+  const memberInfo = memberStore.memberInfo || {}
   const reqGender = game.value?.requiredGender || game.value?.genderLimit
 
   // 性別防呆
@@ -267,43 +278,6 @@ const displaySignups = computed(() => {
     })
     return
   }
-  // 🪶 羽毛背景隨機資料（從列表頁搬過來）
-const cols = 4
-const rows = 4
-const feathers = [
-  { x: 3,  y: 2,  size: 200, opacity: 0.30, rotate: 25  },
-  { x: 28, y: 8,  size: 170, opacity: 0.30, rotate: 140 },
-  { x: 55, y: 5,  size: 190, opacity: 0.30, rotate: 200 },
-  { x: 80, y: 3,  size: 160, opacity: 0.30, rotate: 310 },
-  { x: 8,  y: 25, size: 180, opacity: 0.30, rotate: 75  },
-  { x: 42, y: 22, size: 220, opacity: 0.30, rotate: 160 },
-  { x: 70, y: 28, size: 190, opacity: 0.30, rotate: 240 },
-  { x: 88, y: 24, size: 160, opacity: 0.30, rotate: 50  },
-  { x: 15, y: 55, size: 200, opacity: 0.30, rotate: 120 },
-  { x: 50, y: 60, size: 175, opacity: 0.30, rotate: 280 },
-  { x: 75, y: 65, size: 210, opacity: 0.30, rotate: 15  },
-  { x: 92, y: 70, size: 165, opacity: 0.30, rotate: 190 },
-  { x: 5,  y: 75, size: 195, opacity: 0.30, rotate: 55  },
-  { x: 35, y: 80, size: 180, opacity: 0.30, rotate: 170 },
-  { x: 62, y: 78, size: 205, opacity: 0.30, rotate: 320 },
-  { x: 85, y: 85, size: 170, opacity: 0.30, rotate: 95  },
-  { x: 30, y: 42, size: 185, opacity: 0.30, rotate: 210 },
-  { x: 55, y: 48, size: 195, opacity: 0.30, rotate: 330 },
-  { x: 45, y: 68, size: 175, opacity: 0.30, rotate: 80  },
-  { x: 68, y: 50, size: 200, opacity: 0.30, rotate: 145 },
-]
-
-for (let row = 0; row < rows; row++) {
-  for (let col = 0; col < cols; col++) {
-    feathers.push({
-      x: (col / cols) * 95 + Math.random() * (95 / cols),
-      y: (row / rows) * 60 + Math.random() * (60 / rows),
-      size: 70 + Math.random() * 70,
-      opacity: 0.08 + Math.random() * 0.05,
-      rotate: Math.random() * 360
-    })
-  }
-}
 
   // 程度防呆
   const levelRank = { '初級': 1, '中級': 2, '高級': 3 }
@@ -323,14 +297,41 @@ for (let row = 0; row < rows; row++) {
     return
   }
 
+  // 🕐 時間衝突檢查
+  const { hasConflict, conflictMessage } = await checkTimeConflict(
+    currentMemberId.value,
+    game.value.gameDate,
+    game.value.startTime,
+    game.value.endTime,
+    { excludeGameId: Number(gameId) }
+  )
+  if (hasConflict) {
+    Swal.fire({
+      icon: 'warning',
+      title: '⚠️ 時間衝突',
+      text: conflictMessage,
+      confirmButtonColor: '#dc3545',
+      confirmButtonText: '我知道了'
+    })
+    return
+  }
+
   isJoining.value = true
-  await joinPickupGame(gameId, currentMemberId)
+  await joinPickupGame(gameId, currentMemberId.value)
 
   await Promise.all([
     fetchGames(),
     fetchSignups(gameId)
   ])
   isJoining.value = false
+}
+
+function onAuthSuccess() {
+  showAuthModal.value = false
+  Promise.all([
+    fetchGames(),
+    fetchSignups(gameId)
+  ])
 }
 
 
@@ -567,6 +568,7 @@ const handleKick = async (signupId, memberName) => {
     </div>
 
   </div>
+  <AuthModal v-model="showAuthModal" @login-success="onAuthSuccess" />
 </template>
 
 <style scoped>
