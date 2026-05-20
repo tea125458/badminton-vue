@@ -284,17 +284,13 @@ async function handleSave() {
   errorMsg.value = ''
 
   const d = form.value
-  if (!d.phone || !d.email) {
-    errorMsg.value = '電話和 Email 為必填'
+  if (!d.phone) {
+    errorMsg.value = '手機號碼為必填'
     return
   }
   const phoneDigits = d.phone.replace(/\D/g, '')
   if (phoneDigits.length !== 10 || !phoneDigits.startsWith('09')) {
     errorMsg.value = '電話格式錯誤！必須為 09 開頭的 10 位數字'
-    return
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) {
-    errorMsg.value = 'Email 格式錯誤！'
     return
   }
 
@@ -605,7 +601,7 @@ async function handleAvatarUpload(event) {
                       </div>
                     </div>
 
-                    <!-- 第三排：手機與信箱 (可修改) -->
+                    <!-- 第三排：手機（可修改）與信箱（不可修改） -->
                     <div class="row g-3 mb-4">
                       <div class="col-md-6">
                         <label class="form-label-gray">手機號碼</label>
@@ -620,7 +616,7 @@ async function handleAvatarUpload(event) {
                       </div>
                       <div class="col-md-6">
                         <label class="form-label-gray">電子信箱</label>
-                        <input v-model="form.email" type="email" class="form-control-styled" />
+                        <input v-model="form.email" type="email" class="form-control-styled" disabled />
                       </div>
                     </div>
 
