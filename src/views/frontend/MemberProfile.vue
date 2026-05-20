@@ -5,7 +5,7 @@
  * - 上方：歡迎區 + 帳號 / 等級概覽
  * - 下方：個人資料表單（姓名、性別不可改）
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { memberApi } from '@/api/member'
 import { bookingApi } from '@/api/booking'
@@ -144,12 +144,12 @@ watch(() => route.query.tab, (newTab) => {
   if (newTab) switchTab(newTab)
 })
 
-async function fetchOrders() {
+async function fetchOrders(isBackground = false) {
   if (!member.value?.memberId) {
-    loadingOrders.value = false
+    if (!isBackground) loadingOrders.value = false
     return
   }
-  loadingOrders.value = true
+  if (!isBackground) loadingOrders.value = true
   try {
     const data = await orderApi.findByMemberId(member.value.memberId)
     // 確保 data 是陣列，避免 slice 報錯
@@ -167,7 +167,7 @@ async function fetchOrders() {
   } catch (err) {
     console.error('載入訂單失敗', err)
   } finally {
-    loadingOrders.value = false
+    if (!isBackground) loadingOrders.value = false
   }
 }
 
@@ -237,6 +237,8 @@ function formatPhone() {
   form.value.phone = f
 }
 
+let orderPollingTimer = null
+
 // 載入個人資料
 onMounted(async () => {
   const token = localStorage.getItem('memberToken')
@@ -276,6 +278,18 @@ onMounted(async () => {
   if (tabParam && menuItems.some(m => m.id === tabParam)) {
     switchTab(tabParam)
   }
+
+  // 啟動短輪詢 (Short Polling)
+  // 如果使用者停留在「歷史消費訂單」頁籤，每 5 秒自動向後端獲取最新狀態
+  orderPollingTimer = setInterval(() => {
+    if (activeTab.value === 'orders') {
+      fetchOrders(true) // 傳入 true 代表背景輪詢，不顯示 loading 動畫
+    }
+  }, 5000)
+})
+
+onUnmounted(() => {
+  if (orderPollingTimer) clearInterval(orderPollingTimer)
 })
 
 // 儲存變更

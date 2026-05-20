@@ -3,7 +3,7 @@
  * 當前訂單詳情頁面
  * 只顯示剛成交或特定的訂單
  */
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { orderApi } from '@/api/order'
 
@@ -33,6 +33,8 @@ const mockInvoiceNumber = computed(() => {
   return 'XY-' + String(orderId).padStart(8, '0')
 })
 
+let pollingTimer = null
+
 onMounted(async () => {
   if (!orderId) {
     // 如果沒有 ID，導向個人中心查看歷史
@@ -40,15 +42,28 @@ onMounted(async () => {
     return
   }
 
-  try {
-    const data = await orderApi.findById(orderId)
-    order.value = data
-    items.value = await orderApi.findItems(orderId)
-  } catch (e) {
-    console.error('載入訂單失敗', e)
-  } finally {
-    loading.value = false
+  const loadData = async () => {
+    try {
+      const data = await orderApi.findById(orderId)
+      order.value = data
+      items.value = await orderApi.findItems(orderId)
+    } catch (e) {
+      console.error('載入訂單失敗', e)
+    } finally {
+      loading.value = false
+    }
   }
+
+  await loadData()
+
+  // 啟用短輪詢 (Short Polling)，每 5 秒自動去後端抓取最新狀態
+  pollingTimer = setInterval(() => {
+    loadData()
+  }, 5000)
+})
+
+onUnmounted(() => {
+  if (pollingTimer) clearInterval(pollingTimer)
 })
 
 function formatPrice(val) {
