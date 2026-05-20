@@ -412,8 +412,10 @@ const statusTabs = [
 ]
 
 // ===================== 計算屬性 =====================
+const sortBy = ref('default')
+
 const filteredOrders = computed(() => {
-  return orders.value.filter((o) => {
+  let result = orders.value.filter((o) => {
     const matchStatus = !filterStatus.value || o.status === filterStatus.value
     if (!keyword.value) return matchStatus
     const kw = keyword.value.trim().toLowerCase()
@@ -437,9 +439,41 @@ const filteredOrders = computed(() => {
       o.note?.toLowerCase().includes(kw)
     return matchKeyword && matchStatus
   })
+
+  // 排序處理
+  if (sortBy.value === 'dateNewest') {
+    result.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate))
+  } else if (sortBy.value === 'dateOldest') {
+    result.sort((a, b) => new Date(a.orderDate) - new Date(b.orderDate))
+  } else if (sortBy.value === 'amountHighest') {
+    result.sort((a, b) => b.totalAmount - a.totalAmount)
+  } else if (sortBy.value === 'amountLowest') {
+    result.sort((a, b) => a.totalAmount - b.totalAmount)
+  } else {
+    // 預設排序: 編號由大到小 (最新訂單)
+    result.sort((a, b) => b.orderId - a.orderId)
+  }
+
+  return result
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredOrders.value.length / pageSize)))
+
+const filterLabel = computed(() => {
+  if (!filterStatus.value) return '全部狀態'
+  const tab = statusTabs.find(t => t.key === filterStatus.value)
+  return tab ? tab.label : '狀態篩選'
+})
+
+const sortLabel = computed(() => {
+  const map = {
+    default: '預設 (最新訂單)',
+    dateOldest: '日期由舊到新',
+    amountHighest: '金額由高到低',
+    amountLowest: '金額由低到高',
+  }
+  return map[sortBy.value] || '排序方式'
+})
 
 const pagedOrders = computed(() => {
   const start = (currentPage.value - 1) * pageSize
@@ -720,109 +754,102 @@ function getInvoiceTypeText(order) {
       </div>
     </div>
 
-    <!-- ====== 頁面標題 & 新增按鈕 ====== -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <div>
-        <h2 class="page-title"><i class="bi bi-receipt"></i> 訂單管理</h2>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <button class="btn-add" @click="openCreateOrder">
-          <i class="bi bi-plus-lg"></i> 新增訂單
-        </button>
-        <!-- 匯出下拉選單 -->
-        <div class="export-dropdown-wrap" style="position: relative">
-          <button class="btn btn-outline-brand" @click="showExportMenu = !showExportMenu">
-            <i class="bi bi-download me-1"></i>
-            <i class="bi bi-caret-down-fill" style="font-size: 0.6rem"></i>
-          </button>
-          <transition name="fade">
-            <div v-if="showExportMenu" class="export-dropdown-menu">
-              <button class="export-menu-item" @click="handleExport('EXCEL')">
-                <i class="bi bi-file-earmark-excel me-2" style="color: #10b981"></i>匯出 Excel
-                (.xlsx)
-              </button>
-              <button class="export-menu-item" @click="handleExport('PDF')">
-                <i class="bi bi-file-earmark-pdf me-2" style="color: #ef4444"></i>匯出 PDF (.pdf)
-              </button>
-              <button class="export-menu-item" @click="handleExport('JSON')">
-                <i class="bi bi-filetype-json me-2" style="color: #3b82f6"></i>匯出 JSON (.json)
-              </button>
-            </div>
-          </transition>
-        </div>
-      </div>
-    </div>
-    <!-- ====== 工具列 (狀態比例圖 + 搜尋框) ====== -->
-    <div class="card card-rounded shadow-sm border-0 mb-3">
-      <div class="card-body p-3 d-flex flex-column flex-md-row align-items-center gap-4">
-        <!-- 狀態長條比例圖 (篩選器) -->
-        <div class="flex-grow-1 w-100">
-          <div class="d-flex justify-content-between align-items-end mb-2" style="color: #64748b">
-            <span class="fw-bold" style="font-size: 0.85rem"
-              ><i class="bi bi-funnel me-1"></i>訂單狀態分佈 (點擊篩選)</span
-            >
-            <div class="d-flex align-items-center" style="font-size: 0.95rem">
-              <span
-                v-if="filterStatus"
-                class="badge bg-secondary me-3 px-3 py-2 shadow-sm"
-                style="cursor: pointer; font-size: 0.85rem"
-                @click="onFilterChange('')"
-                ><i class="bi bi-x-circle me-1"></i>清除篩選</span
-              >
-              <span class="fw-bold text-dark" style="letter-spacing: 0.5px"
-                >總計 {{ Number(statusCounts[''] || 0).toLocaleString() }} 筆</span
-              >
-            </div>
-          </div>
-          <div class="status-stacked-bar">
-            <!-- 我們只顯示有數量的狀態 -->
-            <template v-for="tab in statusTabs.slice(1)" :key="tab.key">
-              <div
-                v-if="statusCounts[tab.key] > 0"
-                class="stacked-segment"
-                :class="{
-                  'is-dimmed': filterStatus && filterStatus !== tab.key,
-                  'is-active': filterStatus === tab.key,
-                }"
-                :style="{
-                  width: (statusCounts[tab.key] / statusCounts['']) * 100 + '%',
-                  backgroundColor: statusMap[tab.key]?.color,
-                  color: 'white',
-                }"
-                @click="onFilterChange(tab.key)"
-                :title="tab.label + ': ' + statusCounts[tab.key] + '筆'"
-              >
-                <span
-                  class="segment-label"
-                  v-if="(statusCounts[tab.key] / statusCounts['']) * 100 > 4"
-                >
-                  {{ tab.label }} {{ statusCounts[tab.key] }}
-                </span>
-              </div>
-            </template>
-            <!-- 若完全沒訂單的佔位 -->
-            <div
-              v-if="statusCounts[''] === 0"
-              class="stacked-segment"
-              style="width: 100%; background-color: #e2e8f0; color: #94a3b8"
-            >
-              無資料
-            </div>
-          </div>
-        </div>
-
-        <!-- 搜尋框 -->
-        <div class="input-group" style="width: 100%; max-width: 320px; flex-shrink: 0">
-          <span class="input-group-text bg-white border-end-0"
-            ><i class="bi bi-search text-secondary"></i
-          ></span>
+    <!-- ====== 頁面標題 & 整合工具列 ====== -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
+      <!-- 左側：標題與搜尋框 -->
+      <div class="d-flex align-items-center gap-4">
+        <h2 class="page-title mb-0" style="white-space: nowrap;"><i class="bi bi-receipt"></i> 訂單管理</h2>
+        
+        <div class="input-group" style="width: 280px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); border-radius: 0.5rem;">
+          <span class="input-group-text bg-white border-end-0" style="border-radius: 0.5rem 0 0 0.5rem;">
+            <i class="bi bi-search text-secondary"></i>
+          </span>
           <input
             v-model="keyword"
             type="text"
             class="form-control border-start-0"
-            placeholder="搜尋編號、會員、訂購日期......"
+            placeholder="搜尋編號、會員、日期..."
+            style="border-radius: 0 0.5rem 0.5rem 0;"
           />
         </div>
+      </div>
+
+      <!-- 右側：篩選、排序與新增按鈕 -->
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        
+        <!-- 狀態篩選 Dropdown -->
+        <div class="dropdown">
+          <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown" style="border-radius: 0.5rem; padding: 0.5rem 1rem;">
+            <i class="bi bi-funnel"></i>
+            <span class="fw-semibold" style="font-size: 0.9rem;">{{ filterLabel }}</span>
+            <span v-if="filterStatus" class="badge bg-secondary rounded-pill ms-1">{{ statusCounts[filterStatus] || 0 }}</span>
+          </button>
+          <ul class="dropdown-menu shadow-sm border-0" style="border-radius: 0.75rem; min-width: 200px; padding: 0.5rem 0;">
+            <li><h6 class="dropdown-header text-muted fw-bold">訂單狀態</h6></li>
+            <li>
+              <button class="dropdown-item py-2 fw-medium d-flex justify-content-between align-items-center" :class="{active: filterStatus === ''}" @click="onFilterChange('')">
+                <span>全部狀態</span>
+                <span class="badge bg-light text-dark border">{{ statusCounts[''] || 0 }}</span>
+              </button>
+            </li>
+            <li><hr class="dropdown-divider my-1"></li>
+            <li v-for="tab in statusTabs.slice(1)" :key="tab.key">
+              <button class="dropdown-item py-2 fw-medium d-flex justify-content-between align-items-center" :class="{active: filterStatus === tab.key}" @click="onFilterChange(tab.key)">
+                <span>{{ tab.label }}</span>
+                <span class="badge" :style="{ backgroundColor: statusMap[tab.key]?.color }">{{ statusCounts[tab.key] || 0 }}</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 排序選單 Dropdown -->
+        <div class="dropdown">
+          <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown" style="border-radius: 0.5rem; padding: 0.5rem 1rem;">
+            <i class="bi bi-sort-down"></i>
+            <span class="fw-semibold" style="font-size: 0.9rem;">{{ sortLabel }}</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="border-radius: 0.75rem; min-width: 180px; padding: 0.5rem 0;">
+            <li><h6 class="dropdown-header text-muted fw-bold">排序方式</h6></li>
+            <li><button class="dropdown-item py-2 fw-medium" :class="{active: sortBy === 'default'}" @click="sortBy = 'default'">預設 (最新訂單)</button></li>
+            <li><button class="dropdown-item py-2 fw-medium" :class="{active: sortBy === 'dateOldest'}" @click="sortBy = 'dateOldest'">日期由舊到新</button></li>
+            <li><hr class="dropdown-divider my-1"></li>
+            <li><button class="dropdown-item py-2 fw-medium" :class="{active: sortBy === 'amountHighest'}" @click="sortBy = 'amountHighest'">金額由高到低</button></li>
+            <li><button class="dropdown-item py-2 fw-medium" :class="{active: sortBy === 'amountLowest'}" @click="sortBy = 'amountLowest'">金額由低到高</button></li>
+          </ul>
+        </div>
+
+        <!-- 批次刪除 (僅選取時顯示) -->
+        <transition name="fade">
+          <button v-if="selectedIds.size > 0" class="btn btn-outline-danger d-flex align-items-center gap-2" style="border-radius: 0.5rem; padding: 0.5rem 1rem;" @click="showBatchDeleteConfirm = true">
+            <i class="bi bi-trash3"></i>
+            <span class="fw-semibold" style="font-size: 0.9rem;">刪除 ({{ selectedIds.size }})</span>
+          </button>
+        </transition>
+
+        <!-- 取消全選 (僅選取時顯示) -->
+        <transition name="fade">
+          <button v-if="selectedIds.size > 0" class="btn btn-outline-secondary d-flex align-items-center gap-2" style="border-radius: 0.5rem; padding: 0.5rem 1rem;" @click="clearSelection" title="取消選取">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </transition>
+
+        <!-- 匯出選單 (自動根據是否有勾選切換) -->
+        <div class="dropdown ms-1">
+          <button class="btn btn-outline-secondary dropdown-toggle d-flex align-items-center gap-2" data-bs-toggle="dropdown" style="border-radius: 0.5rem; padding: 0.5rem 1rem;">
+            <i class="bi bi-download"></i>
+            <span class="fw-semibold" style="font-size: 0.9rem;">{{ selectedIds.size > 0 ? '匯出勾選' : '匯出全部' }}</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="border-radius: 0.75rem; min-width: 160px; padding: 0.5rem 0;">
+            <li><button class="dropdown-item py-2 fw-medium" @click="selectedIds.size > 0 ? batchExport('EXCEL') : handleExport('EXCEL')"><i class="bi bi-file-earmark-excel me-2 text-success"></i>匯出 Excel</button></li>
+            <li><button class="dropdown-item py-2 fw-medium" @click="selectedIds.size > 0 ? batchExport('PDF') : handleExport('PDF')"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>匯出 PDF</button></li>
+            <li><button class="dropdown-item py-2 fw-medium" @click="selectedIds.size > 0 ? batchExport('JSON') : handleExport('JSON')"><i class="bi bi-filetype-json me-2 text-primary"></i>匯出 JSON</button></li>
+          </ul>
+        </div>
+
+        <!-- 新增訂單 -->
+        <button class="btn-add ms-2" @click="openCreateOrder">
+          <i class="bi bi-plus-lg"></i> 新增訂單
+        </button>
       </div>
     </div>
     <!-- ====== C 版面：左右分割 Master-Detail ====== -->
@@ -840,55 +867,6 @@ function getInvoiceTypeText(order) {
           </p>
         </div>
         <div v-else class="card card-rounded shadow-sm border-0 overflow-hidden">
-          <!-- 批次操作工具列 -->
-          <transition name="batch-bar">
-            <div v-if="selectedIds.size > 0" class="batch-toolbar">
-              <div class="batch-toolbar-left">
-                <span class="batch-count"
-                  ><i class="bi bi-check2-square me-1"></i>已選取
-                  <strong>{{ selectedIds.size }}</strong> 筆訂單</span
-                >
-              </div>
-              <div class="batch-toolbar-actions">
-                <div class="batch-status-wrap" style="position: relative">
-                  <button
-                    class="batch-btn batch-btn-status"
-                    @click.stop="showBatchStatusMenu = !showBatchStatusMenu"
-                  >
-                    <i class="bi bi-arrow-repeat me-1"></i>批次變更狀態
-                    <i
-                      class="bi bi-caret-down-fill"
-                      style="font-size: 0.55rem; margin-left: 2px"
-                    ></i>
-                  </button>
-                  <div v-if="showBatchStatusMenu" class="batch-status-menu">
-                    <button
-                      v-for="s in ['UNPAID', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED']"
-                      :key="s"
-                      class="batch-status-item"
-                      @click="batchChangeStatus(s)"
-                    >
-                      <i
-                        :class="['bi', statusMap[s]?.icon]"
-                        class="me-1"
-                        :style="{ color: statusMap[s]?.color }"
-                      ></i
-                      >{{ statusMap[s]?.label }}
-                    </button>
-                  </div>
-                </div>
-                <button class="batch-btn batch-btn-export" @click="batchExport('EXCEL')">
-                  <i class="bi bi-file-earmark-excel me-1"></i>匯出勾選
-                </button>
-                <button class="batch-btn batch-btn-delete" @click="showBatchDeleteConfirm = true">
-                  <i class="bi bi-trash3 me-1"></i>批次刪除
-                </button>
-                <button class="batch-btn batch-btn-clear" @click="clearSelection">
-                  <i class="bi bi-x-lg me-1"></i>取消全選
-                </button>
-              </div>
-            </div>
-          </transition>
           <div class="table-responsive">
             <table class="table table-hover align-middle text-center mb-0">
               <thead>
@@ -955,19 +933,57 @@ function getInvoiceTypeText(order) {
                     >
                   </td>
                   <td @click.stop>
-                    <div class="d-flex gap-1 justify-content-center">
+                    <div class="d-flex gap-1 justify-content-center align-items-center">
                       <button
                         class="btn btn-sm action-btn action-btn-edit"
+                        title="編輯"
                         @click="openEdit(order)"
                       >
                         <i class="bi bi-pencil"></i>
                       </button>
                       <button
                         class="btn btn-sm action-btn action-btn-delete"
+                        title="刪除"
                         @click="confirmDelete(order)"
                       >
                         <i class="bi bi-trash3"></i>
                       </button>
+                      <div class="dropdown">
+                        <button
+                          class="btn btn-sm action-btn action-btn-status dropdown-toggle"
+                          data-bs-toggle="dropdown"
+                          title="變更狀態"
+                        >
+                          <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                          <li>
+                            <button class="dropdown-item fw-semibold" :class="{ active: order.status === 'UNPAID' }" @click="changeStatus(order, 'UNPAID')">
+                              <i class="bi bi-clipboard-check me-2" :style="{ color: order.status === 'UNPAID' ? '' : '#F59E0B' }"></i>訂單成立
+                            </button>
+                          </li>
+                          <li>
+                            <button class="dropdown-item fw-semibold" :class="{ active: order.status === 'PAID' }" @click="changeStatus(order, 'PAID')">
+                              <i class="bi bi-box-seam me-2" :style="{ color: order.status === 'PAID' ? '' : '#3B82F6' }"></i>備貨中
+                            </button>
+                          </li>
+                          <li>
+                            <button class="dropdown-item fw-semibold" :class="{ active: order.status === 'SHIPPED' }" @click="changeStatus(order, 'SHIPPED')">
+                              <i class="bi bi-shop me-2" :style="{ color: order.status === 'SHIPPED' ? '' : '#8B5CF6' }"></i>待取貨
+                            </button>
+                          </li>
+                          <li>
+                            <button class="dropdown-item fw-semibold" :class="{ active: order.status === 'COMPLETED' }" @click="changeStatus(order, 'COMPLETED')">
+                              <i class="bi bi-check2-circle me-2" :style="{ color: order.status === 'COMPLETED' ? '' : '#10B981' }"></i>已取貨
+                            </button>
+                          </li>
+                          <li>
+                            <button class="dropdown-item fw-semibold text-danger" :class="{ active: order.status === 'CANCELLED' }" @click="changeStatus(order, 'CANCELLED')">
+                              <i class="bi bi-x-circle me-2"></i>已取消
+                            </button>
+                          </li>
+                        </ul>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -1991,6 +2007,10 @@ table td {
   border: 1px solid #bae6fd;
 }
 
+.action-btn-status.dropdown-toggle::after {
+  display: none;
+}
+
 .action-btn-status:hover:not(:disabled) {
   background: var(--brand-sky, #0ea5e9);
   color: white;
@@ -2514,6 +2534,7 @@ table td {
   color: #334155;
   cursor: pointer;
   transition: background 0.15s;
+  white-space: nowrap;
 }
 
 .export-menu-item:hover {

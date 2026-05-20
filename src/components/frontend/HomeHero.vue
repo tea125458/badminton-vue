@@ -25,7 +25,7 @@ function scrollToContent() {
 
     <!-- 文字內容 -->
     <div class="hero-content">
-      <h1 class="hero-heading">揮灑汗水，盡享羽球<span class="hero-accent">樂趣</span></h1>
+      <h1 class="hero-heading">揮灑汗水，<span class="hero-accent">羽</span>你同樂</h1>
 
       <p class="hero-subtitle">
         專業場地、優質設備、熱情球友，讓每一次揮拍都成為美好回憶。<br />

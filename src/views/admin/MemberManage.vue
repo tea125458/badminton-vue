@@ -275,11 +275,26 @@ async function deleteMember(id, name) {
 
 // ===== 變更狀態 =====
 async function changeStatus(id, status) {
+  const statusLabel = { ACTIVE: '正常', INACTIVE: '停權', BANNED: '封鎖' }[status] || status
   try {
     await adminApi.updateMemberStatus(id, status)
     loadData()
+    Swal.fire({
+      title: '狀態已更新',
+      text: `會員狀態已變更為「${statusLabel}」`,
+      icon: 'success',
+      iconColor: '#0ea5e9',
+      showConfirmButton: false,
+      timer: 1500,
+      width: '350px',
+    })
   } catch (e) {
-    alert('狀態更新失敗')
+    Swal.fire({
+      title: '狀態更新失敗',
+      text: e.response?.data || e.message,
+      icon: 'error',
+      confirmButtonColor: '#0ea5e9',
+    })
   }
 }
 
@@ -294,8 +309,21 @@ async function saveNote() {
     await adminApi.updateMemberNote(noteTarget.value.id, noteTarget.value.note)
     showNoteModal.value = false
     loadData()
+    Swal.fire({
+      title: '備註已更新',
+      icon: 'success',
+      iconColor: '#0ea5e9',
+      showConfirmButton: false,
+      timer: 1200,
+      width: '300px',
+    })
   } catch (e) {
-    alert('備註更新失敗')
+    Swal.fire({
+      title: '備註更新失敗',
+      text: e.response?.data || e.message,
+      icon: 'error',
+      confirmButtonColor: '#0ea5e9',
+    })
   }
 }
 
