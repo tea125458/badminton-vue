@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import * as bootstrap from 'bootstrap'
-// 🌟 直接引入你寫好的神級 API
+// 🌟 引入 API
 import { usePickupGameApi } from '@/composables/usePickupGameApi'
 const emit = defineEmits(['refresh-list'])
 const router = useRouter()
@@ -149,6 +149,16 @@ const submitForm = async () => {
   emit('refresh-list')
 }
 
+// ⚡ 一鍵輸入 (Demo 用)
+const quickFill = () => {
+  newGame.value.feePerPerson = 300
+  newGame.value.maxPlayers = 6
+  newGame.value.skillLevel = 'INTERMEDIATE'
+  newGame.value.requiredGender = 'ALL'
+  newGame.value.description = '🏸 週末歡樂流汗團！新手友善，主揪會帶勝利比賽級羽球，請自備水壺跟毛巾。\n氣氛輕鬆不計較輸贏，打完球還可以一起去附近吃宵夜喔！😎'
+  selectedTags.value = ['新手友善', '歡樂流汗']
+}
+
 // ============================
 // 🏷️ 揪團特色標籤選擇器
 // ============================
@@ -181,6 +191,9 @@ const isTagDisabled = (tag) => !isTagSelected(tag) && selectedTags.value.length 
         <div class="modal-header border-bottom-0 bg-light rounded-top-4 pb-2 pt-3 px-4">
           <h5 class="modal-title fw-bold text-dark d-flex align-items-center">
             <i class="bi bi-plus-circle-fill text-sky-blue me-2 fs-4"></i> 發起揪團
+            <button type="button" class="btn btn-sm text-warning p-0 ms-2" @click="quickFill" title="一鍵輸入" style="border: none; background: transparent;">
+              <i class="bi bi-lightning-fill fs-5"></i>
+            </button>
           </h5>
           <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>

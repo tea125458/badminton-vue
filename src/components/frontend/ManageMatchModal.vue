@@ -203,6 +203,11 @@ watch(() => props.game?.gameId, (newId) => {
 const broadcastMessage = ref('')
 const isSending = ref(false)
 
+// ⚡ 一鍵輸入 (Demo 用)
+const quickFillEmail = () => {
+  broadcastMessage.value = '大家好！\n\n剛收到球館通知，因為原本的 A 館冷氣臨時進行維修保養，我們今天的場地改到隔壁的『B 館 2 號場』囉！\n\n打球時間一樣不變，造成不便敬請見諒，大家待會見！'
+}
+
 const sendBroadcast = async () => {
   if (!broadcastMessage.value.trim()) {
     Swal.fire({ icon: 'warning', title: '請輸入公告內容', confirmButtonText: '好的' })
@@ -391,7 +396,12 @@ const sendBroadcast = async () => {
           <div v-show="activeTab === 'broadcast'">
             <div class="card border-0 rounded-4 shadow-sm bg-white">
               <div class="card-body p-4">
-                <h6 class="fw-bold text-dark mb-2"><i class="bi bi-megaphone-fill me-2 text-mori-teal"></i>群發 Email 公告</h6>
+                <h6 class="fw-bold text-dark mb-2 d-flex align-items-center">
+                  <i class="bi bi-megaphone-fill me-2 text-mori-teal"></i>群發 Email 公告
+                  <button type="button" class="btn btn-sm text-warning p-0 ms-2" @click="quickFillEmail" title="一鍵輸入" style="border: none; background: transparent;">
+                    <i class="bi bi-lightning-fill fs-5"></i>
+                  </button>
+                </h6>
                 <p class="text-secondary small mb-3">輸入公告內容後，系統會自動寄送 Email 給所有已報名成功的球友。</p>
                 <textarea v-model="broadcastMessage" class="form-control bg-light shadow-none border-0 mb-4 p-3 rounded-3" rows="5" placeholder="例如：今天場地臨時改到 B 館，請大家留意哦！" style="resize: vertical;" :disabled="isSending"></textarea>
                 <div class="d-flex justify-content-between align-items-center">
