@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import * as bootstrap from 'bootstrap'
 // 🌟 直接引入你寫好的神級 API
 import { usePickupGameApi } from '@/composables/usePickupGameApi'
 const emit = defineEmits(['refresh-list'])
+const router = useRouter()
 
 // 判斷主揪性別 (防止男生開純女團)
 const memberInfo = computed(() => {
@@ -51,7 +53,9 @@ onMounted(() => {
 // 🌟 從後端撈取登入者自己的可用預約
 import api from '@/api'
 const myBookings = ref([])
+const bookingsLoaded = ref(false)
 const fetchMyBookings = async () => {
+  bookingsLoaded.value = false
   try {
     // 🌟 同時撈取預約 + 揪團，排除已被使用的預約
     const [bookingsRes, gamesRes] = await Promise.all([
@@ -97,6 +101,8 @@ const fetchMyBookings = async () => {
   } catch (err) {
     console.error('抓取我的預約失敗', err)
     myBookings.value = []
+  } finally {
+    bookingsLoaded.value = true
   }
 }
 const selectedBookingId = ref('')
@@ -115,8 +121,16 @@ const applyBooking = () => {
 }
 
 const showModal = () => {
+  selectedBookingId.value = ''
+  bookingsLoaded.value = false
   fetchMyBookings()  // 🌟 每次打開 Modal 時都重新撈取最新的預約資料
   modalInstance.show()
+}
+
+// 🌟 跳轉到預約頁面
+const goToBooking = () => {
+  modalInstance.hide()
+  router.push('/booking')
 }
 defineExpose({ showModal })
 // 送出表單
@@ -176,15 +190,60 @@ const isTagDisabled = (tag) => !isTagSelected(tag) && selectedTags.value.length 
             <!-- 🌟 新版：從我的預約中挑選場地時段 -->
             <div class="mb-4">
               <label class="form-label fw-bold text-secondary small mb-1">1. 選擇您的預約場地與時段</label>
-              <div class="input-group">
-                <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-calendar-check"></i></span>
-                <select class="form-select border-start-0 ps-0 shadow-none" v-model="selectedBookingId" @change="applyBooking" required>
-                  <option value="" disabled>請選擇可用預約...</option>
-                  <option v-for="b in myBookings" :key="b.bookingId" :value="b.bookingId">
-                    {{ b.bookingDate }} ({{ b.startTime }}-{{ b.endTime }}) | {{ b.venueName }} - {{ b.courtName }}
-                  </option>
-                </select>
+
+              <!-- 🔄 載入中 -->
+              <div v-if="!bookingsLoaded" class="text-center py-4 text-muted">
+                <div class="spinner-border spinner-border-sm me-2 text-sky-blue"></div>
+                <span class="small">正在載入您的可用預約...</span>
               </div>
+
+              <!-- ⚠️ 無可用預約時的友善引導 -->
+              <div v-else-if="myBookings.length === 0" class="empty-booking-guide rounded-4 p-4 text-center">
+                <div class="empty-icon-wrapper mx-auto mb-3">
+                  <i class="bi bi-calendar-x fs-1"></i>
+                </div>
+                <h6 class="fw-bold text-dark mb-2">目前沒有可用的場地預約</h6>
+                <p class="text-secondary small mb-3" style="line-height: 1.7;">
+                  發起揪團前，需要先<strong class="text-dark">預約一個場地</strong>。<br>
+                  預約完成後再回來發起揪團，系統會自動帶入場地與時段資訊喔！
+                </p>
+                <div class="d-flex flex-column gap-2 align-items-center">
+                  <button type="button" class="btn btn-sky-blue rounded-pill fw-bold px-4 py-2 shadow-sm" @click="goToBooking">
+                    <i class="bi bi-calendar-plus me-1"></i> 前往預約球場
+                  </button>
+                  <div class="guide-steps mt-3 w-100">
+                    <div class="d-flex align-items-center gap-3 text-start mb-2">
+                      <span class="step-badge">1</span>
+                      <span class="small text-secondary">先到「預約球場」頁面預約場地與時段</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 text-start mb-2">
+                      <span class="step-badge">2</span>
+                      <span class="small text-secondary">預約成功後，回來點擊「發起揪團」</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 text-start">
+                      <span class="step-badge">3</span>
+                      <span class="small text-secondary">選擇已預約的場地，輕鬆開團找球友！</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ✅ 有可用預約時正常顯示下拉選單 -->
+              <template v-else>
+                <div class="input-group">
+                  <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-calendar-check"></i></span>
+                  <select class="form-select border-start-0 ps-0 shadow-none" v-model="selectedBookingId" @change="applyBooking" required>
+                    <option value="" disabled>請選擇可用預約...</option>
+                    <option v-for="b in myBookings" :key="b.bookingId" :value="b.bookingId">
+                      {{ b.bookingDate }} ({{ b.startTime }}-{{ b.endTime }}) | {{ b.venueName }} - {{ b.courtName }}
+                    </option>
+                  </select>
+                </div>
+                <div class="d-flex align-items-center mt-2 text-muted" style="font-size: 0.75rem;">
+                  <i class="bi bi-info-circle me-1"></i>
+                  <span>僅顯示未來且尚未開團的預約。找不到？<a href="#" class="text-sky-blue fw-bold text-decoration-none" @click.prevent="goToBooking">去預約新場地</a></span>
+                </div>
+              </template>
             </div>
 
             <!-- 自動帶入的預約資訊 (唯讀) -->
@@ -221,7 +280,7 @@ const isTagDisabled = (tag) => !isTagSelected(tag) && selectedTags.value.length 
             </div>
             
             <!-- 🌟 性別限制 (防呆檢查) -->
-            <div class="mb-4">
+            <div class="mb-4" v-if="selectedBookingId">
               <label class="form-label fw-bold text-secondary small mb-1">性別限制</label>
               <div class="input-group">
                 <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-gender-ambiguous"></i></span>
@@ -288,4 +347,40 @@ const isTagDisabled = (tag) => !isTagSelected(tag) && selectedTags.value.length 
 /* 未選取標籤：乾淨白底 + 淺灰邊框，輕盈感 */
 .btn-tag-idle { background-color: #fff; border: 1px solid #dee2e6; color: #6c757d; }
 .btn-tag-idle:hover:not(:disabled) { border-color: #0ea5e9; color: #0ea5e9; }
+
+/* ============================
+   🌟 無預約時的引導區塊樣式
+   ============================ */
+.empty-booking-guide {
+  background: linear-gradient(135deg, #F0F9FF 0%, #F8FAFC 50%, #FFF7ED 100%);
+  border: 1px dashed #BAE6FD;
+}
+.empty-icon-wrapper {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background-color: #E0F2FE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0EA5E9;
+}
+.step-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #0EA5E9;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.guide-steps {
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  padding: 16px;
+}
 </style>
