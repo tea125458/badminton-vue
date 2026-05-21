@@ -14,6 +14,7 @@ import { memberApi } from '@/api/member'
 import { productApi } from '@/api/product'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useExport } from '@/composables/useExport'
+import Swal from 'sweetalert2'
 
 // ===================== 資料狀態 =====================
 const orders = ref([])
@@ -281,7 +282,7 @@ async function loadProducts() {
 function addToCart() {
   const pid = parseInt(selectedProductId.value)
   if (!pid) {
-    alert('請選擇商品！')
+    Swal.fire({ icon: 'warning', title: '請選擇商品', confirmButtonColor: '#0ea5e9' })
     return
   }
   const qty = parseInt(selectQty.value) || 1
@@ -315,7 +316,7 @@ function updateCartQty(index, delta) {
   const newQty = item.quantity + delta
   if (newQty < 1) return
   if (newQty > item.stock) {
-    alert(`庫存不足！剩餘 ${item.stock} 件`)
+    Swal.fire({ icon: 'warning', title: '庫存不足', text: `剩餘 ${item.stock} 件`, confirmButtonColor: '#0ea5e9' })
     return
   }
   item.quantity = newQty
@@ -337,11 +338,11 @@ function openCreateOrder() {
 // 送出新增訂單
 async function handleCreateOrder() {
   if (!selectedMember.value) {
-    alert('請選擇會員！')
+    Swal.fire({ icon: 'warning', title: '請選擇會員', confirmButtonColor: '#0ea5e9' })
     return
   }
   if (cart.value.length === 0) {
-    alert('請至少加入一項商品！')
+    Swal.fire({ icon: 'warning', title: '請至少加入一項商品', confirmButtonColor: '#0ea5e9' })
     return
   }
 
@@ -366,10 +367,10 @@ async function handleCreateOrder() {
 
     showCreateModal.value = false
     await loadOrders()
-    alert('訂單建立成功！')
+    Swal.fire({ icon: 'success', title: '訂單建立成功', confirmButtonColor: '#10B981' })
   } catch (e) {
     console.error('建立訂單失敗', e)
-    alert('建立訂單失敗：' + (e.response?.data?.message || e.message))
+    Swal.fire({ icon: 'error', title: '建立訂單失敗', text: e.response?.data?.message || e.message, confirmButtonColor: '#EF4444' })
   } finally {
     creating.value = false
   }
@@ -574,7 +575,7 @@ async function loadOrders() {
     }
   } catch (e) {
     console.error('載入訂單失敗', e)
-    alert('載入訂單失敗，請確認後端是否已啟動')
+    Swal.fire({ icon: 'error', title: '載入訂單失敗', text: '請確認後端是否已啟動', confirmButtonColor: '#EF4444' })
   } finally {
     loading.value = false
   }
@@ -589,7 +590,7 @@ async function changeStatus(order, newStatus) {
     await loadOrders()
   } catch (e) {
     console.error('狀態更新失敗', e)
-    alert('狀態更新失敗')
+    Swal.fire({ icon: 'error', title: '狀態更新失敗', confirmButtonColor: '#EF4444' })
   }
 }
 
@@ -613,7 +614,7 @@ async function handleSave() {
     await loadOrders()
   } catch (e) {
     console.error('更新失敗', e)
-    alert('更新失敗')
+    Swal.fire({ icon: 'error', title: '更新失敗', confirmButtonColor: '#EF4444' })
   } finally {
     saving.value = false
   }
@@ -633,7 +634,7 @@ async function handleDelete() {
     await loadOrders()
   } catch (e) {
     console.error('刪除失敗', e)
-    alert('刪除失敗')
+    Swal.fire({ icon: 'error', title: '刪除失敗', confirmButtonColor: '#EF4444' })
   }
 }
 
