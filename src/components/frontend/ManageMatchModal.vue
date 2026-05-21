@@ -328,7 +328,7 @@ const sendBroadcast = async () => {
                     class="list-group-item participant-item px-2 py-3 d-flex align-items-center justify-content-between">
                   <div class="d-flex align-items-center gap-3">
                     <span class="text-muted fw-bold" style="width: 24px; font-size: 0.8rem;">#{{ idx + 1 }}</span>
-                    <img :src="signup.member?.photoUrl || `https://i.pravatar.cc/150?u=${signup.member?.memberId}`"
+                    <img :src="signup.member?.profilePicture || '/profile_pictures/4.png'"
                          class="rounded-circle shadow-sm" width="40" height="40" alt="avatar" style="border: 2px solid #fff; object-fit: cover;">
                     <div>
                       <div class="fw-bold text-dark mb-1" style="font-size: 0.95rem;">{{ signup.member?.fullName || '球友' }}</div>

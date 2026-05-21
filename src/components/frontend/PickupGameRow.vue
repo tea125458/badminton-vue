@@ -148,7 +148,7 @@ const handleCardClick = () => {
         </div>
 
         <div class="d-flex align-items-center mt-auto">
-          <img :src="game.host?.photoUrl || `https://i.pravatar.cc/150?u=${game.host?.memberId}`"
+          <img :src="game.host?.profilePicture || '/profile_pictures/4.png'"
                class="rounded-circle me-2 host-avatar" width="32" height="32" alt="avatar">
           <span class="small text-secondary">{{ game.host?.fullName || '揪團主' }}</span>
         </div>
