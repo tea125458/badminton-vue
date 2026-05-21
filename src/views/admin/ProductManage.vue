@@ -256,6 +256,31 @@ function handleExport(format) {
   exportData(buildExportRows(), format, '商品清單')
 }
 
+// ===================== 一鍵填入 Demo 資料 =====================
+function fillDemoProduct() {
+  if (isEditing.value) return
+  const demoProducts = [
+    { name: 'YONEX ASTROX 99 Pro', brand: 'YONEX', category: 'RACKET', price: 6200, stock: 15, spec: '4U/G5', tag: '熱銷', desc: '進攻型頂級球拍，採用 NAMD+石墨烯複合材料，提供極致的打擊力道與控球精準度。' },
+    { name: 'VICTOR THRUSTER K-9900', brand: 'VICTOR', category: 'RACKET', price: 4800, stock: 8, spec: '3U/G5', tag: '精選', desc: '攻擊型球拍，採用高剛性碳纖維，適合喜歡重殺的球友。' },
+    { name: 'YONEX SHB-65Z3', brand: 'YONEX', category: 'SHOES', price: 3980, stock: 20, spec: '25.5cm', tag: '', desc: '專業競技缽球鞋，採用 POWER CUSHION+ 避震材料，提供絕佳穩定性。' },
+    { name: 'VICTOR NS-3000 羽球', brand: 'VICTOR', category: 'SHUTTLECOCK', price: 550, stock: 50, spec: '鵝毛/12入', tag: '促銷', desc: '櫳準級競技用球，耐打耐用，飛行穩定。適合日常練習與比賽。' },
+    { name: 'YONEX BG-65 球線', brand: 'YONEX', category: 'STRING', price: 180, stock: 100, spec: '0.70mm/10m', tag: '', desc: '全球銷量第一的缽球線，耐久性優秀，適合各種打法。' },
+    { name: 'VICTOR GR262 握把布', brand: 'VICTOR', category: 'GRIP', price: 60, stock: 200, spec: '三入裝', tag: '促銷', desc: '極佳吸汗性與持久黏性，雙色可選。' },
+    { name: 'YONEX AC-102EX 毛巾握把布', brand: 'YONEX', category: 'GRIP', price: 90, stock: 80, spec: '三入裝', tag: '', desc: '柔軟毛巾質地，吸汗力強，採用抗菌材料。' },
+    { name: 'Yonex Astrox 88D Pro', brand: 'YONEX', category: 'RACKET', price: 5600, stock: 12, spec: '4U/G5', tag: '精選', desc: '雙打後場神器，強力魅力塞後場攻擊型球拍。' },
+  ]
+  const demo = demoProducts[Math.floor(Math.random() * demoProducts.length)]
+  formData.value.productName = demo.name
+  formData.value.brand = demo.brand
+  formData.value.category = demo.category
+  formData.value.price = demo.price
+  formData.value.stockQty = demo.stock
+  formData.value.spec = demo.spec
+  formData.value.marketingTag = demo.tag
+  formData.value.description = demo.desc
+  formData.value.status = 'ACTIVE'
+}
+
 onMounted(loadProducts)
 
 const defaultImage = 'http://localhost:8080/images/products/default.png'
@@ -516,7 +541,12 @@ function onImageError(e) {
             <i :class="isEditing ? 'bi bi-pencil-square' : 'bi bi-plus-circle'" class="me-2" style="color: var(--brand-sky)"></i>
             {{ isEditing ? '編輯商品' : '新增商品' }}
           </h5>
-          <button class="btn-close" @click="showModal = false"></button>
+          <div class="d-flex align-items-center gap-2">
+            <button v-if="!isEditing" class="btn-autofill-admin" @click="fillDemoProduct">
+              <i class="bi bi-lightning-charge-fill"></i> 一鍵輸入
+            </button>
+            <button class="btn-close" @click="showModal = false"></button>
+          </div>
         </div>
 
         <div class="modal-body-custom">
@@ -703,6 +733,34 @@ function onImageError(e) {
 </template>
 
 <style scoped>
+/* ===== 一鍵填入按鈕（後台版） ===== */
+.btn-autofill-admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  border: none;
+  border-radius: 2rem;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  white-space: nowrap;
+}
+.btn-autofill-admin:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+}
+.btn-autofill-admin:active {
+  transform: translateY(0) scale(0.98);
+}
+.btn-autofill-admin i {
+  font-size: 0.85rem;
+}
+
 /* ===== 頁面級：覆寫圓角變數 ===== */
 .product-manage {
   --brand-card-radius: 0.5rem;

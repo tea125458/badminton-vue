@@ -122,6 +122,35 @@ const isValid = computed(() => {
          cvc.value.length === 3
 })
 
+// --- 一鍵填入 Demo 資料 ---
+const fillDemoData = () => {
+  if (isProcessing.value) return
+
+  // 隨機挑選一組卡別
+  const types = ['VISA', 'MASTER', 'JCB']
+  cardType.value = types[Math.floor(Math.random() * types.length)]
+
+  // 生成隨機 16 碼卡號（第一碼對應卡別：VISA=4, MASTER=5, JCB=3）
+  const prefixMap = { VISA: '4', MASTER: '5', JCB: '3' }
+  const firstDigit = prefixMap[cardType.value] || '4'
+  let number = firstDigit
+  for (let i = 1; i < 16; i++) number += Math.floor(Math.random() * 10)
+  cardGroup.value = [number.slice(0, 4), number.slice(4, 8), number.slice(8, 12), number.slice(12, 16)]
+
+  // 持卡人姓名（隨機挑一個）
+  const names = ['CHEN XIAO MING', 'WANG MEI LI', 'LIN DA WEI', 'ZHANG WEI', 'HUANG YA TING']
+  cardHolder.value = names[Math.floor(Math.random() * names.length)]
+
+  // 有效期限（未來 1~4 年內的隨機月份）
+  const now = new Date()
+  const futureYear = now.getFullYear() + 1 + Math.floor(Math.random() * 4)
+  expiryMM.value = String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')
+  expiryYY.value = String(futureYear).slice(-2)
+
+  // 安全碼（隨機 3 碼）
+  cvc.value = String(Math.floor(Math.random() * 900) + 100)
+}
+
 // --- 付款處理 ---
 const handlePay = () => {
   if (!isValid.value) return
@@ -151,6 +180,7 @@ const handlePay = () => {
 
       <h3 class="modal-title">信用卡安全支付</h3>
       <p class="modal-amount">付款金額：<span>NT$ {{ amount.toLocaleString() }}</span></p>
+
 
       <!-- 翻轉卡片動畫區塊 -->
       <div class="card-scene">
@@ -303,6 +333,11 @@ const handlePay = () => {
           </div>
         </div>
 
+        <!-- 一鍵填入 Demo 按鈕 -->
+        <button class="btn-autofill" @click="fillDemoData" :disabled="isProcessing">
+          <i class="bi bi-lightning-charge-fill"></i> 一鍵輸入
+        </button>
+
         <button class="btn-pay" :class="{ 'processing': isProcessing }" :disabled="!isValid || isProcessing"
           @click="handlePay">
           <span v-if="!isProcessing">確認付款 NT$ {{ amount.toLocaleString() }}</span>
@@ -324,6 +359,44 @@ const handlePay = () => {
 </template>
 
 <style scoped>
+/* ===== 一鍵填入按鈕 ===== */
+.btn-autofill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 1rem auto 0.5rem;
+  padding: 0.55rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  border: none;
+  border-radius: 2rem;
+  cursor: pointer;
+  transition: all 0.25s;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+}
+
+.btn-autofill:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+}
+
+.btn-autofill:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-autofill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-autofill i {
+  font-size: 0.9rem;
+}
+
 /* Modal 遮罩 */
 .cc-modal-overlay {
   position: fixed;
