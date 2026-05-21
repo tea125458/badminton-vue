@@ -165,6 +165,27 @@ async function saveVenue() {
     saving.value = false
   }
 }
+// ========== 一鍵填入 Demo 資料 ==========
+const demoVenues = [
+  { venueName: '羽翔運動中心', address: '台北市大安區忠孝東路三段100號B1', phone: '02-2771-1234', image: '/uploads/venues/demo_venue.png' },
+  { venueName: '翼風羽球館',   address: '新北市板橋區文化路二段50號',     phone: '02-2955-5678', image: '/uploads/venues/demo_venue.png' },
+  { venueName: '雲頂羽球會館', address: '台中市西屯區台灣大道四段200號',   phone: '04-2358-9012', image: '/uploads/venues/demo_venue.png' },
+  { venueName: '飛羽運動空間', address: '高雄市前鎮區中山二路88號',        phone: '07-3345-6789', image: '/uploads/venues/demo_venue.png' },
+  { venueName: '晴天羽球中心', address: '桃園市中壢區環中東路500號',       phone: '03-4567-8901', image: '/uploads/venues/demo_venue.png' },
+]
+
+function quickFillForm() {
+  // 從資料池隨機挑一筆，填入表單欄位
+  const demo = demoVenues[Math.floor(Math.random() * demoVenues.length)]
+  form.value.venueName = demo.venueName
+  form.value.address = demo.address
+  form.value.phone = demo.phone
+  form.value.imageUrl = demo.image
+  // 設定圖片預覽（使用已存在的場館圖片）
+  imagePreview.value = demo.image
+  // 清除 imageFile，因為圖片已在伺服器上，不需要重新上傳
+  imageFile.value = null
+}
 </script>
 
 <template>
@@ -370,6 +391,9 @@ async function saveVenue() {
           </div>
         </div>
         <div class="modal-footer">
+          <button v-if="!editId" type="button" class="btn btn-quick-fill me-auto" @click="quickFillForm">
+            <i class="bi bi-lightning-fill me-1"></i>一鍵填入
+          </button>
           <button type="button" class="btn btn-secondary" @click="showModal = false">取消</button>
           <button type="button" class="btn btn-primary" :disabled="saving" @click="saveVenue">
             <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
@@ -566,5 +590,21 @@ async function saveVenue() {
   background: var(--brand-sky, #0ea5e9);
   color: white;
   border-color: var(--brand-sky, #0ea5e9);
+}
+/* ===== 一鍵填入按鈕（Modal 內）===== */
+.btn-quick-fill {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.4rem 1rem;
+  transition: all 0.2s;
+}
+.btn-quick-fill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(245, 158, 11, 0.35);
+  color: white;
 }
 </style>

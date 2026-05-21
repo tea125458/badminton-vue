@@ -20,12 +20,14 @@ const currentRole = computed(() => {
   try {
     const info = localStorage.getItem('adminInfo')
     return info ? JSON.parse(info).role : null
-  } catch { return null }
+  } catch {
+    return null
+  }
 })
 
 const menuGroups = [
   {
-    label: '會員管理',
+    label: '會員與職員',
     items: [
       { icon: 'bi-people', label: '會員管理', to: '/admin/members' },
       { icon: 'bi-person-badge', label: '職員管理', to: '/admin/admins', requiredRole: 'MANAGER' },
@@ -54,9 +56,7 @@ const menuGroups = [
   },
   {
     label: '內容管理',
-    items: [
-      { icon: 'bi-megaphone', label: '公告管理', to: '/admin/announcements' },
-    ],
+    items: [{ icon: 'bi-megaphone', label: '公告管理', to: '/admin/announcements' }],
   },
   {
     label: '統計數據',
@@ -72,7 +72,10 @@ const menuGroups = [
   <aside class="admin-sidebar" :class="{ collapsed: isCollapsed }">
     <!-- 品牌區 -->
     <div class="sidebar-brand">
-      <RouterLink to="/admin/dashboard" class="d-flex align-items-center gap-2 text-decoration-none">
+      <RouterLink
+        to="/admin/dashboard"
+        class="d-flex align-items-center gap-2 text-decoration-none"
+      >
         <img src="@/assets/images/brand-logo.png" alt="羽過天晴" class="brand-logo" />
         <span v-if="!isCollapsed" class="brand-text">羽過天晴</span>
       </RouterLink>
@@ -84,7 +87,9 @@ const menuGroups = [
         <div v-if="!isCollapsed" class="nav-group-label">{{ group.label }}</div>
 
         <RouterLink
-          v-for="item in group.items.filter(i => !i.requiredRole || i.requiredRole === currentRole)"
+          v-for="item in group.items.filter(
+            (i) => !i.requiredRole || i.requiredRole === currentRole,
+          )"
           :key="item.to"
           :to="item.to"
           class="nav-item"
@@ -116,7 +121,7 @@ const menuGroups = [
   width: 280px;
   min-height: 100vh;
   background: white;
-  border-right: 1px solid #F1F5F9;
+  border-right: 1px solid #f1f5f9;
   display: flex;
   flex-direction: column;
   transition: width 0.3s ease;
@@ -130,7 +135,7 @@ const menuGroups = [
 /* ----- 品牌區 ----- */
 .sidebar-brand {
   padding: 1.25rem;
-  border-bottom: 1px solid #F1F5F9;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .brand-logo {
@@ -161,7 +166,7 @@ const menuGroups = [
 }
 
 .nav-group + .nav-group {
-  border-top: 1px solid #F1F5F9;
+  border-top: 1px solid #f1f5f9;
   margin-top: 0.25rem;
   padding-top: 0.5rem;
 }
@@ -172,7 +177,7 @@ const menuGroups = [
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #64748B;
+  color: #64748b;
 }
 
 .nav-item {
@@ -197,7 +202,7 @@ const menuGroups = [
 }
 
 .nav-item:hover {
-  background-color: #F0F9FF;
+  background-color: #f0f9ff;
   color: var(--brand-sky);
 }
 
@@ -232,7 +237,7 @@ const menuGroups = [
 /* ----- 底部 ----- */
 .sidebar-footer {
   padding: 0.75rem 0.5rem;
-  border-top: 1px solid #F1F5F9;
+  border-top: 1px solid #f1f5f9;
   margin-top: auto;
 }
 
@@ -245,7 +250,7 @@ const menuGroups = [
   border: none;
   background: none;
   border-radius: 0.75rem;
-  color: #94A3B8;
+  color: #94a3b8;
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
@@ -253,8 +258,8 @@ const menuGroups = [
 }
 
 .collapse-btn:hover {
-  background-color: #F1F5F9;
-  color: #64748B;
+  background-color: #f1f5f9;
+  color: #64748b;
 }
 
 .collapsed .collapse-btn {
