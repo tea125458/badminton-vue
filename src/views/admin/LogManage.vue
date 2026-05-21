@@ -144,6 +144,9 @@ const chartOptions = {
   }
 }
 
+// 強制圖表重新渲染的 key
+const chartKey = computed(() => logs.value.length + '_' + logs.value.map(l => l.logId).join(','))
+
 // 統計圖表數據
 const chartData = computed(() => {
   const actionCounts = {}
@@ -295,6 +298,16 @@ function clearFilters() {
   loadLogs()
 }
 
+// 開啟統計分析（先重新載入全部日誌，確保圖表是最新資料）
+async function openStats() {
+  filterAction.value = ''
+  filterStartDate.value = ''
+  filterEndDate.value = ''
+  searchKeyword.value = ''
+  await loadLogs()
+  showStats.value = true
+}
+
 // 格式化時間
 function formatTime(datetime) {
   if (!datetime) return '-'
@@ -430,7 +443,7 @@ onUnmounted(() => {
             <button 
               class="btn-soft btn-soft-brown px-2" 
               style="width: auto; min-width: 65px;"
-              @click="showStats = true"
+              @click="openStats"
             >
               <span>分析</span>
             </button>
@@ -632,7 +645,7 @@ onUnmounted(() => {
                   <div class="card-body">
                     <h6 class="fw-bold mb-3 small text-secondary">每週新增會員</h6>
                     <div style="height: 220px">
-                      <Bar :data="chartData.weeklyReg" :options="chartOptions" />
+                      <Bar :key="'weeklyReg-' + chartKey" :data="chartData.weeklyReg" :options="chartOptions" />
                     </div>
                   </div>
                 </div>
@@ -643,7 +656,7 @@ onUnmounted(() => {
                   <div class="card-body">
                     <h6 class="fw-bold mb-3 small text-secondary">註冊來源比例</h6>
                     <div style="height: 220px">
-                      <Pie :data="chartData.sources" :options="chartOptions" />
+                      <Pie :key="'sources-' + chartKey" :data="chartData.sources" :options="chartOptions" />
                     </div>
                   </div>
                 </div>
@@ -655,7 +668,7 @@ onUnmounted(() => {
                   <div class="card-body">
                     <h6 class="fw-bold mb-3 small text-secondary">各類型操作統計</h6>
                     <div style="height: 200px">
-                      <Bar :data="chartData.actions" :options="chartOptions" />
+                      <Bar :key="'actions-' + chartKey" :data="chartData.actions" :options="chartOptions" />
                     </div>
                   </div>
                 </div>

@@ -377,18 +377,18 @@ const today = computed(() => {
 // ========== 匯出功能 ==========
 function getExportData() {
   return bookings.value.map((b) => ({
-    '預約編號': b.bookingId,
-    '會員姓名': b.member?.fullName || '-',
-    '電話': b.member?.phone || '-',
-    '球場': b.court?.courtName || '-',
-    '預約日期': b.bookingDate || '-',
-    '開始時間': b.startTime || '-',
-    '結束時間': b.endTime || '-',
-    '金額': b.totalAmount || 0,
-    '付款方式': paymentText(b.paymentType),
-    '狀態': statusText(b.status),
-    '備註': b.note || '-',
-    '建立時間': b.createdAt || '-',
+    預約編號: b.bookingId,
+    會員姓名: b.member?.fullName || '-',
+    電話: b.member?.phone || '-',
+    球場: b.court?.courtName || '-',
+    預約日期: b.bookingDate || '-',
+    開始時間: b.startTime || '-',
+    結束時間: b.endTime || '-',
+    金額: b.totalAmount || 0,
+    付款方式: paymentText(b.paymentType),
+    狀態: statusText(b.status),
+    備註: b.note || '-',
+    建立時間: b.createdAt || '-',
   }))
 }
 
@@ -412,19 +412,31 @@ function handleExport(format) {
         >
           <i class="bi bi-download me-1"></i>匯出
         </button>
-        <ul class="dropdown-menu shadow-sm border-0" style="border-radius: 0.75rem; font-size: 0.85rem">
+        <ul
+          class="dropdown-menu shadow-sm border-0"
+          style="border-radius: 0.75rem; font-size: 0.85rem"
+        >
           <li>
-            <button class="dropdown-item d-flex align-items-center gap-2 py-2" @click="handleExport('excel')">
+            <button
+              class="dropdown-item d-flex align-items-center gap-2 py-2"
+              @click="handleExport('excel')"
+            >
               <i class="bi bi-file-earmark-excel text-success"></i> 匯出 Excel
             </button>
           </li>
           <li>
-            <button class="dropdown-item d-flex align-items-center gap-2 py-2" @click="handleExport('json')">
+            <button
+              class="dropdown-item d-flex align-items-center gap-2 py-2"
+              @click="handleExport('json')"
+            >
               <i class="bi bi-filetype-json text-primary"></i> 匯出 JSON
             </button>
           </li>
           <li>
-            <button class="dropdown-item d-flex align-items-center gap-2 py-2" @click="handleExport('pdf')">
+            <button
+              class="dropdown-item d-flex align-items-center gap-2 py-2"
+              @click="handleExport('pdf')"
+            >
               <i class="bi bi-file-earmark-pdf text-danger"></i> 匯出 PDF
             </button>
           </li>
@@ -598,12 +610,7 @@ function handleExport(format) {
           <i class="bi bi-chevron-left"></i>
         </button>
       </li>
-      <li
-        v-for="p in totalPages"
-        :key="p"
-        class="page-item"
-        :class="{ active: p === currentPage }"
-      >
+      <li v-for="p in totalPages" :key="p" class="page-item" :class="{ active: p === currentPage }">
         <button class="page-link" @click="goToPage(p)">{{ p }}</button>
       </li>
       <li class="page-item" :class="{ disabled: currentPage === totalPages }">
@@ -614,152 +621,155 @@ function handleExport(format) {
     </ul>
   </nav>
 
-  <!-- 新增預約 Modal -->
-  <div v-if="showModal" class="modal-backdrop fade show" @click="showModal = false"></div>
-  <div v-if="showModal" class="modal fade show d-block" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
+  <!-- ===== 新增/編輯預約 Modal ===== -->
+  <Teleport to="body">
+    <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
+      <div class="modal-box">
         <div class="modal-header">
-          <h5 class="modal-title">{{ modalTitle }}</h5>
-          <button type="button" class="btn-close" @click="showModal = false"></button>
+          <h3>{{ modalTitle }}</h3>
+          <button class="modal-close" @click="showModal = false">
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
         <div class="modal-body">
-          <!-- 會員 ID -->
-          <div class="mb-3">
-            <label class="form-label">會員<span class="text-danger">*</span></label>
-            <!-- 已選中的會員 -->
-            <div
-              v-if="selectedMemberText"
-              class="alert alert-success py-2 d-flex justify-content-between align-items-center"
-            >
-              <span>✅{{ selectedMemberText }}(ID:{{ form.memberId }})</span>
-              <button
-                v-if="!isEditMode"
-                type="button"
-                class="btn-close btn-sm"
-                @click="((selectedMemberText = ''), (form.memberId = ''))"
-              ></button>
-            </div>
-            <!-- 搜尋框（未選中時顯示，編輯模式不可更換會員） -->
-            <div v-else-if="!isEditMode">
-              <input
-                type="text"
-                class="form-control"
-                v-model="form.memberSearch"
-                placeholder="輸入姓名或電話搜尋..."
-                @input="searchMember"
-              />
-              <!-- 搜尋結果列表 -->
-              <ul
-                v-if="memberResults.length"
-                class="list-group mt-1"
-                style="max-height: 200px; overflow-y: auto"
-              >
-                <li
-                  v-for="m in memberResults"
-                  :key="m.memberId"
-                  class="list-group-item list-group-item-action"
-                  style="cursor: pointer"
-                  @click="selectMember(m)"
+          <!-- Row 1: 會員搜尋 -->
+          <div class="form-row">
+            <div class="form-col">
+              <label>會員 <span class="req">*</span></label>
+              <!-- 已選中的會員 -->
+              <div v-if="selectedMemberText" class="member-selected">
+                <span
+                  ><i class="bi bi-person-check me-1"></i>{{ selectedMemberText }}（ID:{{
+                    form.memberId
+                  }}）</span
                 >
-                  {{ m.fullName }} ({{ m.phone || '無電話' }})
-                </li>
-              </ul>
+                <button
+                  v-if="!isEditMode"
+                  class="member-clear"
+                  @click="((selectedMemberText = ''), (form.memberId = ''))"
+                >
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <!-- 搜尋框（未選中時顯示） -->
+              <template v-else-if="!isEditMode">
+                <input
+                  v-model="form.memberSearch"
+                  type="text"
+                  placeholder="輸入姓名或電話搜尋..."
+                  @input="searchMember"
+                />
+                <ul v-if="memberResults.length" class="member-dropdown">
+                  <li v-for="m in memberResults" :key="m.memberId" @click="selectMember(m)">
+                    <i class="bi bi-person me-1"></i>{{ m.fullName }}（{{ m.phone || '無電話' }}）
+                  </li>
+                </ul>
+              </template>
+              <!-- 編輯模式：唯讀顯示 -->
+              <input v-else :value="selectedMemberText" disabled />
             </div>
           </div>
-          <!-- 場館選擇（連動用，不送後端） -->
-          <div class="mb-3">
-            <label class="form-label">場館<span class="text-danger">*</span></label>
-            <select class="form-select" v-model="form.venueId" @change="onVenueChange">
-              <option value="" disabled="">請選擇場館</option>
-              <option v-for="v in venues" :key="v.venueId" :value="v.venueId">
-                {{ v.venueName }}
-              </option>
-            </select>
+          <!-- Row 2: 場館 + 球場 -->
+          <div class="form-row">
+            <div class="form-col">
+              <label>場館 <span class="req">*</span></label>
+              <select v-model="form.venueId" @change="onVenueChange">
+                <option value="" disabled>請選擇場館</option>
+                <option v-for="v in venues" :key="v.venueId" :value="v.venueId">
+                  {{ v.venueName }}
+                </option>
+              </select>
+            </div>
+            <div class="form-col">
+              <label>球場 <span class="req">*</span></label>
+              <select v-model="form.courtId" :disabled="!form.venueId">
+                <option value="" disabled>請先選擇場館</option>
+                <option v-for="c in filteredCourts" :key="c.courtId" :value="c.courtId">
+                  {{ c.courtName }}
+                </option>
+              </select>
+            </div>
           </div>
-          <!-- 球場選擇（根據場館篩選） -->
-          <div class="mb-3">
-            <label class="form-label">球場<span class="text-danger">*</span></label>
-            <select class="form-select" v-model="form.courtId" :disabled="!form.venueId">
-              <option value="" disabled>請先選擇場館</option>
-              <option v-for="c in filteredCourts" :key="c.courtId" :value="c.courtId">
-                {{ c.courtName }}
-              </option>
-            </select>
+          <!-- Row 3: 預約日期 + 開始時間 + 結束時間 -->
+          <div class="form-row">
+            <div class="form-col">
+              <label>預約日期 <span class="req">*</span></label>
+              <input
+                type="date"
+                v-model="form.bookingDate"
+                :min="today"
+                @click="$event.target.showPicker()"
+              />
+            </div>
+            <div class="form-col-half">
+              <label>開始時間 <span class="req">*</span></label>
+              <select v-model="form.startTime" @change="onStartTimeChange">
+                <option value="" disabled>請選擇</option>
+                <option v-for="t in startTimeOptions" :key="t" :value="t">{{ t }}</option>
+              </select>
+            </div>
+            <div class="form-col-half">
+              <label>結束時間 <span class="req">*</span></label>
+              <select v-model="form.endTime" :disabled="!form.startTime" @change="onEndTimeChange">
+                <option value="" disabled>請選擇</option>
+                <option v-for="t in endTimeOptions" :key="t" :value="t">{{ t }}</option>
+              </select>
+            </div>
           </div>
-          <!-- 預約日期 -->
-          <div class="mb-3">
-            <label class="form-label">預約日期<span class="text-danger">*</span></label>
-            <input type="date" class="form-control" v-model="form.bookingDate" :min="today" />
+          <!-- Row 4: 金額 + 付款方式 -->
+          <div class="form-row">
+            <div class="form-col-half">
+              <label>金額</label>
+              <input type="number" v-model="form.totalAmount" readonly />
+            </div>
+            <div class="form-col">
+              <label>付款方式</label>
+              <select v-model="form.paymentType">
+                <option value="">請選擇</option>
+                <option value="CASH">現金</option>
+                <option value="CREDIT_CARD">信用卡</option>
+                <option value="TRANSFER">轉帳</option>
+                <option value="LINE_PAY">LINE Pay</option>
+              </select>
+            </div>
           </div>
-          <!-- 開始時間 -->
-          <div class="mb-3">
-            <label class="form-label">開始時間<span class="text-danger">*</span></label>
-            <select class="form-select" v-model="form.startTime" @change="onStartTimeChange">
-              <option value="" disabled>請選擇</option>
-              <option v-for="t in startTimeOptions" :key="t" :value="t">{{ t }}</option>
-            </select>
-          </div>
-          <!-- 結束時間 -->
-          <div class="mb-3">
-            <label class="form-label">結束時間<span class="text-danger">*</span></label>
-            <select
-              class="form-select"
-              v-model="form.endTime"
-              :disabled="!form.startTime"
-              @change="onEndTimeChange"
-            >
-              <option value="" disabled>請選擇</option>
-              <option v-for="t in endTimeOptions" :key="t" :value="t">{{ t }}</option>
-            </select>
-          </div>
-          <!-- 金額（自動計算） -->
-          <div class="mb-3">
-            <label class="form-label">金額</label>
-            <input type="number" class="form-control" v-model="form.totalAmount" readonly />
-          </div>
-          <!-- 付款方式 -->
-          <div class="mb-3">
-            <label class="form-label">付款方式</label>
-            <select class="form-select" v-model="form.paymentType">
-              <option value="">請選擇</option>
-              <option value="CASH">現金</option>
-              <option value="CREDIT_CARD">信用卡</option>
-              <option value="TRANSFER">轉帳</option>
-              <option value="LINE_PAY">LINE Pay</option>
-            </select>
-          </div>
-          <!-- 備註 -->
-          <div class="mb-3">
-            <label class="form-label">備註</label>
-            <textarea class="form-control" v-model="form.note" rows="2" placeholder="選填">
-            </textarea>
+          <!-- Row 5: 備註 -->
+          <div class="form-row">
+            <div class="form-col">
+              <label>備註</label>
+              <textarea v-model="form.note" rows="2" placeholder="選填"></textarea>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showModal = false">取消</button>
-          <button type="button" class="btn btn-primary" @click="saveBooking">
+          <button class="btn-cancel" @click="showModal = false">取消</button>
+          <button class="btn-save" @click="saveBooking">
             <i class="bi bi-check-lg me-1"></i>{{ isEditMode ? '更新' : '儲存' }}
           </button>
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 
   <!-- 通知彈窗 -->
-  <div v-if="notifyVisible" class="modal-backdrop fade show" style="z-index: 1060" @click="closeNotify"></div>
+  <div
+    v-if="notifyVisible"
+    class="modal-backdrop fade show"
+    style="z-index: 1060"
+    @click="closeNotify"
+  ></div>
   <div v-if="notifyVisible" class="modal fade show d-block" tabindex="-1" style="z-index: 1070">
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem">
         <div class="modal-body text-center py-4 px-4">
           <div v-if="notifyType === 'success'" class="mb-3">
-            <i class="bi bi-check-circle-fill" style="font-size: 3rem; color: #10B981"></i>
+            <i class="bi bi-check-circle-fill" style="font-size: 3rem; color: #10b981"></i>
           </div>
           <div v-else-if="notifyType === 'error'" class="mb-3">
-            <i class="bi bi-x-circle-fill" style="font-size: 3rem; color: #EF4444"></i>
+            <i class="bi bi-x-circle-fill" style="font-size: 3rem; color: #ef4444"></i>
           </div>
           <div v-else class="mb-3">
-            <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; color: #F59E0B"></i>
+            <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; color: #f59e0b"></i>
           </div>
           <h5 class="fw-bold mb-2">{{ notifyTitle }}</h5>
           <p class="text-secondary mb-3" style="font-size: 0.95rem">{{ notifyMessage }}</p>
@@ -771,22 +781,34 @@ function handleExport(format) {
 
   <!-- 確認刪除彈窗 -->
   <div v-if="confirmDeleteVisible" class="modal-backdrop fade show" style="z-index: 1060"></div>
-  <div v-if="confirmDeleteVisible" class="modal fade show d-block" tabindex="-1" style="z-index: 1070">
+  <div
+    v-if="confirmDeleteVisible"
+    class="modal fade show d-block"
+    tabindex="-1"
+    style="z-index: 1070"
+  >
     <div class="modal-dialog modal-dialog-centered modal-sm">
       <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem">
         <div class="modal-body text-center py-4 px-4">
           <div class="mb-3">
-            <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; color: #EF4444"></i>
+            <i class="bi bi-exclamation-triangle-fill" style="font-size: 3rem; color: #ef4444"></i>
           </div>
           <h5 class="fw-bold mb-2">確認刪除</h5>
           <p class="text-secondary mb-3" style="font-size: 0.95rem">
-            確定要刪除預約 <strong>#{{ pendingDeleteBooking?.bookingId }}</strong> 嗎？<br/>
-            會員：{{ pendingDeleteBooking?.member?.fullName || '-' }}<br/>
+            確定要刪除預約 <strong>#{{ pendingDeleteBooking?.bookingId }}</strong> 嗎？<br />
+            會員：{{ pendingDeleteBooking?.member?.fullName || '-' }}<br />
             此操作無法復原。
           </p>
           <div class="d-flex gap-2 justify-content-center">
-            <button class="btn btn-secondary px-3 rounded-pill" @click="confirmDeleteVisible = false">取消</button>
-            <button class="btn btn-danger px-3 rounded-pill" @click="confirmDelete">確認刪除</button>
+            <button
+              class="btn btn-secondary px-3 rounded-pill"
+              @click="confirmDeleteVisible = false"
+            >
+              取消
+            </button>
+            <button class="btn btn-danger px-3 rounded-pill" @click="confirmDelete">
+              確認刪除
+            </button>
           </div>
         </div>
       </div>
@@ -811,7 +833,7 @@ function handleExport(format) {
   padding: 0.65rem 1.5rem;
   border: none;
   border-radius: 0.75rem;
-  background: #00B4B4;
+  background: #00b4b4;
   color: white;
   font-size: 1.05rem;
   font-weight: 700;
@@ -894,8 +916,8 @@ function handleExport(format) {
   border-color: var(--brand-sky, #0ea5e9);
 }
 .badge-pending {
-  background: #FEF3C7;
-  color: #D97706;
+  background: #fef3c7;
+  color: #d97706;
 }
 
 /* 編輯按鈕 */
@@ -923,7 +945,7 @@ function handleExport(format) {
 /* ===== 自訂分頁（與 ProductManage 統一）===== */
 .pagination-custom .page-link {
   border: none;
-  color: #64748B;
+  color: #64748b;
   font-weight: 600;
   font-size: 0.85rem;
   padding: 0.5rem 0.85rem;
@@ -932,7 +954,7 @@ function handleExport(format) {
   transition: all 0.2s ease;
 }
 .pagination-custom .page-link:hover {
-  background: #F0F9FF;
+  background: #f0f9ff;
   color: var(--brand-sky);
 }
 .pagination-custom .active .page-link {
@@ -941,6 +963,216 @@ function handleExport(format) {
   box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
 }
 .pagination-custom .disabled .page-link {
-  color: #CBD5E1;
+  color: #cbd5e1;
+}
+
+/* ===== Modal（與會員管理統一）===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+.modal-box {
+  background: white;
+  border-radius: 1.25rem;
+  width: 100%;
+  max-width: 800px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.12);
+  animation: modalIn 0.25s ease;
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.modal-close {
+  border: none;
+  background: none;
+  font-size: 1.1rem;
+  color: #94a3b8;
+  cursor: pointer;
+}
+.modal-close:hover {
+  color: #475569;
+}
+.modal-body {
+  padding: 1.5rem 1.5rem 0.6rem;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* ===== Form Inside Modal ===== */
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.form-row:last-child {
+  margin-bottom: 0;
+}
+.form-col {
+  flex: 1;
+}
+.form-col-half {
+  flex: 0.5;
+}
+.modal-body label {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 0.3rem;
+}
+.req {
+  color: #ef4444;
+}
+.modal-body input,
+.modal-body select,
+.modal-body textarea {
+  width: 100%;
+  padding: 0.8rem 0.8rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.6rem;
+  font-size: 1.2rem;
+  background: #f8fafc;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.modal-body input:focus,
+.modal-body select:focus,
+.modal-body textarea:focus {
+  border-color: var(--brand-sky);
+  background: white;
+}
+.modal-body input:disabled,
+.modal-body select:disabled {
+  opacity: 0.5;
+}
+.modal-body textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+.modal-body input[readonly] {
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: default;
+}
+
+/* 會員選中狀態 */
+.member-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  background: #f0fdf4;
+  border: 2px solid #86efac;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  color: #16a34a;
+  font-weight: 600;
+}
+.member-clear {
+  border: none;
+  background: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem;
+}
+.member-clear:hover {
+  color: #ef4444;
+}
+
+/* 會員搜尋下拉 */
+.member-dropdown {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.6rem;
+  background: white;
+}
+.member-dropdown li {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid #f1f5f9;
+}
+.member-dropdown li:last-child {
+  border-bottom: none;
+}
+.member-dropdown li:hover {
+  background: #f0f9ff;
+  color: var(--brand-sky);
+}
+
+/* 日期輸入框內部微調 */
+input[type='date']::-webkit-datetime-edit-text {
+  padding: 0 0.1rem;
+  color: #94a3b8;
+}
+
+/* Footer 按鈕 */
+.btn-cancel {
+  padding: 0.55rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  background: white;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-save {
+  padding: 0.55rem 1.25rem;
+  border: none;
+  border-radius: 0.6rem;
+  background: linear-gradient(135deg, var(--brand-sky), var(--brand-teal));
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-save:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
 }
 </style>
