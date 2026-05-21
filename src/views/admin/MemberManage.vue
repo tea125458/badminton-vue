@@ -613,12 +613,11 @@ function handleExport(format) {
                   v-model="form.fullName"
                   type="text"
                   placeholder="請輸入姓名"
-                  :disabled="!!editId && !isManager"
                 />
               </div>
               <div class="form-col-half">
                 <label>性別</label>
-                <select v-model="form.gender" :disabled="!!editId && !isManager">
+                <select v-model="form.gender">
                   <option value="男">男</option>
                   <option value="女">女</option>
                 </select>
