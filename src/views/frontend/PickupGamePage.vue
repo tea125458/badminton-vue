@@ -195,6 +195,11 @@ watch(() => route.query.size, (newSize) => {
   itemsPerPage.value = Number(newSize) || 10
 })
 
+// 🌟 關鍵修復：當切換日期篩選或搜尋時，自動回到第一頁，避免卡在空的分頁
+watch([selectedDateFilter, searchQuery], () => {
+  changePage(1)
+})
+
 // 計算總頁數
 const totalPages = computed(() => {
   return Math.ceil(availableGames.value.length / itemsPerPage.value) || 1
