@@ -24,14 +24,16 @@ export function useLinePay() {
     error.value = null
 
     try {
-      const response = await paymentApi.linePayRequest({
+      // ★ 共用 api 實例的 Response 攔截器會自動解包 response.data
+      //   所以這裡拿到的 response 就是後端回傳的 JSON 本體
+      const result = await paymentApi.linePayRequest({
         orderId,
         amount,
         productName
       })
 
-      if (response.data.success) {
-        const { paymentUrl, transactionId } = response.data
+      if (result.success) {
+        const { paymentUrl, transactionId } = result
         
         // 將 transactionId 暫存在 localStorage，給 Callback 頁面使用
         localStorage.setItem(`linePay_tid_${orderId}`, transactionId)
@@ -40,7 +42,7 @@ export function useLinePay() {
         // 🚀 跳轉至 LINE Pay 付款頁面
         window.location.href = paymentUrl
       } else {
-        throw new Error(response.data.message || '申請付款失敗')
+        throw new Error(result.message || '申請付款失敗')
       }
     } catch (err) {
       console.error('[LINE Pay] Request error:', err)
@@ -57,12 +59,13 @@ export function useLinePay() {
   const confirmPayment = async ({ transactionId, amount, orderId }) => {
     isLoading.value = true
     try {
-      const response = await paymentApi.linePayConfirm({
+      // ★ 共用 api 的 Response 攔截器已自動解包，result 即為 JSON 本體
+      const result = await paymentApi.linePayConfirm({
         transactionId,
         amount,
         orderId
       })
-      return response.data
+      return result
     } catch (err) {
       console.error('[LINE Pay] Confirm error:', err)
       throw err

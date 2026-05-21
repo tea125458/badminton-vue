@@ -376,6 +376,56 @@ async function handleCreateOrder() {
   }
 }
 
+// ===================== 一鍵填入 Demo 資料 =====================
+async function fillDemoOrder() {
+  if (creating.value) return
+
+  // 1. 自動搜尋會員（用「王」來搜，若無結果則用「陳」）
+  if (!selectedMember.value) {
+    const searchTerms = ['王', '陳', '李', '林']
+    for (const term of searchTerms) {
+      try {
+        const results = await memberApi.search(term)
+        if (results.length > 0) {
+          const picked = results[Math.floor(Math.random() * results.length)]
+          pickMember(picked)
+          break
+        }
+      } catch (e) {
+        console.error('搜尋會員失敗', e)
+      }
+    }
+  }
+
+  // 2. 隨機加入 1~3 項商品到購物車
+  if (products.value.length > 0) {
+    cart.value = []
+    const count = Math.min(1 + Math.floor(Math.random() * 3), products.value.length)
+    const shuffled = [...products.value].sort(() => Math.random() - 0.5)
+    for (let i = 0; i < count; i++) {
+      const p = shuffled[i]
+      const qty = Math.min(1 + Math.floor(Math.random() * 3), p.stockQty)
+      cart.value.push({
+        productId: p.productId,
+        name: p.productName,
+        brand: p.brand || '',
+        imageUrl: p.imageUrl,
+        price: Math.round(p.price),
+        stock: p.stockQty,
+        quantity: qty,
+      })
+    }
+  }
+
+  // 3. 隨機付款方式
+  const payments = ['CASH', 'CREDIT_CARD', 'TRANSFER', 'LINE_PAY']
+  createForm.value.paymentType = payments[Math.floor(Math.random() * payments.length)]
+
+  // 4. 備註
+  const notes = ['麻煩幫我傳達班時準備', '請包裝好，謝謝', '下班後過去取貨', '']
+  createForm.value.note = notes[Math.floor(Math.random() * notes.length)]
+}
+
 // ===================== 常數 =====================
 const statusMap = {
   UNPAID: { label: '訂單成立', color: '#F59E0B', bg: '#FEF3C7', icon: 'bi-clipboard-check', badgeClass: 'badge-unpaid' },
@@ -1444,7 +1494,12 @@ function getInvoiceTypeText(order) {
             <i class="bi bi-cart-plus me-2" style="color: var(--brand-teal)"></i>
             新增訂單
           </h5>
-          <button class="btn-close" @click="showCreateModal = false"></button>
+          <div class="d-flex align-items-center gap-2">
+            <button class="btn-autofill-admin" @click="fillDemoOrder">
+              <i class="bi bi-lightning-charge-fill"></i> 一鍵輸入
+            </button>
+            <button class="btn-close" @click="showCreateModal = false"></button>
+          </div>
         </div>
         <div class="modal-body-custom">
           <!-- 會員搜尋 -->
@@ -1702,6 +1757,34 @@ function getInvoiceTypeText(order) {
 </template>
 
 <style scoped>
+/* ===== 一鍵填入按鈕（後台版） ===== */
+.btn-autofill-admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  border: none;
+  border-radius: 2rem;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  white-space: nowrap;
+}
+.btn-autofill-admin:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+}
+.btn-autofill-admin:active {
+  transform: translateY(0) scale(0.98);
+}
+.btn-autofill-admin i {
+  font-size: 0.85rem;
+}
+
 /* ===== 頁面標題（與職員管理統一）===== */
 .page-title {
   margin: 0;
