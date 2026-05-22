@@ -174,17 +174,27 @@ const demoVenues = [
   { venueName: '晴天羽球中心', address: '桃園市中壢區環中東路500號',       phone: '03-4567-8901', image: '/uploads/venues/demo_venue.png' },
 ]
 
-function quickFillForm() {
+async function quickFillForm() {
   // 從資料池隨機挑一筆，填入表單欄位
   const demo = demoVenues[Math.floor(Math.random() * demoVenues.length)]
   form.value.venueName = demo.venueName
   form.value.address = demo.address
   form.value.phone = demo.phone
-  form.value.imageUrl = demo.image
-  // 設定圖片預覽（使用已存在的場館圖片）
-  imagePreview.value = demo.image
-  // 清除 imageFile，因為圖片已在伺服器上，不需要重新上傳
-  imageFile.value = null
+
+  // 把 demo 圖片抓下來轉成 File，讓儲存時走正常上傳流程（後端會產生獨立 UUID 檔名）
+  try {
+    const response = await fetch(demo.image + '?t=' + Date.now())
+    const blob = await response.blob()
+    const file = new File([blob], 'demo_venue.png', { type: blob.type })
+    imageFile.value = file
+    imagePreview.value = URL.createObjectURL(file)
+    form.value.imageUrl = '' // 清空，由上傳後回填
+  } catch (e) {
+    // 若抓取失敗，退回舊方式直接引用路徑
+    form.value.imageUrl = demo.image
+    imagePreview.value = demo.image + '?t=' + Date.now()
+    imageFile.value = null
+  }
 }
 </script>
 

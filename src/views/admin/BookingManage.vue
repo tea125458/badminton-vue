@@ -371,7 +371,11 @@ async function saveBooking() {
 
 // 今天的日期（用於限制日期選擇器）
 const today = computed(() => {
-  return new Date().toISOString().slice(0, 10)
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
 })
 
 // ========== 匯出功能 ==========
@@ -394,6 +398,62 @@ function getExportData() {
 
 function handleExport(format) {
   exportData(getExportData(), format.toUpperCase(), '預約資料')
+}
+
+// ========== ⚡ 一鍵填入 Demo 資料 ==========
+async function quickFillForm() {
+  // 隨機選一個場館
+  const activeVenues = venues.value.filter(v => v.status === 'ACTIVE')
+  if (activeVenues.length === 0) {
+    showNotify('warning', '提示', '沒有可用的場館，請先新增場館')
+    return
+  }
+  const randomVenue = activeVenues[Math.floor(Math.random() * activeVenues.length)]
+  form.value.venueId = randomVenue.venueId
+
+  // 篩選該場館底下的球場，隨機選一個
+  const venueCourts = allCourts.value.filter(
+    c => c.venue && c.venue.venueId === randomVenue.venueId && c.status === 'ACTIVE'
+  )
+  if (venueCourts.length > 0) {
+    form.value.courtId = venueCourts[Math.floor(Math.random() * venueCourts.length)].courtId
+  }
+
+  // 隨機會員
+  try {
+    const members = await memberApi.findAll()
+    if (members.length > 0) {
+      const randomMember = members[Math.floor(Math.random() * members.length)]
+      form.value.memberId = randomMember.memberId
+      selectedMemberText.value = `${randomMember.fullName} (${randomMember.phone || 'N/A'})`
+    }
+  } catch (e) {
+    console.error('取得會員失敗:', e)
+  }
+
+  // 隨機日期（今天 ~ 未來 7 天）
+  const futureDate = new Date()
+  futureDate.setDate(futureDate.getDate() + Math.floor(Math.random() * 7))
+  const yyyy = futureDate.getFullYear()
+  const mm = String(futureDate.getMonth() + 1).padStart(2, '0')
+  const dd = String(futureDate.getDate()).padStart(2, '0')
+  form.value.bookingDate = `${yyyy}-${mm}-${dd}`
+
+  // 隨機時段（10:00 ~ 20:00 開始，1~3 小時）
+  const startH = 10 + Math.floor(Math.random() * 11) // 10~20
+  const duration = 1 + Math.floor(Math.random() * 3)  // 1~3 小時
+  const endH = Math.min(startH + duration, 22)
+  form.value.startTime = startH.toString().padStart(2, '0') + ':00'
+  form.value.endTime = endH.toString().padStart(2, '0') + ':00'
+
+  // 自動計算金額
+  form.value.totalAmount = (endH - startH) * 300
+
+  // 隨機付款方式
+  const payments = ['CASH', 'CREDIT_CARD', 'TRANSFER', 'LINE_PAY']
+  form.value.paymentType = payments[Math.floor(Math.random() * payments.length)]
+
+  form.value.note = '一鍵填入 Demo 資料'
 }
 </script>
 
@@ -742,6 +802,9 @@ function handleExport(format) {
           </div>
         </div>
         <div class="modal-footer">
+          <button v-if="!isEditMode" type="button" class="btn btn-quick-fill me-auto" @click="quickFillForm">
+            <i class="bi bi-lightning-fill me-1"></i>一鍵填入
+          </button>
           <button class="btn-cancel" @click="showModal = false">取消</button>
           <button class="btn-save" @click="saveBooking">
             <i class="bi bi-check-lg me-1"></i>{{ isEditMode ? '更新' : '儲存' }}
@@ -1174,5 +1237,22 @@ input[type='date']::-webkit-datetime-edit-text {
     flex-direction: column;
     gap: 0.75rem;
   }
+}
+
+/* ===== 一鍵填入按鈕（Modal 內）===== */
+.btn-quick-fill {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.4rem 1rem;
+  transition: all 0.2s;
+}
+.btn-quick-fill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(245, 158, 11, 0.35);
+  color: white;
 }
 </style>
