@@ -24,7 +24,7 @@ const errorMsg = ref('')
 
 // 自訂提示 Modal
 const modalVisible = ref(false)
-const modalType = ref('success')   // 'success' | 'error' | 'warning' | 'confirm'
+const modalType = ref('success') // 'success' | 'error' | 'warning' | 'confirm'
 const modalTitle = ref('')
 const modalMessage = ref('')
 const modalCallback = ref(null)
@@ -71,16 +71,16 @@ const loadingOrders = ref(false)
 // 發票捐贈單位對照表
 const getDonationUnit = (code) => {
   const unitMap = {
-    '919': '財團法人創世社會福利基金會',
-    '25885': '財團法人伊甸社會福利基金會',
-    '13579': '財團法人陽光社會福利基金會',
-    '5678': '財團法人台灣兒童暨家庭扶助基金會',
-    '520': '財團法人罕見疾病基金會',
-    '135': '財團法人董氏基金會',
+    919: '財團法人創世社會福利基金會',
+    25885: '財團法人伊甸社會福利基金會',
+    13579: '財團法人陽光社會福利基金會',
+    5678: '財團法人台灣兒童暨家庭扶助基金會',
+    520: '財團法人罕見疾病基金會',
+    135: '財團法人董氏基金會',
     '001': '財團法人羅慧夫顱顏基金會',
-    '888': '財團法人台灣癌症基金會',
-    '999': '財團法人喜憨兒社會福利基金會',
-    '111': '財團法人弘道老人福利基金會'
+    888: '財團法人台灣癌症基金會',
+    999: '財團法人喜憨兒社會福利基金會',
+    111: '財團法人弘道老人福利基金會',
   }
   return unitMap[code] || ''
 }
@@ -140,9 +140,12 @@ const menuItems = [
 ]
 
 // 監聽網址頁籤變化
-watch(() => route.query.tab, (newTab) => {
-  if (newTab) switchTab(newTab)
-})
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab) switchTab(newTab)
+  },
+)
 
 async function fetchOrders(isBackground = false) {
   if (!member.value?.memberId) {
@@ -153,7 +156,9 @@ async function fetchOrders(isBackground = false) {
   try {
     const data = await orderApi.findByMemberId(member.value.memberId)
     // 確保 data 是陣列，避免 slice 報錯
-    orders.value = Array.isArray(data) ? data.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate)) : []
+    orders.value = Array.isArray(data)
+      ? data.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate))
+      : []
 
     // 預抓所有訂單的明細，以正確顯示圖片與商品件數
     for (let i = 0; i < orders.value.length; i++) {
@@ -221,7 +226,9 @@ function getInvoiceLabel(order) {
   }
   if (order.invoiceType === 'DONATION') {
     const unit = getDonationUnit(order.invoiceCarrier)
-    return unit ? `捐贈發票 — ${unit}（捐贈碼：${order.invoiceCarrier}）` : `捐贈發票（捐贈碼：${order.invoiceCarrier}）`
+    return unit
+      ? `捐贈發票 — ${unit}（捐贈碼：${order.invoiceCarrier}）`
+      : `捐贈發票（捐贈碼：${order.invoiceCarrier}）`
   }
   return '未設定'
 }
@@ -258,7 +265,7 @@ onMounted(async () => {
       phone: data.phone || '',
       email: data.email || '',
     }
-    
+
     // 初始頁籤
     if (route.query.tab) {
       switchTab(route.query.tab)
@@ -275,7 +282,7 @@ onMounted(async () => {
 
   // 若 URL 帶有 ?tab=bookings，自動切換到對應頁籤
   const tabParam = route.query.tab
-  if (tabParam && menuItems.some(m => m.id === tabParam)) {
+  if (tabParam && menuItems.some((m) => m.id === tabParam)) {
     switchTab(tabParam)
   }
 
@@ -406,7 +413,7 @@ async function loadBookings() {
 // 切換到預約紀錄頁籤時載入
 function switchTab(tabId) {
   activeTab.value = tabId
-  
+
   // 核心修復：在切換頁籤時，同步更新 URL query 參數，確保「上一頁」能正確返回該頁籤
   router.replace({ query: { ...route.query, tab: tabId } })
 
@@ -436,15 +443,24 @@ function getStatusInfo(booking) {
 
 // 取消預約
 async function cancelBooking(booking) {
-  showModal('confirm', '確認取消', `確定要取消 ${booking.bookingDate} ${booking.startTime}~${booking.endTime} 的預約嗎？`, async () => {
-    try {
-      await bookingApi.cancelBooking(booking.bookingId)
-      showModal('success', '已取消', '預約已成功取消！')
-      loadBookings()
-    } catch (err) {
-      showModal('error', '取消失敗', err.response?.data?.message || err.response?.data || err.message)
-    }
-  })
+  showModal(
+    'confirm',
+    '確認取消',
+    `確定要取消 ${booking.bookingDate} ${booking.startTime}~${booking.endTime} 的預約嗎？`,
+    async () => {
+      try {
+        await bookingApi.cancelBooking(booking.bookingId)
+        showModal('success', '已取消', '預約已成功取消！')
+        loadBookings()
+      } catch (err) {
+        showModal(
+          'error',
+          '取消失敗',
+          err.response?.data?.message || err.response?.data || err.message,
+        )
+      }
+    },
+  )
 }
 
 // 再次預約
@@ -517,7 +533,11 @@ async function handleAvatarUpload(event) {
                   >
                     <img
                       v-if="avatarUrl"
-                      :src="avatarUrl.startsWith('http') ? avatarUrl : 'http://localhost:8080' + avatarUrl"
+                      :src="
+                        avatarUrl.startsWith('http')
+                          ? avatarUrl
+                          : 'http://localhost:8080' + avatarUrl
+                      "
                       alt="頭像"
                       class="avatar-img"
                     />
@@ -630,7 +650,12 @@ async function handleAvatarUpload(event) {
                       </div>
                       <div class="col-md-6">
                         <label class="form-label-gray">電子信箱</label>
-                        <input v-model="form.email" type="email" class="form-control-styled" disabled />
+                        <input
+                          v-model="form.email"
+                          type="email"
+                          class="form-control-styled"
+                          disabled
+                        />
                       </div>
                     </div>
 
@@ -711,6 +736,18 @@ async function handleAvatarUpload(event) {
                           class="form-control-styled"
                           placeholder="請再次輸入新密碼"
                         />
+                        <!-- 即時密碼一致性提示 -->
+                        <div v-if="pwdForm.confirmPassword" class="mt-1 px-1">
+                          <span
+                            v-if="pwdForm.newPassword === pwdForm.confirmPassword"
+                            class="text-success small fw-bold"
+                          >
+                            <i class="bi bi-check-circle-fill me-1"></i>密碼一致
+                          </span>
+                          <span v-else class="text-danger small fw-bold">
+                            <i class="bi bi-x-circle-fill me-1"></i>密碼不一致
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -872,18 +909,26 @@ async function handleAvatarUpload(event) {
                   <div class="profile-card-base shadow-sm border bg-white p-4">
                     <h6 class="section-title-bar mb-4">歷史消費訂單</h6>
 
-                     <div v-if="loadingOrders" class="skeleton-order-list">
-                       <div v-for="i in 3" :key="i" class="skeleton-order-card mb-4 p-4 rounded-4" style="border: 1px solid #e2e8f0; border-radius: 1rem;">
-                         <div class="d-flex justify-content-between align-items-center mb-3">
-                           <div class="skeleton-block" style="width: 140px; height: 24px;"></div>
-                           <div class="skeleton-block" style="width: 80px; height: 20px; border-radius: 10px;"></div>
-                         </div>
-                         <div class="d-flex justify-content-between align-items-center">
-                           <div class="skeleton-block" style="width: 200px; height: 16px;"></div>
-                           <div class="skeleton-block" style="width: 100px; height: 24px;"></div>
-                         </div>
-                       </div>
-                     </div>
+                    <div v-if="loadingOrders" class="skeleton-order-list">
+                      <div
+                        v-for="i in 3"
+                        :key="i"
+                        class="skeleton-order-card mb-4 p-4 rounded-4"
+                        style="border: 1px solid #e2e8f0; border-radius: 1rem"
+                      >
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                          <div class="skeleton-block" style="width: 140px; height: 24px"></div>
+                          <div
+                            class="skeleton-block"
+                            style="width: 80px; height: 20px; border-radius: 10px"
+                          ></div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                          <div class="skeleton-block" style="width: 200px; height: 16px"></div>
+                          <div class="skeleton-block" style="width: 100px; height: 24px"></div>
+                        </div>
+                      </div>
+                    </div>
 
                     <div v-else-if="orders.length === 0" class="empty-state py-5 text-center">
                       <i class="bi bi-cart-x mb-3 d-block text-light" style="font-size: 4rem"></i>
@@ -900,29 +945,65 @@ async function handleAvatarUpload(event) {
 
                     <div v-else class="order-list">
                       <!-- 最新一筆訂單高亮 -->
-                      <div v-if="orders.length > 0" class="latest-order-card p-4 rounded-4 mb-4 cursor-pointer" style="background: linear-gradient(135deg, #F0FDFA 0%, #FFFFFF 100%); border: 2px solid #5EEAD4; transition: all 0.3s;" @click="toggleExpand(orders[0].orderId)">
+                      <div
+                        v-if="orders.length > 0"
+                        class="latest-order-card p-4 rounded-4 mb-4 cursor-pointer"
+                        style="
+                          background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 100%);
+                          border: 2px solid #5eead4;
+                          transition: all 0.3s;
+                        "
+                        @click="toggleExpand(orders[0].orderId)"
+                      >
                         <div class="d-flex justify-content-between align-items-start mb-3">
                           <div>
-                            <div class="small fw-bold mb-1" style="color: #0D9488;"><i class="bi bi-stars me-1"></i>最新一筆訂單</div>
+                            <div class="small fw-bold mb-1" style="color: #0d9488">
+                              <i class="bi bi-stars me-1"></i>最新一筆訂單
+                            </div>
                             <h4 class="fw-800 mb-0">#{{ orders[0].orderId }}</h4>
                           </div>
-                          <span class="badge rounded-pill px-3 py-2" :style="{ backgroundColor: statusMap[orders[0].status]?.bg, color: statusMap[orders[0].status]?.color }">
+                          <span
+                            class="badge rounded-pill px-3 py-2"
+                            :style="{
+                              backgroundColor: statusMap[orders[0].status]?.bg,
+                              color: statusMap[orders[0].status]?.color,
+                            }"
+                          >
                             {{ statusMap[orders[0].status]?.label }}
                           </span>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
                           <div class="d-flex align-items-center gap-4">
-                            <div class="fw-bold" style="font-size: 1.25rem; color: #0D9488;">NT$ {{ orders[0].totalAmount.toLocaleString() }}</div>
-                            <router-link :to="'/my-orders?orderId=' + orders[0].orderId" class="btn btn-sm rounded-pill px-3 shadow-sm" style="background: #0D9488; color: white; border: none; font-size: 0.85rem;" @click.stop>我的訂單</router-link>
+                            <div class="fw-bold" style="font-size: 1.25rem; color: #0d9488">
+                              NT$ {{ orders[0].totalAmount.toLocaleString() }}
+                            </div>
+                            <router-link
+                              :to="'/my-orders?orderId=' + orders[0].orderId"
+                              class="btn btn-sm rounded-pill px-3 shadow-sm"
+                              style="
+                                background: #0d9488;
+                                color: white;
+                                border: none;
+                                font-size: 0.85rem;
+                              "
+                              @click.stop
+                              >我的訂單</router-link
+                            >
                           </div>
-                          <i class="bi fs-5" style="color: #0D9488;" :class="expandedId === orders[0].orderId ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+                          <i
+                            class="bi fs-5"
+                            style="color: #0d9488"
+                            :class="
+                              expandedId === orders[0].orderId ? 'bi-chevron-up' : 'bi-chevron-down'
+                            "
+                          ></i>
                         </div>
 
                         <!-- 展開內容：明細與進度條 -->
                         <div
                           v-if="expandedId === orders[0].orderId"
                           class="order-expanded-content mt-3 pt-3 border-top animate__animated animate__fadeIn"
-                          style="border-color: rgba(94, 234, 212, 0.3) !important;"
+                          style="border-color: rgba(94, 234, 212, 0.3) !important"
                         >
                           <!-- 進度條 (Mini 版) -->
                           <div class="progress-tracker-mini mb-4">
@@ -981,36 +1062,86 @@ async function handleAvatarUpload(event) {
                           <div class="order-info-card mb-3">
                             <div class="order-info-grid">
                               <div class="order-info-item">
-                                <div class="order-info-label"><i class="bi bi-calendar3 me-1"></i>訂購日期</div>
-                                <div class="order-info-value">{{ formatDateTime(orders[0].orderDate) }}</div>
-                              </div>
-                              <div class="order-info-item">
-                                <div class="order-info-label"><i class="bi bi-credit-card me-1"></i>付款方式</div>
+                                <div class="order-info-label">
+                                  <i class="bi bi-calendar3 me-1"></i>訂購日期
+                                </div>
                                 <div class="order-info-value">
-                                  <span class="payment-badge">{{ paymentMap[orders[0].paymentType] || '未設定' }}</span>
+                                  {{ formatDateTime(orders[0].orderDate) }}
                                 </div>
                               </div>
                               <div class="order-info-item">
-                                <div class="order-info-label"><i class="bi bi-geo-alt me-1"></i>取貨方式</div>
+                                <div class="order-info-label">
+                                  <i class="bi bi-credit-card me-1"></i>付款方式
+                                </div>
+                                <div class="order-info-value">
+                                  <span class="payment-badge">{{
+                                    paymentMap[orders[0].paymentType] || '未設定'
+                                  }}</span>
+                                </div>
+                              </div>
+                              <div class="order-info-item">
+                                <div class="order-info-label">
+                                  <i class="bi bi-geo-alt me-1"></i>取貨方式
+                                </div>
                                 <div class="order-info-value">球館自取</div>
                                 <div class="order-info-sub">羽過天晴羽球館</div>
                               </div>
                               <div class="order-info-item">
-                                <div class="order-info-label"><i class="bi bi-receipt me-1"></i>電子發票</div>
-                                <div class="order-info-value" style="font-size: 0.8rem; line-height: 1.4;">{{ getInvoiceLabel(orders[0]) }}</div>
-                                <div class="order-info-sub fw-bold" style="color: var(--brand-teal); margin-top: 0.15rem; font-size: 0.75rem;">發票號碼：XY-{{ String(orders[0].orderId || '').padStart(8, '0') }}</div>
+                                <div class="order-info-label">
+                                  <i class="bi bi-receipt me-1"></i>電子發票
+                                </div>
+                                <div
+                                  class="order-info-value"
+                                  style="font-size: 0.8rem; line-height: 1.4"
+                                >
+                                  {{ getInvoiceLabel(orders[0]) }}
+                                </div>
+                                <div
+                                  class="order-info-sub fw-bold"
+                                  style="
+                                    color: var(--brand-teal);
+                                    margin-top: 0.15rem;
+                                    font-size: 0.75rem;
+                                  "
+                                >
+                                  發票號碼：XY-{{
+                                    String(orders[0].orderId || '').padStart(8, '0')
+                                  }}
+                                </div>
                               </div>
                             </div>
                           </div>
 
                           <!-- 商品明细 -->
-                          <div v-if="loadingItems === orders[0].orderId" class="skeleton-items-grid px-1 py-2">
+                          <div
+                            v-if="loadingItems === orders[0].orderId"
+                            class="skeleton-items-grid px-1 py-2"
+                          >
                             <div class="order-items-grid">
-                              <div v-for="j in 1" :key="j" class="order-item-card d-flex align-items-center gap-3 p-2 border rounded-3 mb-2" style="border: 1px solid #f1f5f9; border-radius: 0.5rem;">
-                                <div class="item-img-wrap skeleton-img" style="width: 60px; height: 60px; border-radius: 0.5rem; flex-shrink: 0;"></div>
+                              <div
+                                v-for="j in 1"
+                                :key="j"
+                                class="order-item-card d-flex align-items-center gap-3 p-2 border rounded-3 mb-2"
+                                style="border: 1px solid #f1f5f9; border-radius: 0.5rem"
+                              >
+                                <div
+                                  class="item-img-wrap skeleton-img"
+                                  style="
+                                    width: 60px;
+                                    height: 60px;
+                                    border-radius: 0.5rem;
+                                    flex-shrink: 0;
+                                  "
+                                ></div>
                                 <div class="item-details gap-2 flex-grow-1">
-                                  <div class="skeleton-block" style="width: 80%; height: 16px;"></div>
-                                  <div class="skeleton-block" style="width: 40%; height: 12px;"></div>
+                                  <div
+                                    class="skeleton-block"
+                                    style="width: 80%; height: 16px"
+                                  ></div>
+                                  <div
+                                    class="skeleton-block"
+                                    style="width: 40%; height: 12px"
+                                  ></div>
                                 </div>
                               </div>
                             </div>
@@ -1037,7 +1168,9 @@ async function handleAvatarUpload(event) {
                                     {{ item.product?.productName }}
                                   </div>
                                   <div class="item-meta">
-                                    <span class="item-price">NT$ {{ item.unitPrice.toLocaleString() }}</span>
+                                    <span class="item-price"
+                                      >NT$ {{ item.unitPrice.toLocaleString() }}</span
+                                    >
                                     <span class="item-qty">x {{ item.quantity }}</span>
                                   </div>
                                   <div class="item-subtotal">
@@ -1047,12 +1180,12 @@ async function handleAvatarUpload(event) {
                               </div>
                             </div>
                           </div>
-
-
                         </div>
                       </div>
 
-                      <h6 v-if="orders.length > 1" class="text-secondary small fw-bold mb-3">更早之前的訂單</h6>
+                      <h6 v-if="orders.length > 1" class="text-secondary small fw-bold mb-3">
+                        更早之前的訂單
+                      </h6>
 
                       <div
                         v-for="order in orders.slice(1)"
@@ -1111,7 +1244,14 @@ async function handleAvatarUpload(event) {
                             </div>
                             <div class="mt-2 d-flex justify-content-between align-items-end">
                               <div class="order-summary-text text-secondary small">
-                                共 {{ orderItems[order.orderId]?.length || '...' }} 項商品，共 {{ orderItems[order.orderId]?.reduce((sum, item) => sum + item.quantity, 0) || '...' }} 件 ·
+                                共 {{ orderItems[order.orderId]?.length || '...' }} 項商品，共
+                                {{
+                                  orderItems[order.orderId]?.reduce(
+                                    (sum, item) => sum + item.quantity,
+                                    0,
+                                  ) || '...'
+                                }}
+                                件 ·
                                 {{ paymentMap[order.paymentType] }}
                               </div>
                               <div
@@ -1195,36 +1335,84 @@ async function handleAvatarUpload(event) {
                           <div class="order-info-card mb-3">
                             <div class="order-info-grid">
                               <div class="order-info-item">
-                                <div class="order-info-label"><i class="bi bi-calendar3 me-1"></i>訂購日期</div>
-                                <div class="order-info-value">{{ formatDateTime(order.orderDate) }}</div>
-                              </div>
-                              <div class="order-info-item">
-                                <div class="order-info-label"><i class="bi bi-credit-card me-1"></i>付款方式</div>
+                                <div class="order-info-label">
+                                  <i class="bi bi-calendar3 me-1"></i>訂購日期
+                                </div>
                                 <div class="order-info-value">
-                                  <span class="payment-badge">{{ paymentMap[order.paymentType] || '未設定' }}</span>
+                                  {{ formatDateTime(order.orderDate) }}
                                 </div>
                               </div>
                               <div class="order-info-item">
-                                <div class="order-info-label"><i class="bi bi-geo-alt me-1"></i>取貨方式</div>
+                                <div class="order-info-label">
+                                  <i class="bi bi-credit-card me-1"></i>付款方式
+                                </div>
+                                <div class="order-info-value">
+                                  <span class="payment-badge">{{
+                                    paymentMap[order.paymentType] || '未設定'
+                                  }}</span>
+                                </div>
+                              </div>
+                              <div class="order-info-item">
+                                <div class="order-info-label">
+                                  <i class="bi bi-geo-alt me-1"></i>取貨方式
+                                </div>
                                 <div class="order-info-value">球館自取</div>
                                 <div class="order-info-sub">羽過天晴羽球館</div>
                               </div>
                               <div class="order-info-item">
-                                <div class="order-info-label"><i class="bi bi-receipt me-1"></i>電子發票</div>
-                                <div class="order-info-value" style="font-size: 0.8rem; line-height: 1.4;">{{ getInvoiceLabel(order) }}</div>
-                                <div class="order-info-sub fw-bold" style="color: var(--brand-teal); margin-top: 0.15rem; font-size: 0.75rem;">發票號碼：XY-{{ String(order.orderId || '').padStart(8, '0') }}</div>
+                                <div class="order-info-label">
+                                  <i class="bi bi-receipt me-1"></i>電子發票
+                                </div>
+                                <div
+                                  class="order-info-value"
+                                  style="font-size: 0.8rem; line-height: 1.4"
+                                >
+                                  {{ getInvoiceLabel(order) }}
+                                </div>
+                                <div
+                                  class="order-info-sub fw-bold"
+                                  style="
+                                    color: var(--brand-teal);
+                                    margin-top: 0.15rem;
+                                    font-size: 0.75rem;
+                                  "
+                                >
+                                  發票號碼：XY-{{ String(order.orderId || '').padStart(8, '0') }}
+                                </div>
                               </div>
                             </div>
                           </div>
 
                           <!-- 商品明细 -->
-                          <div v-if="loadingItems === order.orderId" class="skeleton-items-grid px-1 py-2">
+                          <div
+                            v-if="loadingItems === order.orderId"
+                            class="skeleton-items-grid px-1 py-2"
+                          >
                             <div class="order-items-grid">
-                              <div v-for="j in 1" :key="j" class="order-item-card d-flex align-items-center gap-3 p-2 border rounded-3 mb-2" style="border: 1px solid #f1f5f9; border-radius: 0.5rem;">
-                                <div class="item-img-wrap skeleton-img" style="width: 60px; height: 60px; border-radius: 0.5rem; flex-shrink: 0;"></div>
+                              <div
+                                v-for="j in 1"
+                                :key="j"
+                                class="order-item-card d-flex align-items-center gap-3 p-2 border rounded-3 mb-2"
+                                style="border: 1px solid #f1f5f9; border-radius: 0.5rem"
+                              >
+                                <div
+                                  class="item-img-wrap skeleton-img"
+                                  style="
+                                    width: 60px;
+                                    height: 60px;
+                                    border-radius: 0.5rem;
+                                    flex-shrink: 0;
+                                  "
+                                ></div>
                                 <div class="item-details gap-2 flex-grow-1">
-                                  <div class="skeleton-block" style="width: 80%; height: 16px;"></div>
-                                  <div class="skeleton-block" style="width: 40%; height: 12px;"></div>
+                                  <div
+                                    class="skeleton-block"
+                                    style="width: 80%; height: 16px"
+                                  ></div>
+                                  <div
+                                    class="skeleton-block"
+                                    style="width: 40%; height: 12px"
+                                  ></div>
                                 </div>
                               </div>
                             </div>
@@ -1251,7 +1439,9 @@ async function handleAvatarUpload(event) {
                                     {{ item.product?.productName }}
                                   </div>
                                   <div class="item-meta">
-                                    <span class="item-price">NT$ {{ item.unitPrice.toLocaleString() }}</span>
+                                    <span class="item-price"
+                                      >NT$ {{ item.unitPrice.toLocaleString() }}</span
+                                    >
                                     <span class="item-qty">x {{ item.quantity }}</span>
                                   </div>
                                   <div class="item-subtotal">
@@ -1261,8 +1451,6 @@ async function handleAvatarUpload(event) {
                               </div>
                             </div>
                           </div>
-
-
                         </div>
                       </div>
                     </div>
@@ -1276,30 +1464,30 @@ async function handleAvatarUpload(event) {
     </div>
   </div>
 
-    <!-- 自訂提示 Modal -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="modalVisible" class="custom-modal-overlay" @click.self="closeModal(false)">
-          <div class="custom-modal-card">
-            <div class="modal-icon" :class="modalType">
-              <i v-if="modalType === 'success'" class="bi bi-check-lg"></i>
-              <i v-else-if="modalType === 'error'" class="bi bi-x-lg"></i>
-              <i v-else-if="modalType === 'confirm'" class="bi bi-question-lg"></i>
-              <i v-else class="bi bi-exclamation-lg"></i>
-            </div>
-            <h4 class="modal-title-custom">{{ modalTitle }}</h4>
-            <p class="modal-message">{{ modalMessage }}</p>
-            <div v-if="modalType === 'confirm'" class="d-flex gap-3 justify-content-center">
-              <button class="btn-modal-cancel" @click="closeModal(false)">再想想</button>
-              <button class="btn-modal-confirm confirm" @click="closeModal(true)">確定取消</button>
-            </div>
-            <button v-else class="btn-modal-confirm" :class="modalType" @click="closeModal(true)">
-              {{ modalType === 'success' ? '太棒了' : '我知道了' }}
-            </button>
+  <!-- 自訂提示 Modal -->
+  <Teleport to="body">
+    <Transition name="modal-fade">
+      <div v-if="modalVisible" class="custom-modal-overlay" @click.self="closeModal(false)">
+        <div class="custom-modal-card">
+          <div class="modal-icon" :class="modalType">
+            <i v-if="modalType === 'success'" class="bi bi-check-lg"></i>
+            <i v-else-if="modalType === 'error'" class="bi bi-x-lg"></i>
+            <i v-else-if="modalType === 'confirm'" class="bi bi-question-lg"></i>
+            <i v-else class="bi bi-exclamation-lg"></i>
           </div>
+          <h4 class="modal-title-custom">{{ modalTitle }}</h4>
+          <p class="modal-message">{{ modalMessage }}</p>
+          <div v-if="modalType === 'confirm'" class="d-flex gap-3 justify-content-center">
+            <button class="btn-modal-cancel" @click="closeModal(false)">再想想</button>
+            <button class="btn-modal-confirm confirm" @click="closeModal(true)">確定取消</button>
+          </div>
+          <button v-else class="btn-modal-confirm" :class="modalType" @click="closeModal(true)">
+            {{ modalType === 'success' ? '太棒了' : '我知道了' }}
+          </button>
         </div>
-      </Transition>
-    </Teleport>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -1331,7 +1519,9 @@ async function handleAvatarUpload(event) {
   background-color: #ffffff !important;
   box-shadow: 0 8px 24px rgba(27, 176, 193, 0.12) !important;
   border: 1px solid rgba(84, 218, 213, 0.2) !important;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 .profile-card-base:hover {
   box-shadow: 0 12px 32px rgba(27, 176, 193, 0.18) !important;
@@ -1834,7 +2024,7 @@ async function handleAvatarUpload(event) {
 }
 
 .order-info-label i {
-  color: #0D9488;
+  color: #0d9488;
 }
 
 .order-info-value {
@@ -1993,7 +2183,7 @@ async function handleAvatarUpload(event) {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite linear;
   border-radius: 6px;
-  content: "";
+  content: '';
 }
 
 .skeleton-img {
@@ -2037,8 +2227,14 @@ async function handleAvatarUpload(event) {
 }
 
 @keyframes modalBounceIn {
-  from { opacity: 0; transform: scale(0.85) translateY(20px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .modal-icon {
@@ -2051,21 +2247,37 @@ async function handleAvatarUpload(event) {
   margin: 0 auto 1.25rem;
   font-size: 2rem;
 }
-.modal-icon.success { background: #ECFDF5; color: #10B981; border: 3px solid #A7F3D0; }
-.modal-icon.error   { background: #FEF2F2; color: #EF4444; border: 3px solid #FECACA; }
-.modal-icon.warning  { background: #FFFBEB; color: #F59E0B; border: 3px solid #FDE68A; }
-.modal-icon.confirm  { background: #FFF7ED; color: #F97316; border: 3px solid #FED7AA; }
+.modal-icon.success {
+  background: #ecfdf5;
+  color: #10b981;
+  border: 3px solid #a7f3d0;
+}
+.modal-icon.error {
+  background: #fef2f2;
+  color: #ef4444;
+  border: 3px solid #fecaca;
+}
+.modal-icon.warning {
+  background: #fffbeb;
+  color: #f59e0b;
+  border: 3px solid #fde68a;
+}
+.modal-icon.confirm {
+  background: #fff7ed;
+  color: #f97316;
+  border: 3px solid #fed7aa;
+}
 
 .modal-title-custom {
   font-size: 1.35rem;
   font-weight: 700;
-  color: #1E293B;
+  color: #1e293b;
   margin-bottom: 0.5rem;
 }
 
 .modal-message {
   font-size: 0.95rem;
-  color: #64748B;
+  color: #64748b;
   margin-bottom: 1.75rem;
   line-height: 1.6;
 }
@@ -2080,25 +2292,46 @@ async function handleAvatarUpload(event) {
   cursor: pointer;
   transition: all 0.2s ease;
 }
-.btn-modal-confirm.success { background: linear-gradient(135deg, #10B981, #34D399); color: white; }
-.btn-modal-confirm.error   { background: linear-gradient(135deg, #EF4444, #F87171); color: white; }
-.btn-modal-confirm.confirm { background: linear-gradient(135deg, #EF4444, #F87171); color: white; }
-.btn-modal-confirm:hover { transform: translateY(-2px); filter: brightness(1.05); }
+.btn-modal-confirm.success {
+  background: linear-gradient(135deg, #10b981, #34d399);
+  color: white;
+}
+.btn-modal-confirm.error {
+  background: linear-gradient(135deg, #ef4444, #f87171);
+  color: white;
+}
+.btn-modal-confirm.confirm {
+  background: linear-gradient(135deg, #ef4444, #f87171);
+  color: white;
+}
+.btn-modal-confirm:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
 
 .btn-modal-cancel {
   display: inline-block;
   padding: 0.65rem 2.5rem;
-  border: 1.5px solid #CBD5E1;
+  border: 1.5px solid #cbd5e1;
   border-radius: 0.75rem;
   font-size: 0.95rem;
   font-weight: 700;
   background: white;
-  color: #64748B;
+  color: #64748b;
   cursor: pointer;
   transition: all 0.2s ease;
 }
-.btn-modal-cancel:hover { background: #F8FAFC; border-color: #94A3B8; }
+.btn-modal-cancel:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
 
-.modal-fade-enter-active, .modal-fade-leave-active { transition: opacity 0.25s ease; }
-.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
 </style>
