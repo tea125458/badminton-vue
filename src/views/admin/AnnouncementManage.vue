@@ -238,16 +238,28 @@ const demoAnnouncements = [
   { title: '會員日專屬優惠！打球購物享折扣', content: '每月 15 號為會員日！\n\n• 場地預約 9 折\n• 商城購物滿 $500 折 $50\n• 臨打媒合免報名費\n\n活動僅限當日，别錯過囉！', category: '活動', status: 'PUBLISHED', isPinned: true },
 ]
 
-function quickFillForm() {
+async function quickFillForm() {
   const demo = demoAnnouncements[Math.floor(Math.random() * demoAnnouncements.length)]
   form.value.title = demo.title
   form.value.content = demo.content
   form.value.category = demo.category
   form.value.status = demo.status
   form.value.isPinned = demo.isPinned
-  form.value.imageUrl = '/uploads/announcements/demo_announcement.png'
-  imagePreview.value = '/uploads/announcements/demo_announcement.png'
-  imageFile.value = null
+
+  // 把 demo 圖片抓下來轉成 File，讓儲存時走正常上傳流程（後端會產生獨立 UUID 檔名）
+  try {
+    const response = await fetch('/uploads/announcements/demo_announcement.png?t=' + Date.now())
+    const blob = await response.blob()
+    const file = new File([blob], 'demo_announcement.png', { type: blob.type })
+    imageFile.value = file
+    imagePreview.value = URL.createObjectURL(file)
+    form.value.imageUrl = '' // 清空，由上傳後回填
+  } catch (e) {
+    // 若抓取失敗，退回舊方式
+    form.value.imageUrl = '/uploads/announcements/demo_announcement.png'
+    imagePreview.value = '/uploads/announcements/demo_announcement.png?t=' + Date.now()
+    imageFile.value = null
+  }
 }
 </script>
 
