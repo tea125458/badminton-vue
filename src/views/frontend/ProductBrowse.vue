@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { productApi } from '@/api/product'
 import { useCartStore } from '@/stores/cart'
@@ -17,21 +17,36 @@ const products = ref([])
 const loading = ref(false)
 const loadError = ref(null)
 
-async function fetchProducts() {
-  loading.value = true
-  loadError.value = null
+async function fetchProducts(quiet = false) {
+  if (!quiet) loading.value = true
+  if (!quiet) loadError.value = null
   try {
     const data = await productApi.findAll()
-    products.value = data.filter((p) => p.status === 'ACTIVE')
+    products.value = data
+      .filter((p) => p.status === 'ACTIVE')
+      .sort((a, b) => b.productId - a.productId)
   } catch (e) {
-    loadError.value = '無法載入商品，請確認後端服務是否已啟動'
+    if (!quiet) loadError.value = '無法載入商品，請確認後端服務是否已啟動'
     console.error(e)
   } finally {
-    loading.value = false
+    if (!quiet) loading.value = false
   }
 }
 
-onMounted(fetchProducts)
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    fetchProducts(true)
+  }
+}
+
+onMounted(() => {
+  fetchProducts()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+})
 
 // ===================== 常數 =====================
 const categoryMap = {
