@@ -175,8 +175,10 @@ async function processOrder() {
     // Step 3: 判斷金流跳轉
     if (paymentType.value === 'LINE_PAY') {
       // 🚀 進入 LINE Pay 流程
+      // 加入時間戳記避免資料庫重置後訂單編號重複，導致 LINE Pay 報錯 (400 Bad Request)
+      const timestamp = new Date().getTime()
       await requestPayment({
-        orderId: `ORD-${newOrder.orderId}`,
+        orderId: `ORD-${newOrder.orderId}-${timestamp}`,
         amount: cart.total,
         productName: `羽過天晴商品訂單 #${newOrder.orderId}`
       })
