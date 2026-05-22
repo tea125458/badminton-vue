@@ -70,8 +70,14 @@ const selectedDate = ref('') // 選擇的日期
 const bookedSlots = ref([]) // 已被預約的時段（從 API 取得）
 const selectedSlots = ref([]) // 使用者選中的時段
 
-// 今天日期（限制日期選擇器不能選過去）
-const today = computed(() => new Date().toISOString().slice(0, 10))
+// 今天日期（限制日期選擇器不能選過去）— 使用本地時間避免時區偏差
+const today = computed(() => {
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+})
 
 // 所有可選時段（10:00 ~ 22:00，每格代表 1 小時）
 const timeSlots = [

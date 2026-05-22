@@ -119,7 +119,7 @@ const availableGames = computed(() => {
   const now = new Date()
   let result = pickupGames.value.filter(game => {
     // 資料庫狀態已標記為取消或結束 → 直接排除
-    if (game.status === 'CANCELLED' || game.status === 'CLOSED') return false
+    if (game.status === 'CANCELLED') return false
     // 日期已過 → 排除
     if (game.gameDate < todayStr) return false
     // 🌟 關鍵修正：即使是「今天」的場次，如果結束時間已過也要排除

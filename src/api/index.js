@@ -23,7 +23,7 @@ const api = axios.create({
 
   // timeout: 請求超時時間（毫秒）
   // 超過 10 秒沒有回應就自動取消請求
-  timeout: 10000,
+  timeout: 30000,
 
   // headers: 預設的請求標頭
   headers: {
