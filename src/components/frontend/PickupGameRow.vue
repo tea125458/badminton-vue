@@ -186,6 +186,11 @@ const handleCardClick = () => {
               <i class="bi bi-check2-circle me-1"></i>報名資訊
             </button>
           </template>
+          <template v-else-if="game.status === 'CLOSED'">
+            <button class="btn btn-mori-disabled btn-sm mt-2 w-100 rounded-pill fw-bold" disabled>
+              已停止報名
+            </button>
+          </template>
           <template v-else>
             <button v-if="!isFull" class="btn btn-sm mt-2 w-100 rounded-pill fw-bold btn-mori-join"
                     @click.stop="$emit('open-quick-view', game)">
