@@ -22,11 +22,11 @@ const newPassword = ref('')
 const confirmPassword = ref('')
 const showPassword = ref(false)
 
-// 一鍵帶入 Demo 資料 (正式發表用)
+// 一鍵輸入 Demo 資料 (正式發表用)
 function fillDemoData() {
   if (step.value === 1) {
-    username.value = 'hsuanhsu'
-    email.value = 'starry1470@gmail.com'
+    username.value = 'wangdaqian'
+    email.value = 'wangdaqian108@gmail.com'
   } else if (step.value === 2) {
     newPassword.value = 'pass123'
     confirmPassword.value = 'pass123'
@@ -254,7 +254,7 @@ async function handleSubmit() {
               </div>
               <div v-if="step !== 3">
                 <button type="button" class="btn btn-sm p-0 mt-1 small fw-bold" style="color: #48b4e0; text-decoration: none;" @click="fillDemoData">
-                  一鍵帶入
+                  一鍵輸入
                 </button>
               </div>
             </div>
