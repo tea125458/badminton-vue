@@ -28,6 +28,13 @@ async function quickFill() {
   await handleLogin()
 }
 
+// 一鍵登入新會員
+async function quickFillNewMember() {
+  username.value = 'wangdaqian'
+  password.value = 'pass123'
+  await handleLogin()
+}
+
 onMounted(() => {
   if (route.query.registered) {
     successMsg.value = '註冊成功！請使用新帳號登入'
@@ -75,7 +82,7 @@ async function handleGoogleLogin(response) {
     localStorage.setItem('memberToken', res.token)
     localStorage.setItem('memberInfo', JSON.stringify(res.member))
     memberStore.login(res.token, res.member)
-    router.push('/profile')
+    router.push('/')
   } catch (err) {
     console.error('Google 登入失敗:', err)
     errorMsg.value = err.response?.data?.message || 'Google 登入失敗，請稍後再試'
@@ -171,14 +178,22 @@ async function handleGoogleLogin(response) {
             <span v-else><i class="bi bi-box-arrow-in-right me-2"></i>登入</span>
           </button>
 
-          <button
-            type="button"
-            class="btn btn-outline-secondary w-100 py-1 fw-semibold border-dashed"
-            @click="quickFill"
-            style="margin-top: 6px"
-          >
-            <i class="bi bi-lightning-fill text-warning me-1"></i>一鍵登入
-          </button>
+          <div class="d-flex gap-2" style="margin-top: 6px">
+            <button
+              type="button"
+              class="btn btn-outline-secondary w-50 py-1 fw-semibold border-dashed"
+              @click="quickFill"
+            >
+              <i class="bi bi-lightning-fill text-warning me-1"></i>一鍵登入
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-info w-50 py-1 fw-semibold border-dashed"
+              @click="quickFillNewMember"
+            >
+              新會員登入
+            </button>
+          </div>
         </form>
 
         <div class="d-flex align-items-center my-3">
@@ -372,5 +387,16 @@ async function handleGoogleLogin(response) {
 
 .toggle-pwd:hover {
   color: #64748b;
+}
+
+/* 確保按鈕在懸停、點擊與焦點狀態下字體不會變黑色 */
+.btn-outline-info.border-dashed:hover,
+.btn-outline-info.border-dashed:active,
+.btn-outline-info.border-dashed:focus,
+.btn-outline-info.border-dashed:focus-visible,
+.btn-outline-info.border-dashed.active {
+  color: #ffffff !important;
+  background-color: #0dcaf0 !important;
+  border-color: #0dcaf0 !important;
 }
 </style>
