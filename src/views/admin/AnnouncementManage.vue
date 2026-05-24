@@ -248,7 +248,7 @@ async function quickFillForm() {
 
   // 把 demo 圖片抓下來轉成 File，讓儲存時走正常上傳流程（後端會產生獨立 UUID 檔名）
   try {
-    const response = await fetch('/uploads/announcements/demo_announcement.png?t=' + Date.now())
+    const response = await fetch('/images/announcements/demo_announcement.png?t=' + Date.now())
     const blob = await response.blob()
     const file = new File([blob], 'demo_announcement.png', { type: blob.type })
     imageFile.value = file
@@ -256,8 +256,8 @@ async function quickFillForm() {
     form.value.imageUrl = '' // 清空，由上傳後回填
   } catch (e) {
     // 若抓取失敗，退回舊方式
-    form.value.imageUrl = '/uploads/announcements/demo_announcement.png'
-    imagePreview.value = '/uploads/announcements/demo_announcement.png?t=' + Date.now()
+    form.value.imageUrl = '/images/announcements/demo_announcement.png'
+    imagePreview.value = '/images/announcements/demo_announcement.png?t=' + Date.now()
     imageFile.value = null
   }
 }
