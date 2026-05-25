@@ -232,9 +232,9 @@ async function saveAnnouncement() {
 // ========== 一鍵填入 Demo 資料 ==========
 const demoAnnouncements = [
   { title: '【重要】端午連假營業時間調整', content: '親愛的會員您好，\n\n端午連假期間（6/7~6/10），本館營業時間調整為 09:00~18:00，6/11（二）起恢復正常營業時間 08:00~22:00。\n\n連假期間場地預約可能較緊張，建議提早預約。\n\n祠您端午佳節愉快！', category: '緊急', status: 'PUBLISHED', isPinned: true },
-  { title: '新球場開放通知！歡迎預約體驗', content: '好消息！\n\n本館新增 4 面國際標準羽球場地，全新 PU 地板、LED 照明系統、中央空調，即日起開放預約！\n\n前 100 名預約者享 8 折優惠。\n\n歡迎大家來體驗！', category: '活動', status: 'PUBLISHED', isPinned: false },
-  { title: '羽球教學課程開放報名', content: '本館與國手教練合作，推出初學者、進階者專屬教學課程！\n\n• 初學班：每週三 19:00~21:00\n• 進階班：每週五 19:00~21:00\n\n課程費用：每期 8 堂，會員價 $3,200。\n\n名額有限，歡迎報名！', category: '活動', status: 'DRAFT', isPinned: false },
-  { title: '系統維護公告（預計 30 分鐘）', content: '親愛的會員，\n\n為提升系統穩定度，本站將於今晚 23:00~23:30 進行系統維護，屆時將暫停預約功能。\n\n已預約的場次不受影響，敬請見諒。\n\n感謝您的配合！', category: '一般', status: 'PUBLISHED', isPinned: false },
+  { title: '新球場開放通知！歡迎預約體驗', content: '好消息！\n\n本館新增 4 面國際標準羽球場地，全新 PU 地板、LED 照明系統、中央空調，即日起開放預約！\n\n前 100 名預約者享 8 折優惠。\n\n歡迎大家來體驗！', category: '活動', status: 'PUBLISHED', isPinned: true },
+  { title: '羽球教學課程開放報名', content: '本館與國手教練合作，推出初學者、進階者專屬教學課程！\n\n• 初學班：每週三 19:00~21:00\n• 進階班：每週五 19:00~21:00\n\n課程費用：每期 8 堂，會員價 $3,200。\n\n名額有限，歡迎報名！', category: '活動', status: 'PUBLISHED', isPinned: true },
+  { title: '系統維護公告（預計 30 分鐘）', content: '親愛的會員，\n\n為提升系統穩定度，本站將於今晚 23:00~23:30 進行系統維護，屆時將暫停預約功能。\n\n已預約的場次不受影響，敬請見諒。\n\n感謝您的配合！', category: '一般', status: 'PUBLISHED', isPinned: true },
   { title: '會員日專屬優惠！打球購物享折扣', content: '每月 15 號為會員日！\n\n• 場地預約 9 折\n• 商城購物滿 $500 折 $50\n• 臨打媒合免報名費\n\n活動僅限當日，别錯過囉！', category: '活動', status: 'PUBLISHED', isPinned: true },
 ]
 
