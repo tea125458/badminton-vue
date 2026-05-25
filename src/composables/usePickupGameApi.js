@@ -536,6 +536,36 @@ export function usePickupGameApi() {
   }
 
   // ============================
+  // ✉️ 聯絡主揪 (系統代發 Email)
+  // ============================
+  const contactHost = async (gameId, message) => {
+    try {
+      const token = localStorage.getItem('memberToken') || localStorage.getItem('adminToken');
+      const res = await axios.post(`/api/pickup-games/${gameId}/contact-host`, 
+        { message },
+        { headers: { Authorization: token ? `Bearer ${token}` : '' } }
+      )
+      Swal.fire({
+        icon: 'success',
+        title: '發送成功',
+        text: '您的訊息已透過系統寄送給主揪！',
+        confirmButtonColor: '#0d6efd'
+      })
+      return true
+    } catch (err) {
+      console.error('聯絡主揪失敗', err)
+      const errMsg = err.response?.data?.error || '發送失敗，請稍後再試'
+      Swal.fire({
+        icon: 'error',
+        title: '發送失敗',
+        text: errMsg,
+        confirmButtonText: '我知道了'
+      })
+      return false
+    }
+  }
+
+  // ============================
   // 📦 回傳所有東西給外部使用
   // ============================
   return {
@@ -579,5 +609,7 @@ export function usePickupGameApi() {
     saveInlineEdit,
     fetchMemberBookings,  // 🌟 抓取會員預約
     selectAdminBooking,   // 🌟 選擇預約後帶入資料
+    contactHost,          // 🌟 聯絡主揪
   }
 }
+
