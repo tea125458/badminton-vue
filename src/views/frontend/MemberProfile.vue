@@ -330,6 +330,24 @@ async function handleSave() {
   }
 }
 
+// 一鍵帶入舊密碼測試資料
+function fillTestOldPwd() {
+  pwdForm.value = {
+    oldPassword: 'pass123',
+    newPassword: 'pass123',
+    confirmPassword: 'pass123',
+  }
+}
+
+// 一鍵帶入新密碼測試資料
+function fillTestNewPwd() {
+  pwdForm.value = {
+    oldPassword: 'pass123',
+    newPassword: 'pass1234',
+    confirmPassword: 'pass1234',
+  }
+}
+
 // 執行修改密碼
 async function handleChangePassword() {
   pwdSuccessMsg.value = ''
@@ -764,7 +782,21 @@ async function handleAvatarUpload(event) {
                       <i class="bi bi-shield-exclamation me-1"></i> {{ pwdErrorMsg }}
                     </div>
 
-                    <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+                    <div class="d-flex justify-content-end align-items-center gap-2 mt-4 pt-3 border-top">
+                      <button
+                        type="button"
+                        class="btn-pwd-test-old"
+                        @click="fillTestOldPwd"
+                      >
+                        測試舊密碼
+                      </button>
+                      <button
+                        type="button"
+                        class="btn-pwd-test-new"
+                        @click="fillTestNewPwd"
+                      >
+                        測試新密碼
+                      </button>
                       <button
                         type="button"
                         class="btn-pwd-save"
@@ -1665,6 +1697,27 @@ async function handleAvatarUpload(event) {
   font-size: 0.8rem;
   color: #6c757d;
   font-weight: 400;
+}
+
+.btn-pwd-test-old,
+.btn-pwd-test-new {
+  background-color: transparent;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: all 0.2s ease;
+  border-style: dashed !important;
+  border-width: 2px !important;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+.btn-pwd-test-old:hover,
+.btn-pwd-test-new:hover {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+  color: #475569;
 }
 
 /* 側邊欄樣式 */

@@ -286,7 +286,29 @@ async function deleteAdmin(id, name) {
 
 // ===== 變更狀態 =====
 async function changeStatus(id, status) {
+  const admin = admins.value.find((a) => a.adminId === id)
+  const name = admin ? (admin.fullName || admin.username) : ''
   const statusLabel = { ACTIVE: '在職', INACTIVE: '停權', RESIGNED: '已離職' }[status] || status
+
+  const result = await Swal.fire({
+    title: '確定要變更狀態嗎？',
+    html: `<div style="font-size: 0.95rem; color: #64748b;">將職員「${name}」的狀態變更為「${statusLabel}」</div>`,
+    icon: 'warning',
+    iconColor: '#0ea5e9',
+    showCancelButton: true,
+    confirmButtonText: '確定變更',
+    cancelButtonText: '取消',
+    reverseButtons: true,
+    background: '#ffffff',
+    color: '#334155',
+    borderRadius: '1.25rem',
+    confirmButtonColor: '#0ea5e9',
+    cancelButtonColor: '#94a3b8',
+    width: '460px',
+  })
+
+  if (!result.isConfirmed) return
+
   try {
     await adminApi.updateStatus(id, status)
     loadData()

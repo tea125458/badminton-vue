@@ -275,7 +275,29 @@ async function deleteMember(id, name) {
 
 // ===== 變更狀態 =====
 async function changeStatus(id, status) {
+  const member = members.value.find((m) => m.memberId === id)
+  const name = member ? (member.fullName || member.username) : ''
   const statusLabel = { ACTIVE: '正常', INACTIVE: '停權', BANNED: '封鎖' }[status] || status
+
+  const result = await Swal.fire({
+    title: '確定要變更狀態嗎？',
+    html: `<div style="font-size: 0.95rem; color: #64748b;">將會員「${name}」的狀態變更為「${statusLabel}」</div>`,
+    icon: 'warning',
+    iconColor: '#0ea5e9',
+    showCancelButton: true,
+    confirmButtonText: '確定變更',
+    cancelButtonText: '取消',
+    reverseButtons: true,
+    background: '#ffffff',
+    color: '#334155',
+    borderRadius: '1.25rem',
+    confirmButtonColor: '#0ea5e9',
+    cancelButtonColor: '#94a3b8',
+    width: '460px',
+  })
+
+  if (!result.isConfirmed) return
+
   try {
     await adminApi.updateMemberStatus(id, status)
     loadData()

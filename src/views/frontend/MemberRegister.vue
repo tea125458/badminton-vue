@@ -87,18 +87,18 @@ function formatPhone() {
 // 一鍵帶入 Demo 資料 (正式發表用)
 function fillDemoData() {
   form.value = {
-    username: 'hsuanhsu',
+    username: 'wangdaqian',
     password: 'pass123',
     confirmPassword: 'pass123',
-    fullName: '許萱',
-    gender: '女',
+    fullName: '王大謙',
+    gender: '男',
     birthday: '1992-08-25',
     phone: '0910-555-888',
-    email: 'starry1470@gmail.com',
-    profilePicture: '/profile_pictures/4.png',
+    email: 'wangdaqian108@gmail.com',
+    profilePicture: '/profile_pictures/3.png',
   }
   // 設定大頭貼預覽 (直接用後端靜態路徑)
-  registerAvatarPreview.value = 'http://localhost:8080/profile_pictures/4.png'
+  registerAvatarPreview.value = 'http://localhost:8080/profile_pictures/3.png'
 }
 
 // 送出第一步，發送驗證信
