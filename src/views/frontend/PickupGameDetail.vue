@@ -13,7 +13,7 @@ const route = useRoute()
 const router = useRouter()
 const gameId = route.params.id
 
-const { pickupGames, fetchGames, signupsMap, fetchSignups, joinPickupGame, removeSignup } = usePickupGameApi()
+const { pickupGames, fetchGames, signupsMap, fetchSignups, joinPickupGame, removeSignup, contactHost } = usePickupGameApi()
 const memberStore = useMemberStore()
 const showAuthModal = ref(false)
 const { checkTimeConflict } = useTimeConflict()
@@ -150,6 +150,47 @@ const onCancelGame = async () => {
       text: '期待您下次再一起打球！',
       confirmButtonColor: '#457B9D'
     })
+  }
+}
+
+// ============================
+// ✉️ 聯絡主揪彈窗
+// ============================
+const openContactHostModal = async () => {
+  const result = await Swal.fire({
+    title: '聯絡主揪',
+    html: `
+      <div class="text-start mb-3 text-secondary" style="font-size: 0.9rem;">
+        請輸入您想詢問的內容，系統將會代為發送 Email 給主揪（${game.value?.host?.fullName}）。主揪回信時會直接寄到您的信箱。
+      </div>
+      <textarea id="contact-message" class="form-control" rows="4" placeholder="例如：請問可以借球拍嗎？" style="resize: none;"></textarea>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '<i class="bi bi-send-fill me-1"></i> 發送訊息',
+    cancelButtonText: '取消',
+    confirmButtonColor: '#457B9D',
+    cancelButtonColor: '#6c757d',
+    focusConfirm: false,
+    preConfirm: () => {
+      const message = document.getElementById('contact-message').value
+      if (!message || message.trim() === '') {
+        Swal.showValidationMessage('請輸入訊息內容')
+        return false
+      }
+      return message
+    }
+  })
+
+  if (result.isConfirmed) {
+    Swal.fire({
+      title: '發送中...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading()
+      }
+    })
+    
+    await contactHost(gameId, result.value)
   }
 }
 
@@ -418,12 +459,12 @@ const handleKick = async (signupId, memberName) => {
                   <h5 class="fw-bold mb-2 d-flex align-items-center">
   {{ game.host?.fullName }}
 
-  <a v-if="isAlreadyJoined && game.host?.phone"
-     :href="`tel:${game.host?.phone}`"
-     class="ms-3 badge bg-mori-success text-white text-decoration-none px-2 py-1 shadow-sm transition-all"
+  <button v-if="isAlreadyJoined && game.host?.email"
+     @click="openContactHostModal"
+     class="ms-3 badge bg-mori-teal text-white border-0 px-2 py-1 shadow-sm transition-all"
      style="font-size: 0.85rem; letter-spacing: 0.5px;">
-    <i class="bi bi-telephone-fill me-1"></i> {{ game.host?.phone }}
-  </a>
+    <i class="bi bi-envelope-fill me-1"></i> 聯絡主揪
+  </button>
 </h5>
                   <p class="text-secondary mb-0" style="line-height: 1.8;">
                     哈囉！我是這場臨打的主揪。本次揪團程度要求為「<strong class="text-dark">{{ skillMap[game.skillLevel] }}</strong>」。
@@ -460,8 +501,8 @@ const handleKick = async (signupId, memberName) => {
                     <div class="small fw-bold text-truncate w-100 text-dark">{{ s.member?.fullName }}</div>
                     <div v-if="s.displayTag" class="small text-mori-teal fw-medium" style="font-size: 0.75rem;">{{ s.displayTag }}</div>
 
-                    <div v-if="isCurrentUserHost" class="text-secondary mt-1 px-1 rounded bg-light border" style="font-size: 0.65rem;">
-                      {{ s.member?.phone || '無電話' }}
+                    <div v-if="isCurrentUserHost" class="text-success mt-1 px-1 rounded bg-light border" style="font-size: 0.65rem;">
+                      <i class="bi bi-shield-lock-fill"></i> 個資隱藏
                     </div>
                   </div>
 
