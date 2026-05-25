@@ -14,7 +14,7 @@ import AuthModal from '@/components/frontend/AuthModal.vue'
 
 const router = useRouter()
 const route = useRoute()
-const { pickupGames, fetchGames, joinPickupGame, myRegisteredGameIds, fetchMyRegisteredGames } = usePickupGameApi()
+const { pickupGames, fetchGames, joinPickupGame, myRegisteredGameIds, fetchMyRegisteredGames, contactHost } = usePickupGameApi()
 const memberStore = useMemberStore()
 const showAuthModal = ref(false)
 const pendingAction = ref(null)
@@ -340,6 +340,51 @@ const goToDetails = () => {
   }
   if (quickViewGame.value) {
     router.push(`/pickup/${quickViewGame.value.gameId}`)
+  }
+}
+
+// ============================
+// ✉️ 聯絡主揪彈窗
+// ============================
+const openContactHostModal = async () => {
+  if (quickViewModalInstance) {
+    quickViewModalInstance.hide()
+  }
+
+  const result = await Swal.fire({
+    title: '聯絡主揪',
+    html: `
+      <div class="text-start mb-3 text-secondary" style="font-size: 0.9rem;">
+        請輸入您想詢問的內容，系統將會代為發送 Email 給主揪（${quickViewGame.value?.host?.fullName}）。主揪回信時會直接寄到您的信箱。
+      </div>
+      <textarea id="contact-message" class="form-control" rows="4" placeholder="例如：請問可以借球拍嗎？" style="resize: none;"></textarea>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '<i class="bi bi-send-fill me-1"></i> 發送訊息',
+    cancelButtonText: '取消',
+    confirmButtonColor: '#457B9D',
+    cancelButtonColor: '#6c757d',
+    focusConfirm: false,
+    preConfirm: () => {
+      const message = document.getElementById('contact-message').value
+      if (!message || message.trim() === '') {
+        Swal.showValidationMessage('請輸入訊息內容')
+        return false
+      }
+      return message
+    }
+  })
+
+  if (result.isConfirmed) {
+    Swal.fire({
+      title: '發送中...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading()
+      }
+    })
+    
+    await contactHost(quickViewGame.value.gameId, result.value)
   }
 }
 
@@ -783,9 +828,9 @@ const handleManageGame = (game) => {
               <div class="flex-grow-1">
                 <div class="fw-bold text-dark d-flex align-items-center" style="font-size: 0.95rem;">
                   {{ quickViewGame.host?.fullName || '揪團主' }}
-                  <a v-if="isQuickViewRegistered && quickViewGame.host?.phone" :href="`tel:${quickViewGame.host.phone}`" class="ms-2 badge bg-success text-white text-decoration-none px-2 py-1">
-                    <i class="bi bi-telephone-fill me-1"></i>{{ quickViewGame.host.phone }}
-                  </a>
+                  <button v-if="isQuickViewRegistered && quickViewGame.host?.email" @click="openContactHostModal" class="ms-2 badge bg-mori-teal text-white border-0 px-2 py-1">
+                    <i class="bi bi-envelope-fill me-1"></i>聯絡主揪
+                  </button>
                 </div>
                 <div v-if="qvTags.length" class="d-flex flex-wrap gap-1 mt-1">
                   <span v-for="tag in qvTags" :key="tag" class="badge rounded-pill qv-tag px-2 py-1">{{ tag }}</span>

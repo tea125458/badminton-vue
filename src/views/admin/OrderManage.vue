@@ -291,8 +291,17 @@ function addToCart() {
 
   const existing = cart.value.find((c) => c.productId === pid)
   if (existing) {
-    existing.quantity += qty
+    const newQty = existing.quantity + qty
+    if (newQty > product.stockQty) {
+      Swal.fire({ icon: 'warning', title: '庫存不足', text: `剩餘 ${product.stockQty} 件，購物車已有 ${existing.quantity} 件`, confirmButtonColor: '#0ea5e9' })
+      return
+    }
+    existing.quantity = newQty
   } else {
+    if (qty > product.stockQty) {
+      Swal.fire({ icon: 'warning', title: '庫存不足', text: `剩餘 ${product.stockQty} 件`, confirmButtonColor: '#0ea5e9' })
+      return
+    }
     cart.value.push({
       productId: pid,
       name: product.productName,
@@ -397,7 +406,8 @@ async function fillDemoOrder() {
     }
   }
 
-  // 2. 隨機加入 1~3 項商品到購物車
+  // 2. 重新載入最新商品庫存，再隨機加入 1~3 項商品到購物車
+  await loadProducts()
   if (products.value.length > 0) {
     cart.value = []
     const count = Math.min(1 + Math.floor(Math.random() * 3), products.value.length)
@@ -405,6 +415,7 @@ async function fillDemoOrder() {
     for (let i = 0; i < count; i++) {
       const p = shuffled[i]
       const qty = Math.min(1 + Math.floor(Math.random() * 3), p.stockQty)
+      if (qty < 1) continue // 庫存不足則跳過
       cart.value.push({
         productId: p.productId,
         name: p.productName,
