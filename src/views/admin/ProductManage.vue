@@ -2,7 +2,7 @@
 /**
  * 商品管理 — 列表式 CRUD + 圖片上傳 + 分頁 + 搜尋篩選
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { productApi } from '@/api/product'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { useExport } from '@/composables/useExport'
@@ -115,15 +115,16 @@ function createEmptyForm() {
   }
 }
 
-async function loadProducts() {
-  loading.value = true
+async function loadProducts(quiet = false) {
+  if (!quiet) loading.value = true
   try {
-    products.value = await productApi.findAll()
+    const data = await productApi.findAll()
+    products.value = data.sort((a, b) => b.productId - a.productId)
   } catch (e) {
     console.error('載入商品失敗', e)
-    alert('載入商品失敗，請確認後端是否已啟動')
+    if (!quiet) alert('載入商品失敗，請確認後端是否已啟動')
   } finally {
-    loading.value = false
+    if (!quiet) loading.value = false
   }
 }
 
@@ -281,7 +282,20 @@ function fillDemoProduct() {
   formData.value.status = 'ACTIVE'
 }
 
-onMounted(loadProducts)
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    loadProducts(true)
+  }
+}
+
+onMounted(() => {
+  loadProducts()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+})
 
 const defaultImage = 'http://localhost:8080/images/products/default.png'
 function onImageError(e) {

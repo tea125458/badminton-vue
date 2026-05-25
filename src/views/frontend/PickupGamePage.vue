@@ -14,7 +14,7 @@ import AuthModal from '@/components/frontend/AuthModal.vue'
 
 const router = useRouter()
 const route = useRoute()
-const { pickupGames, fetchGames, joinPickupGame, myRegisteredGameIds, fetchMyRegisteredGames } = usePickupGameApi()
+const { pickupGames, fetchGames, joinPickupGame, myRegisteredGameIds, fetchMyRegisteredGames, contactHost } = usePickupGameApi()
 const memberStore = useMemberStore()
 const showAuthModal = ref(false)
 const pendingAction = ref(null)
@@ -114,12 +114,21 @@ const isWeekend = (dateStr) => {
 // --------------------
 const availableGames = computed(() => {
   const todayStr = getTodayStr()
+  const isMyGamesTab = selectedDateFilter.value === '我的開團' && loggedInMemberId.value
 
   // 🌟 基本過濾：過濾掉已取消、已結束，且【只顯示今天或未來且尚未結束的場次】
   const now = new Date()
   let result = pickupGames.value.filter(game => {
-    // 資料庫狀態已標記為取消或結束 → 直接排除
+    // 已取消 → 任何頁面都直接排除
     if (game.status === 'CANCELLED') return false
+    // 已關閉報名 → 只在「我的開團」中對主揪本人保留，其他頁面排除
+    if (game.status === 'CLOSED') {
+      if (isMyGamesTab && String(game.host?.memberId) === String(loggedInMemberId.value)) {
+        // 主揪在「我的開團」→ 保留（讓主揪可以重新開啟報名）
+      } else {
+        return false
+      }
+    }
     // 日期已過 → 排除
     if (game.gameDate < todayStr) return false
     // 🌟 關鍵修正：即使是「今天」的場次，如果結束時間已過也要排除
@@ -131,7 +140,7 @@ const availableGames = computed(() => {
   })
 
   // 🌟 1. 快速日期篩選
-if (selectedDateFilter.value === '我的開團' && loggedInMemberId.value) {
+  if (isMyGamesTab) {
     result = result.filter(g => String(g.host?.memberId) === String(loggedInMemberId.value))
   } else if (selectedDateFilter.value === '我的報名' && loggedInMemberId.value) {
     // 👉 新增：利用已經存在的 myRegisteredGameIds 陣列來過濾
@@ -331,6 +340,51 @@ const goToDetails = () => {
   }
   if (quickViewGame.value) {
     router.push(`/pickup/${quickViewGame.value.gameId}`)
+  }
+}
+
+// ============================
+// ✉️ 聯絡主揪彈窗
+// ============================
+const openContactHostModal = async () => {
+  if (quickViewModalInstance) {
+    quickViewModalInstance.hide()
+  }
+
+  const result = await Swal.fire({
+    title: '聯絡主揪',
+    html: `
+      <div class="text-start mb-3 text-secondary" style="font-size: 0.9rem;">
+        請輸入您想詢問的內容，系統將會代為發送 Email 給主揪（${quickViewGame.value?.host?.fullName}）。主揪回信時會直接寄到您的信箱。
+      </div>
+      <textarea id="contact-message" class="form-control" rows="4" placeholder="例如：請問可以借球拍嗎？" style="resize: none;"></textarea>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '<i class="bi bi-send-fill me-1"></i> 發送訊息',
+    cancelButtonText: '取消',
+    confirmButtonColor: '#457B9D',
+    cancelButtonColor: '#6c757d',
+    focusConfirm: false,
+    preConfirm: () => {
+      const message = document.getElementById('contact-message').value
+      if (!message || message.trim() === '') {
+        Swal.showValidationMessage('請輸入訊息內容')
+        return false
+      }
+      return message
+    }
+  })
+
+  if (result.isConfirmed) {
+    Swal.fire({
+      title: '發送中...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading()
+      }
+    })
+    
+    await contactHost(quickViewGame.value.gameId, result.value)
   }
 }
 
@@ -774,9 +828,9 @@ const handleManageGame = (game) => {
               <div class="flex-grow-1">
                 <div class="fw-bold text-dark d-flex align-items-center" style="font-size: 0.95rem;">
                   {{ quickViewGame.host?.fullName || '揪團主' }}
-                  <a v-if="isQuickViewRegistered && quickViewGame.host?.phone" :href="`tel:${quickViewGame.host.phone}`" class="ms-2 badge bg-success text-white text-decoration-none px-2 py-1">
-                    <i class="bi bi-telephone-fill me-1"></i>{{ quickViewGame.host.phone }}
-                  </a>
+                  <button v-if="isQuickViewRegistered && quickViewGame.host?.email" @click="openContactHostModal" class="ms-2 badge bg-mori-teal text-white border-0 px-2 py-1">
+                    <i class="bi bi-envelope-fill me-1"></i>聯絡主揪
+                  </button>
                 </div>
                 <div v-if="qvTags.length" class="d-flex flex-wrap gap-1 mt-1">
                   <span v-for="tag in qvTags" :key="tag" class="badge rounded-pill qv-tag px-2 py-1">{{ tag }}</span>

@@ -338,7 +338,7 @@ const sendBroadcast = async () => {
                     <div>
                       <div class="fw-bold text-dark mb-1" style="font-size: 0.95rem;">{{ signup.member?.fullName || '球友' }}</div>
                       <div class="text-secondary" style="font-size: 0.75rem;">
-                        <i class="bi bi-telephone-fill me-1 opacity-75"></i>{{ formatPhone(signup.member?.phone) }}
+                        <i class="bi bi-shield-lock-fill me-1 opacity-75 text-success"></i>個資已由系統隱藏
                       </div>
                     </div>
                   </div>
