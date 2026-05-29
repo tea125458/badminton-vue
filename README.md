@@ -1,98 +1,131 @@
+# 🏸 羽球館預約管理系統 — 前端
 
-<img width="754" height="538" alt="羽過天晴系統" src="https://github.com/user-attachments/assets/68855d2f-4c4c-422b-b796-436797a9bc7e" />
-<img width="1457" height="663" alt="羽過天晴首頁" src="https://github.com/user-attachments/assets/b24347d6-dc15-4461-aae1-9d407d5a470b" />
-# 🏸 羽過天晴 — 羽球場館整合管理系統
-> 一站式羽球場館平台：場地預約 × 臨打揪團 × 商城購物 × 會員管理
-## 📋 專案簡介
-「羽過天晴」是一套為實體羽球場館打造的全端整合系統，涵蓋場地預約、臨打揪團、商品商城、會員中心與後台管理等功能模組。本專案由 6 人團隊協作開發，採前後端分離架構。
+> 一站式羽球場地預約與零打揪團平台，提供會員預約場地、瀏覽商品、發起與加入臨打揪團等完整功能。
+
+## 📌 專案簡介
+
+本專案為資展國際 EEIT 跨域 Java 軟體工程師養成班的結訓專題，由 5 人團隊協作完成。系統採用**前後端分離架構**，前端使用 Vue 3，後端使用 Spring Boot + SQL Server。
+
+**我主要負責的模組：臨打揪團 (Pickup Game)**
+- 從資料庫 ERD 設計、Spring Boot RESTful API 開發，到 Vue 3 前端互動介面，獨立完成全端開發。
+
+## ✨ 功能亮點（臨打揪團模組）
+
+| 功能 | 說明 |
+|------|------|
+| 揪團 CRUD | 主揪可發起揪團，設定人數上限、程度與性別限制 |
+| 一鍵報名 / 退出 | 球友可快速報名，系統即時更新名額進度條 |
+| 時間衝突檢查 | 報名前自動比對預約與已報名場次，防止時段重疊 |
+| 多條件篩選 | 支援日期、關鍵字、程度、性別等複合篩選，搭配分頁與 URL 同步 |
+| Quick View 快速預覽 | 不跳轉即可查看揪團詳情與報名 |
+| 主揪管理面板 | 開關報名、踢除成員、群發 Email 公告 |
+| 聯絡主揪 | 報名者透過系統代發 Email 聯繫主揪，保護雙方個資 |
+| 登入防呆 | 未登入使用者觸發報名時，彈出登入視窗並在登入後自動續接操作 |
+| 後台管理 | 管理員可總覽所有揪團，支援批次取消、匯出 Excel / CSV |
+
 ## 🛠️ 技術棧
-| 層級 | 技術 |
-|------|------|
-| **前端框架** | Vue 3 (Composition API) + Vite |
-| **狀態管理** | Pinia |
-| **路由** | Vue Router |
-| **UI 框架** | Bootstrap 5 + Bootstrap Icons |
-| **後端框架** | Spring Boot 3.4 (Java 17) |
-| **ORM** | Spring Data JPA / Hibernate |
-| **資料庫** | Microsoft SQL Server |
-| **認證授權** | JWT (jjwt) + Google OAuth 2.0 |
-| **即時通訊** | WebSocket (STOMP) |
-| **金流** | LINE Pay API |
-| **郵件服務** | Spring Boot Mail (Gmail SMTP) |
-| **地圖** | Google Maps Embed API |
-| **報表匯出** | xlsx.js / jsPDF / JSON |
-## 🏗️ 系統架構
-採前後端分離架構，前端 Vue 3 透過 Axios 呼叫後端 Spring Boot RESTful API，
-資料庫使用 MS SQL Server，認證採用 JWT Token 機制。
-## 🎯 我負責的模組：臨打揪團系統
-### 解決的問題
-球友預約場地後若有多餘名額，傳統只能在 LINE / FB 社團貼文揪人，資訊分散且管理困難。本模組讓會員直接在平台上完成 **開團 → 搜尋 → 報名 → 管理**，一站式解決。
-### ✨ 核心亮點
-#### 🔥 亮點 1：三層智慧防呆機制
-在報名流程中設計了三道嚴格的攔截邏輯，確保每場活動的品質：
-| 防呆層級 | 攔截邏輯 | 說明 |
-|---------|---------|------|
-| 第一層 | **性別防呆** | 男性無法報名「限女性」場次，反之亦然 |
-| 第二層 | **程度防呆** | 初級球友無法報名「限高級」場次 |
-| 第三層 | **時段衝突** | 系統比對使用者所有預約與報名紀錄，防止時間重疊 |
-#### 🔥 亮點 2：發起揪團自動帶入預約
-會員點擊「發起揪團」時，系統會自動偵測其最近的場地預約，並將日期、時段、場館資訊一鍵帶入，免去手動重填的麻煩。
-#### 🔥 亮點 3：Privacy by Default 預設隱私保護
-- 所有通知（公告、踢除、取消）皆由**系統代發 Email**，雙方個資零洩漏
-- 球友聯絡主揪透過平台信封按鈕，不需互加 LINE
-- 被移除的球友，如有疑問可透過**官方客服信箱**協助處理，由平台公正介入
-#### 🔥 亮點 4：後台代客報名（軟性警告機制）
-前台嚴格攔截不符資格的報名；後台則轉換為**軟性提示**，讓管理員可根據現場情況「特例放行」，在系統嚴謹度與營運彈性間取得平衡。
-### 📦 模組檔案結構
-**前端 (Vue 3)**
-- `PickupGamePage.vue` — 揪團大廳（日期篩選、進階篩選、快速預覽）
-- `PickupGameDetail.vue` — 揪團詳情頁（報名、聯絡主揪、Google Maps）
-- `PickupGameRow.vue` — 揪團卡片元件（進度條、狀態標籤）
-- `CreateGameModal.vue` — 發起揪團彈窗（自動帶入預約）
-- `ManageMatchModal.vue` — 主揪管理彈窗（群發公告、踢除成員）
-- `SignupPanel.vue` — 報名面板（程度選擇、同意條款）
-- `usePickupGameApi.js` — API 組合式函數（CRUD、報名、踢除）
-- `useTimeConflict.js` — 時間衝突檢查邏輯
-- `useGameFilter.js` — 多條件篩選與排序
-- `useExport.js` — 報表匯出（Excel / PDF / JSON）
-- `PickupGameManage.vue` — 後台管理（代客報名、軟刪除、匯出）
-**後端 (Spring Boot)**
-- `PickupGameRestController.java` — RESTful API（含群發公告、聯絡主揪）
-- `PickupGamesService.java` — 商業邏輯（含取消揪團自動通知）
-- `PickupGameSignupsService.java` — 報名邏輯（三層防呆、時間衝突）
-- `PickupGameEmailService.java` — Email 服務（公告、移除、取消、聯絡主揪）
-- `PickupGames.java` — JPA Entity
-- `PickupGameSignups.java` — JPA Entity
-## 👥 團隊成員
-| 成員 | 負責模組 |
-|------|---------|
-| 徐蕊薇 | 臨打揪團系統（前後端） |
-| *(其他組員)* | 場地預約 / 商城 / 會員 / 公告 / 後台管理 |
-## 📸 畫面截圖
-### 揪團大廳
-<img width="1386" height="692" alt="揪團大廳" src="https://github.com/user-attachments/assets/0798c527-41a3-42c1-97bf-2635262a6a0a" />
-### 三層防呆機制
-<img width="844" height="536" alt="防呆彈窗" src="https://github.com/user-attachments/assets/fe016dac-5988-4281-ac9c-435247af4283" />
-### Privacy by Default — Email 通知
-<img width="695" height="507" alt="Gmail收信" src="https://github.com/user-attachments/assets/4a5623e2-15bc-43f5-9844-6339e274875e" />
-### 後台代客報名（軟性警告）
-<img width="1470" height="651" alt="後台代客報名" src="https://github.com/user-attachments/assets/0ddd916f-9786-4e8f-8650-6c75310b28ff" />
-## 🚀 如何啟動
+
+### 前端（本 Repo）
+- **框架**：Vue 3 (Composition API + `<script setup>`)
+- **狀態管理**：Pinia
+- **路由**：Vue Router
+- **HTTP 請求**：Axios
+- **UI 框架**：Bootstrap 5 + Bootstrap Icons
+- **彈窗**：SweetAlert2
+- **圖表**：Chart.js + vue-chartjs
+- **建構工具**：Vite
+- **其他**：LINE Pay 串接、Google 第三方登入、WebSocket (STOMP)、XLSX 匯出
+
+### 後端（獨立 Repo）
+- Java 17 / Spring Boot
+- Spring Data JPA / Hibernate
+- SQL Server
+- RESTful API
+
+## 📁 專案結構
+
+```
+src/
+├── api/                    # API 請求定義
+├── assets/                 # 靜態資源（圖片、字型等）
+├── components/
+│   ├── admin/              # 後台共用元件（側欄、標頭）
+│   ├── common/             # 通用元件（Google Map 等）
+│   ├── frontend/           # 前台元件（揪團卡片、建立揪團 Modal 等）
+│   └── payment/            # 金流相關元件
+├── composables/            # 可複用邏輯（Vue Composables）
+│   ├── usePickupGameApi.js # 揪團 API 封裝（CRUD、報名、聯絡主揪）
+│   ├── useTimeConflict.js  # 時間衝突檢查邏輯
+│   ├── useGameFilter.js    # 揪團篩選 + 排序 + 分頁
+│   ├── useDateFilter.js    # 日期範圍篩選
+│   ├── useExport.js        # 資料匯出（Excel / CSV）
+│   └── useLinePay.js       # LINE Pay 金流串接
+├── layouts/                # 頁面佈局（前台 / 後台）
+├── router/                 # 路由設定
+├── stores/                 # Pinia 狀態管理
+│   ├── member.js           # 會員登入狀態
+│   └── cart.js             # 購物車狀態
+└── views/
+    ├── frontend/           # 前台頁面（首頁、預約、揪團、結帳等）
+    └── admin/              # 後台頁面（儀表板、場地管理、揪團管理等）
+```
+
+## 🏗️ 架構設計理念
+
+### Composable 模式（關注點分離）
+將商業邏輯從 Vue 元件中抽離，封裝為獨立的 Composable 函式：
+
+```javascript
+// 範例：在多個頁面共用揪團 API 邏輯
+import { usePickupGameApi } from '@/composables/usePickupGameApi'
+import { useTimeConflict } from '@/composables/useTimeConflict'
+
+const { pickupGames, fetchGames, joinPickupGame } = usePickupGameApi()
+const { checkTimeConflict } = useTimeConflict()
+```
+
+- **元件層**：只負責 UI 渲染與使用者互動
+- **Composable 層**：封裝 API 請求、資料處理、商業邏輯
+- **Store 層（Pinia）**：管理跨元件的全域狀態（登入資訊、購物車）
+
+### 報名防呆機制
+系統內建多層防呆，確保報名流程的資料正確性：
+1. **性別限制**：根據揪團設定的性別要求自動攔截
+2. **程度限制**：根據揪團設定的程度門檻給予提示
+3. **時間衝突**：比對該會員所有預約與已報名場次，防止同時段重複報名
+4. **名額已滿**：即時計算剩餘名額，滿額自動關閉報名按鈕
+
+## 🚀 快速開始
+
 ### 環境需求
-| 項目 | 版本 |
-|------|------|
-| Java | JDK 17+ |
-| Node.js | 20.19+ |
-| 資料庫 | Microsoft SQL Server |
-| IDE | IntelliJ IDEA (後端) / VS Code (前端) |
-### 後端（Spring Boot）
-1. 使用 IntelliJ IDEA 開啟 `badminton-system`
-2. 等待 Maven 自動下載依賴
-3. 確認 `src/main/resources/application.yml` 資料庫連線設定
-4. 執行 `BadmintonApplication.java` 的 `main()` 方法
-5. 後端啟動於 `http://localhost:8080`
-### 前端（Vue 3 + Vite）
+- Node.js >= 20.19.0
+- npm
+
+### 安裝與啟動
+
 ```bash
-cd badminton-vue
+# 1. 安裝依賴
 npm install
+
+# 2. 啟動開發伺服器
 npm run dev
+
+# 3. 開啟瀏覽器前往
+# http://localhost:5173
+```
+
+> ⚠️ 本專案為前端部分，需搭配後端 Spring Boot 伺服器才能正常運作。
+
+## 👥 團隊分工
+
+| 成員 | 負責模組 |
+|------|----------|
+| **徐蕊薇（我）** | 臨打揪團模組（全端）、報名防呆機制、時間衝突檢查、聯絡主揪系統 |
+| 組員 B | 場地預約模組 |
+| 組員 C | 商品與購物車模組 |
+| 組員 D | 會員系統與權限管理 |
+| 組員 E | 後台管理與金流串接 |
+
+## 📄 License
+
+本專案為學術專題作品，僅供學習與面試展示使用。
