@@ -75,7 +75,7 @@ const removePlayer = async (signup) => {
   const result = await Swal.fire({
     icon: 'warning',
     title: '確定移除這位球友嗎？',
-    text: `將移除 ${signup.member?.fullName || '球友'} 的報名`,
+    text: `將移除 ${signup.memberName || '球友'} 的報名`,
     showCancelButton: true,
     confirmButtonText: '確定移除',
     cancelButtonText: '取消',
@@ -333,10 +333,10 @@ const sendBroadcast = async () => {
                     class="list-group-item participant-item px-2 py-3 d-flex align-items-center justify-content-between">
                   <div class="d-flex align-items-center gap-3">
                     <span class="text-muted fw-bold" style="width: 24px; font-size: 0.8rem;">#{{ idx + 1 }}</span>
-                    <img :src="signup.member?.profilePicture || '/profile_pictures/4.png'"
+                    <img :src="signup.profilePicture || '/profile_pictures/4.png'"
                          class="rounded-circle shadow-sm" width="40" height="40" alt="avatar" style="border: 2px solid #fff; object-fit: cover;">
                     <div>
-                      <div class="fw-bold text-dark mb-1" style="font-size: 0.95rem;">{{ signup.member?.fullName || '球友' }}</div>
+                      <div class="fw-bold text-dark mb-1" style="font-size: 0.95rem;">{{ signup.memberName || '球友' }}</div>
                       <div class="text-secondary" style="font-size: 0.75rem;">
                         <i class="bi bi-shield-lock-fill me-1 opacity-75 text-success"></i>個資已由系統隱藏
                       </div>

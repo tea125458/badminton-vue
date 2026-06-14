@@ -95,7 +95,7 @@ const isCurrentUserHost = computed(() => {
 
 const mySignupCount = computed(() => {
   if (!signups.value) return 0
-  return signups.value.filter(s => String(s.member?.memberId) === String(currentMemberId.value)).length
+  return signups.value.filter(s => String(s.memberId) === String(currentMemberId.value)).length
 })
 
 const signupButtonText = computed(() => {
@@ -119,7 +119,7 @@ const isAlreadyJoined = computed(() => {
 // 2. 新增退出揪團的方法
 const onCancelGame = async () => {
   // 從名單中找出自己的報名紀錄 ID
-  const mySignup = signups.value.find(s => String(s.member?.memberId) === String(currentMemberId.value))
+  const mySignup = signups.value.find(s => String(s.memberId) === String(currentMemberId.value))
   if (!mySignup) return
 
   // 彈出 SweetAlert 再次確認，避免誤點
@@ -136,7 +136,7 @@ const onCancelGame = async () => {
 
   if (result.isConfirmed) {
     // 這裡我們直接呼叫你原本寫好的 removeSignup API (與踢除成員共用同一支後端)
-    await removeSignup(mySignup.signupId, gameId, mySignup.member?.fullName)
+    await removeSignup(mySignup.signupId, gameId, mySignup.memberName)
 
     // 重新抓取資料更新畫面
     await Promise.all([
@@ -225,7 +225,7 @@ const displaySignups = computed(() => {
   const memberCounts = {}
 
   return signups.value.map((signup) => {
-    const mId = signup.member?.memberId
+    const mId = signup.memberId
     const isHost = (String(mId) === String(game.value.host?.memberId))
 
     if (!memberCounts[mId]) {
@@ -485,7 +485,7 @@ const handleKick = async (signupId, memberName) => {
                   <div v-for="s in displaySignups" :key="s.signupId" class="text-center position-relative player-avatar-wrapper" style="width: 80px;">
                     <button
                       v-if="isCurrentUserHost && s.displayTag !== '主揪' && game.status !== 'CANCELLED' && new Date(`${game.gameDate}T${game.endTime}`) >= new Date()"
-                      @click="handleKick(s.signupId, s.member?.fullName)"
+                      @click="handleKick(s.signupId, s.memberName)"
                       class="btn btn-mori-coral btn-sm rounded-circle position-absolute shadow kick-btn text-white"
                       title="踢除此成員"
                     >
@@ -494,11 +494,11 @@ const handleKick = async (signupId, memberName) => {
 
                     <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold mx-auto mb-2 position-relative shadow-sm player-avatar"
                          :class="s.displayTag === '主揪' ? 'bg-mori-teal' : 'bg-secondary'">
-                      {{ s.member?.fullName?.charAt(0) || '無' }}
+                      {{ s.memberName ? s.memberName.charAt(0) : '無' }}
                       <span class="position-absolute bottom-0 end-0 p-1 bg-mori-success border border-2 border-white rounded-circle" style="margin-bottom: 2px; margin-right: 2px;"></span>
                     </div>
 
-                    <div class="small fw-bold text-truncate w-100 text-dark">{{ s.member?.fullName }}</div>
+                    <div class="small fw-bold text-truncate w-100 text-dark">{{ s.memberName || '球友' }}</div>
                     <div v-if="s.displayTag" class="small text-mori-teal fw-medium" style="font-size: 0.75rem;">{{ s.displayTag }}</div>
 
                     <div v-if="isCurrentUserHost" class="text-success mt-1 px-1 rounded bg-light border" style="font-size: 0.65rem;">

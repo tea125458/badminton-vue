@@ -767,7 +767,7 @@ onMounted(() => {
                       <!-- 從 signupsMap 中用 gameId 取出這場的報名資料
                            如果還沒抓到或是空的，就不會顯示任何列 -->
                       <tr v-for="s in signupsMap[game.gameId]" :key="s.signupId">
-                        <td>{{ s.member?.fullName }}</td>
+                        <td>{{ s.memberName }}</td>
                         <td>
                           <span class="badge bg-success">{{
                             s.status === 'JOINED' ? '已加入' : s.status
@@ -778,7 +778,7 @@ onMounted(() => {
                           <!-- 移除按鈕：點擊時用 SweetAlert2 跳出確認視窗 -->
                           <button
                             class="btn btn-outline-danger btn-sm"
-                            @click="removeSignup(s.signupId, game.gameId, s.member?.fullName)"
+                            @click="removeSignup(s.signupId, game.gameId, s.memberName)"
                             :disabled="
                               game.status === 'CANCELLED' || getDisplayStatus(game) === 'CLOSED'
                             "

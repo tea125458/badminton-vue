@@ -338,7 +338,12 @@ export function usePickupGameApi() {
   // 抓取某場揪團的報名名單
   const fetchSignups = async (gameId) => {
     try {
-      const res = await axios.get(`/api/pickup-games/${gameId}/signups`)
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('memberToken');
+      const res = await axios.get(`/api/pickup-games/${gameId}/signups`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : ''
+        }
+      })
       signupsMap.value[gameId] = res.data
     } catch (err) {
       console.error('抓取報名名單失敗', err)
@@ -425,9 +430,14 @@ export function usePickupGameApi() {
     }
 
     try {
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('memberToken');
       await axios.post('/api/pickup-game-signups', {
         game: { gameId: gameId },
         member: { memberId: selectedSignupMember.value.memberId },
+      }, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : ''
+        }
       })
       Swal.fire({
         icon: 'success',
@@ -456,16 +466,54 @@ export function usePickupGameApi() {
   // ============================
   const joinPickupGame = async (gameId, currentMemberId) => {
     try {
+      const token = localStorage.getItem('memberToken') || localStorage.getItem('adminToken');
       // 呼叫你的後端 API，傳入場次 ID 跟 當前登入的會員 ID
       await axios.post('/api/pickup-game-signups', {
         game: { gameId: gameId },
         member: { memberId: currentMemberId },
+      }, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : ''
+        }
       })
+
+      // 從目前的 pickupGames 陣列裡找出這場比賽的資訊
+      const game = pickupGames.value.find(g => g.gameId === gameId)
+      
+      let htmlContent = '請準時前往場館報到！'
+      
+      if (game) {
+        // 組合 Google Calendar 網址
+        const formatDate = (dateStr, timeStr) => {
+          // dateStr: "2026-06-12", timeStr: "19:00:00" -> "20260612T190000"
+          // 有時候 timeStr 可能是 "19:00" 沒有秒，這裡補上
+          const time = timeStr.split(':').length === 2 ? timeStr + ':00' : timeStr
+          return dateStr.replace(/-/g, '') + 'T' + time.replace(/:/g, '')
+        }
+        
+        const dates = `${formatDate(game.gameDate, game.startTime)}/${formatDate(game.gameDate, game.endTime)}`
+        const title = encodeURIComponent(`🏸 羽球臨打：${game.court?.courtName || '羽過天晴'}`)
+        const details = encodeURIComponent(`主揪：${game.host?.fullName || '團主'}\n請準時出席喔！`)
+        const location = encodeURIComponent('羽過天晴羽球館')
+        
+        const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dates}&details=${details}&location=${location}&ctz=Asia/Taipei`
+        
+        htmlContent = `
+          <div class="mb-4">請準時前往場館報到！</div>
+          <a href="${calendarUrl}" target="_blank" class="btn px-4 py-2" style="background-color: #f8f9fa; border: 1px solid #dadce0; color: #3c4043; border-radius: 20px; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; transition: background-color 0.2s;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-calendar-event me-2" viewBox="0 0 16 16" style="color: #1a73e8;">
+              <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/>
+              <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+            </svg>
+            加入 Google 行事曆
+          </a>
+        `
+      }
 
       Swal.fire({
         icon: 'success',
         title: '報名成功！',
-        text: '請準時前往場館報到！',
+        html: htmlContent,
         confirmButtonColor: '#0ea5e9',
         confirmButtonText: '太棒了'
       })
@@ -499,7 +547,12 @@ export function usePickupGameApi() {
     })
     if (result.isConfirmed) {
       try {
-        await axios.delete(`/api/pickup-game-signups/${signupId}`)
+        const token = localStorage.getItem('memberToken') || localStorage.getItem('adminToken');
+        await axios.delete(`/api/pickup-game-signups/${signupId}`, {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : ''
+          }
+        })
         Swal.fire({
           icon: 'success',
           title: '已移除',
